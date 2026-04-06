@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 
 import Login from "./pages/Login";
+import Setup from "./pages/Setup";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
