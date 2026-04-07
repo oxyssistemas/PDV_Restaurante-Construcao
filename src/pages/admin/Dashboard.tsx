@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Grid3X3, ShoppingBag, BookOpen, Users } from 'lucide-react';
+import { Loader2, Grid3X3, ShoppingBag, BookOpen, DollarSign } from 'lucide-react';
 
 export default function AdminDashboard() {
   const { currentRole } = useAuth();
@@ -12,20 +12,26 @@ export default function AdminDashboard() {
     queryKey: ['admin-dashboard', restaurantId],
     enabled: !!restaurantId,
     queryFn: async () => {
-      const [tables, orders, menuItems, categories] = await Promise.all([
+      const today = new Date().toISOString().split('T')[0];
+
+      const [tables, orders, menuItems, categories, dailyPayments] = await Promise.all([
         supabase.from('restaurant_tables').select('id, status', { count: 'exact' }).eq('restaurant_id', restaurantId!),
         supabase.from('orders').select('id, status', { count: 'exact' }).eq('restaurant_id', restaurantId!).in('status', ['pending', 'preparing']),
         supabase.from('menu_items').select('id', { count: 'exact' }).eq('restaurant_id', restaurantId!),
         supabase.from('menu_categories').select('id', { count: 'exact' }).eq('restaurant_id', restaurantId!),
+        supabase.from('payments').select('amount').eq('restaurant_id', restaurantId!).gte('created_at', `${today}T00:00:00`).lte('created_at', `${today}T23:59:59`),
       ]);
 
       const occupiedTables = tables.data?.filter(t => t.status === 'occupied').length || 0;
+      const dailyRevenue = dailyPayments.data?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+
       return {
         totalTables: tables.count || 0,
         occupiedTables,
         activeOrders: orders.count || 0,
         menuItems: menuItems.count || 0,
         categories: categories.count || 0,
+        dailyRevenue,
       };
     },
   });
@@ -35,6 +41,7 @@ export default function AdminDashboard() {
   }
 
   const cards = [
+    { title: 'Faturamento Hoje', value: `R$ ${(stats?.dailyRevenue || 0).toFixed(2)}`, sub: 'total recebido', icon: DollarSign },
     { title: 'Mesas', value: `${stats?.occupiedTables || 0} / ${stats?.totalTables || 0}`, sub: 'ocupadas', icon: Grid3X3 },
     { title: 'Pedidos Ativos', value: stats?.activeOrders || 0, sub: 'em andamento', icon: ShoppingBag },
     { title: 'Itens no Cardápio', value: stats?.menuItems || 0, sub: `${stats?.categories || 0} categorias`, icon: BookOpen },
@@ -43,7 +50,7 @@ export default function AdminDashboard() {
   return (
     <div>
       <h1 className="text-3xl font-bold tracking-tight mb-6">Dashboard</h1>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map(c => (
           <Card key={c.title}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
