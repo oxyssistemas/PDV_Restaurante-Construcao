@@ -23,6 +23,13 @@ import InventoryPage from "./pages/admin/Inventory";
 import UsersPage from "./pages/admin/Users";
 import SettingsPage from "./pages/admin/Settings";
 
+import WaiterLayout from "./components/layouts/WaiterLayout";
+import TableMap from "./pages/waiter/TableMap";
+import WaiterOrders from "./pages/waiter/Orders";
+import OrderDetail from "./pages/waiter/OrderDetail";
+import WaiterMenu from "./pages/waiter/WaiterMenu";
+import WaiterReservations from "./pages/waiter/Reservations";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -62,11 +69,17 @@ const App = () => (
             </Route>
 
             {/* Placeholder routes for other portals */}
-            <Route path="/waiter/*" element={
+            <Route path="/waiter" element={
               <ProtectedRoute allowedRoles={['waiter']}>
-                <PlaceholderPortal name="Garçom" />
+                <WaiterLayout />
               </ProtectedRoute>
-            } />
+            }>
+              <Route index element={<TableMap />} />
+              <Route path="orders" element={<WaiterOrders />} />
+              <Route path="orders/:orderId" element={<OrderDetail />} />
+              <Route path="menu" element={<WaiterMenu />} />
+              <Route path="reservations" element={<WaiterReservations />} />
+            </Route>
             <Route path="/kitchen/*" element={
               <ProtectedRoute allowedRoles={['kitchen']}>
                 <PlaceholderPortal name="Cozinha" />
