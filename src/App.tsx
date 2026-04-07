@@ -15,6 +15,14 @@ import SuperAdminLayout from "./components/layouts/SuperAdminLayout";
 import SuperAdminDashboard from "./pages/super-admin/Dashboard";
 import Restaurants from "./pages/super-admin/Restaurants";
 
+import AdminLayout from "./components/layouts/AdminLayout";
+import AdminDashboard from "./pages/admin/Dashboard";
+import MenuPage from "./pages/admin/Menu";
+import TablesPage from "./pages/admin/Tables";
+import InventoryPage from "./pages/admin/Inventory";
+import UsersPage from "./pages/admin/Users";
+import SettingsPage from "./pages/admin/Settings";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -39,12 +47,21 @@ const App = () => (
               <Route path="restaurants" element={<Restaurants />} />
             </Route>
 
-            {/* Placeholder routes for other portals */}
-            <Route path="/admin/*" element={
+            {/* Admin do Restaurante */}
+            <Route path="/admin" element={
               <ProtectedRoute allowedRoles={['admin']}>
-                <PlaceholderPortal name="Admin do Restaurante" />
+                <AdminLayout />
               </ProtectedRoute>
-            } />
+            }>
+              <Route index element={<AdminDashboard />} />
+              <Route path="menu" element={<MenuPage />} />
+              <Route path="tables" element={<TablesPage />} />
+              <Route path="inventory" element={<InventoryPage />} />
+              <Route path="users" element={<UsersPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+            </Route>
+
+            {/* Placeholder routes for other portals */}
             <Route path="/waiter/*" element={
               <ProtectedRoute allowedRoles={['waiter']}>
                 <PlaceholderPortal name="Garçom" />

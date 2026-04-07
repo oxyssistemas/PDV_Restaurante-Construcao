@@ -19,7 +19,7 @@ serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Verify caller is super_admin
+    // Verify caller
     const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
     const { data: { user: caller } } = await supabaseAdmin.auth.getUser(token);
@@ -32,12 +32,15 @@ serve(async (req) => {
 
     const { data: callerRoles } = await supabaseAdmin
       .from("user_roles")
-      .select("role")
-      .eq("user_id", caller.id)
-      .eq("role", "super_admin");
+      .select("role, restaurant_id")
+      .eq("user_id", caller.id);
 
-    if (!callerRoles || callerRoles.length === 0) {
-      return new Response(JSON.stringify({ error: "Apenas super admins podem criar usuários" }), {
+    const isSuperAdmin = callerRoles?.some(r => r.role === "super_admin");
+    const isAdmin = callerRoles?.some(r => r.role === "admin");
+    const callerRestaurantId = callerRoles?.find(r => r.role === "admin")?.restaurant_id;
+
+    if (!isSuperAdmin && !isAdmin) {
+      return new Response(JSON.stringify({ error: "Apenas super admins e admins podem criar usuários" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -48,6 +51,20 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Email, senha e role são obrigatórios" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Admins can only create non-admin/non-super_admin roles for their own restaurant
+    if (isAdmin && !isSuperAdmin) {
+      if (role === "super_admin" || role === "admin") {
+        return new Response(JSON.stringify({ error: "Admins não podem criar outros admins ou super admins" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (restaurant_id !== callerRestaurantId) {
+        return new Response(JSON.stringify({ error: "Você só pode criar usuários para o seu restaurante" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     // Create user
