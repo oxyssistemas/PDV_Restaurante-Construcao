@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -11,9 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Loader2 } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { Plus, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const roleLabels: Record<string, string> = {
   admin: 'Admin',
@@ -26,10 +30,12 @@ const roleLabels: Record<string, string> = {
 const creatableRoles = ['waiter', 'kitchen', 'cashier', 'finance'] as const;
 
 export default function UsersPage() {
-  const { currentRole } = useAuth();
+  const { currentRole, user } = useAuth();
   const restaurantId = currentRole?.restaurant_id;
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
+  const [editUser, setEditUser] = useState<{ id: string; user_id: string; role: string } | null>(null);
+  const [editRole, setEditRole] = useState('');
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['admin-users', restaurantId],
@@ -42,6 +48,41 @@ export default function UsersPage() {
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
+    },
+  });
+
+  const updateRole = useMutation({
+    mutationFn: async ({ userId, newRole }: { userId: string; newRole: string }) => {
+      const { data, error } = await supabase.functions.invoke('manage-user', {
+        body: { action: 'update_role', user_id: userId, role: newRole, restaurant_id: restaurantId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+    },
+    onSuccess: () => {
+      toast.success('Função atualizada com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setEditUser(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Erro ao atualizar função.');
+    },
+  });
+
+  const deleteUser = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data, error } = await supabase.functions.invoke('manage-user', {
+        body: { action: 'delete', user_id: userId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+    },
+    onSuccess: () => {
+      toast.success('Usuário excluído com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Erro ao excluir usuário.');
     },
   });
 
@@ -73,21 +114,67 @@ export default function UsersPage() {
                   <TableHead>ID do Usuário</TableHead>
                   <TableHead>Função</TableHead>
                   <TableHead>Criado em</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users?.map(u => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-mono text-xs">{u.user_id.slice(0, 8)}...</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{roleLabels[u.role] || u.role}</Badge>
-                    </TableCell>
-                    <TableCell>{new Date(u.created_at).toLocaleDateString('pt-BR')}</TableCell>
-                  </TableRow>
-                ))}
+                {users?.map(u => {
+                  const isSelf = u.user_id === user?.id;
+                  const isAdminRole = u.role === 'admin' || u.role === 'super_admin';
+                  return (
+                    <TableRow key={u.id}>
+                      <TableCell className="font-mono text-xs">{u.user_id.slice(0, 8)}...</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{roleLabels[u.role] || u.role}</Badge>
+                      </TableCell>
+                      <TableCell>{new Date(u.created_at).toLocaleDateString('pt-BR')}</TableCell>
+                      <TableCell className="text-right">
+                        {!isAdminRole && !isSelf && (
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              onClick={() => {
+                                setEditUser({ id: u.id, user_id: u.user_id, role: u.role });
+                                setEditRole(u.role);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Esta ação é irreversível. O usuário será removido permanentemente.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteUser.mutate(u.user_id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Excluir
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {users?.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">Nenhum usuário cadastrado</TableCell>
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Nenhum usuário cadastrado</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -95,6 +182,40 @@ export default function UsersPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Edit Role Dialog */}
+      <Dialog open={!!editUser} onOpenChange={(open) => { if (!open) setEditUser(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar Função</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Usuário</Label>
+              <Input value={editUser?.user_id.slice(0, 8) + '...'} disabled />
+            </div>
+            <div className="space-y-2">
+              <Label>Nova Função</Label>
+              <Select value={editRole} onValueChange={setEditRole}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {creatableRoles.map(r => (
+                    <SelectItem key={r} value={r}>{roleLabels[r]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              disabled={updateRole.isPending || editRole === editUser?.role}
+              onClick={() => editUser && updateRole.mutate({ userId: editUser.user_id, newRole: editRole })}
+              className="gap-2"
+            >
+              {updateRole.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -114,11 +235,11 @@ function CreateUserForm({ restaurantId, onSuccess }: { restaurantId: string; onS
     });
 
     if (error) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+      toast.error(error.message);
     } else if (data?.error) {
-      toast({ title: 'Erro', description: data.error, variant: 'destructive' });
+      toast.error(data.error);
     } else {
-      toast({ title: 'Usuário criado com sucesso!' });
+      toast.success('Usuário criado com sucesso!');
       onSuccess();
     }
     setLoading(false);
