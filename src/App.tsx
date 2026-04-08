@@ -30,6 +30,9 @@ import OrderDetail from "./pages/waiter/OrderDetail";
 import WaiterMenu from "./pages/waiter/WaiterMenu";
 import WaiterReservations from "./pages/waiter/Reservations";
 
+import KitchenLayout from "./components/layouts/KitchenLayout";
+import KitchenQueue from "./pages/kitchen/KitchenQueue";
+
 const queryClient = new QueryClient();
 
 const App = () => (

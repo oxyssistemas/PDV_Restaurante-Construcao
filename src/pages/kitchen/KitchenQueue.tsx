@@ -168,6 +168,3 @@ export default function KitchenQueue() {
   );
 }
 
-function ChefHat2(props: any) {
-  return <ChefHat {...props} />;
-}
