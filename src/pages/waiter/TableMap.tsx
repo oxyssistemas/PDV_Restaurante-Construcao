@@ -4,9 +4,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Users, Plus } from 'lucide-react';
+import { Loader2, Users, Plus, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -26,7 +26,6 @@ export default function TableMap() {
   const { currentRole, user } = useAuth();
   const restaurantId = currentRole?.restaurant_id;
   const navigate = useNavigate();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: tables, isLoading } = useQuery({
@@ -43,7 +42,29 @@ export default function TableMap() {
     },
   });
 
-  // Realtime subscription for table status changes
+  // Get active orders per table
+  const { data: activeOrders } = useQuery({
+    queryKey: ['table-orders', restaurantId],
+    enabled: !!restaurantId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, table_id, total, status, created_at')
+        .eq('restaurant_id', restaurantId!)
+        .in('status', ['pending', 'preparing', 'ready'])
+        .order('created_at');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Group orders by table
+  const ordersByTable = new Map<string, typeof activeOrders>();
+  activeOrders?.forEach(order => {
+    if (!ordersByTable.has(order.table_id)) ordersByTable.set(order.table_id, []);
+    ordersByTable.get(order.table_id)!.push(order);
+  });
+
   useEffect(() => {
     if (!restaurantId) return;
     const channel = supabase
@@ -51,20 +72,25 @@ export default function TableMap() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_tables', filter: `restaurant_id=eq.${restaurantId}` }, () => {
         queryClient.invalidateQueries({ queryKey: ['waiter-tables', restaurantId] });
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ['table-orders', restaurantId] });
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [restaurantId, queryClient]);
 
-  const openTable = useMutation({
+  const addOrder = useMutation({
     mutationFn: async (tableId: string) => {
-      // Set table to occupied
-      const { error: tableError } = await supabase
-        .from('restaurant_tables')
-        .update({ status: 'occupied' as const })
-        .eq('id', tableId);
-      if (tableError) throw tableError;
+      const table = tables?.find(t => t.id === tableId);
+      // If table is free, mark as occupied
+      if (table?.status === 'free') {
+        const { error: tableError } = await supabase
+          .from('restaurant_tables')
+          .update({ status: 'occupied' as const })
+          .eq('id', tableId);
+        if (tableError) throw tableError;
+      }
 
-      // Create a new order for this table
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -80,11 +106,12 @@ export default function TableMap() {
     },
     onSuccess: (order) => {
       queryClient.invalidateQueries({ queryKey: ['waiter-tables'] });
-      toast({ title: 'Mesa aberta!', description: 'Comanda criada com sucesso.' });
+      queryClient.invalidateQueries({ queryKey: ['table-orders'] });
+      toast.success('Comanda criada!');
       navigate(`/waiter/orders/${order.id}`);
     },
     onError: () => {
-      toast({ title: 'Erro', description: 'Não foi possível abrir a mesa.', variant: 'destructive' });
+      toast.error('Não foi possível criar a comanda.');
     },
   });
 
@@ -96,41 +123,69 @@ export default function TableMap() {
     <div>
       <h1 className="text-2xl font-bold tracking-tight mb-6">Mapa de Mesas</h1>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {tables?.map(table => (
-          <Card
-            key={table.id}
-            className={cn(
-              'border-2 cursor-pointer transition-all hover:shadow-lg',
-              statusColors[table.status]
-            )}
-            onClick={() => {
-              if (table.status === 'free') {
-                openTable.mutate(table.id);
-              } else if (table.status === 'occupied') {
-                // Navigate to active order for this table
-                navigate(`/waiter/orders?table=${table.id}`);
-              }
-            }}
-          >
-            <CardContent className="p-4 text-center">
-              <div className="text-3xl font-bold mb-1">{table.number}</div>
-              <div className="flex items-center justify-center gap-1 text-xs mb-2">
-                <Users className="h-3 w-3" />
-                {table.capacity}
-              </div>
-              <Badge variant="outline" className="text-xs">
-                {statusLabels[table.status]}
-              </Badge>
-              {table.status === 'free' && (
+        {tables?.map(table => {
+          const tableOrders = ordersByTable.get(table.id) || [];
+          const totalTable = tableOrders.reduce((s, o) => s + Number(o.total), 0);
+
+          return (
+            <Card
+              key={table.id}
+              className={cn(
+                'border-2 transition-all hover:shadow-lg',
+                statusColors[table.status]
+              )}
+            >
+              <CardContent className="p-4 text-center">
+                <div className="text-3xl font-bold mb-1">{table.number}</div>
+                <div className="flex items-center justify-center gap-1 text-xs mb-2">
+                  <Users className="h-3 w-3" />
+                  {table.capacity}
+                </div>
+                <Badge variant="outline" className="text-xs">
+                  {statusLabels[table.status]}
+                </Badge>
+
+                {/* Show active orders (comandas) */}
+                {tableOrders.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <div className="text-xs text-muted-foreground font-medium">
+                      {tableOrders.length} comanda{tableOrders.length > 1 ? 's' : ''}
+                    </div>
+                    {tableOrders.map((order, idx) => (
+                      <Button
+                        key={order.id}
+                        size="sm"
+                        variant="outline"
+                        className="w-full text-xs gap-1"
+                        onClick={() => navigate(`/waiter/orders/${order.id}`)}
+                      >
+                        <Eye className="h-3 w-3" />
+                        Comanda {idx + 1} — R$ {Number(order.total).toFixed(2)}
+                      </Button>
+                    ))}
+                    <div className="text-xs font-bold mt-1">
+                      Total: R$ {totalTable.toFixed(2)}
+                    </div>
+                  </div>
+                )}
+
+                {/* Add new order button */}
                 <div className="mt-2">
-                  <Button size="sm" variant="default" className="w-full text-xs gap-1">
-                    <Plus className="h-3 w-3" /> Abrir Mesa
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="w-full text-xs gap-1"
+                    onClick={() => addOrder.mutate(table.id)}
+                    disabled={addOrder.isPending}
+                  >
+                    <Plus className="h-3 w-3" />
+                    {table.status === 'free' ? 'Abrir Mesa' : 'Nova Comanda'}
                   </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
       {(!tables || tables.length === 0) && (
         <p className="text-center text-muted-foreground mt-8">Nenhuma mesa cadastrada. Peça ao admin para configurar as mesas.</p>
