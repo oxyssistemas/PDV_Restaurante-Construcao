@@ -30,6 +30,9 @@ import OrderDetail from "./pages/waiter/OrderDetail";
 import WaiterMenu from "./pages/waiter/WaiterMenu";
 import WaiterReservations from "./pages/waiter/Reservations";
 
+import KitchenLayout from "./components/layouts/KitchenLayout";
+import KitchenQueue from "./pages/kitchen/KitchenQueue";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -80,11 +83,13 @@ const App = () => (
               <Route path="menu" element={<WaiterMenu />} />
               <Route path="reservations" element={<WaiterReservations />} />
             </Route>
-            <Route path="/kitchen/*" element={
+            <Route path="/kitchen" element={
               <ProtectedRoute allowedRoles={['kitchen']}>
-                <PlaceholderPortal name="Cozinha" />
+                <KitchenLayout />
               </ProtectedRoute>
-            } />
+            }>
+              <Route index element={<KitchenQueue />} />
+            </Route>
             <Route path="/cashier/*" element={
               <ProtectedRoute allowedRoles={['cashier']}>
                 <PlaceholderPortal name="Caixa" />
