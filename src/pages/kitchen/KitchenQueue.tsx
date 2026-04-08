@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Clock, Flame, CheckCircle2 } from 'lucide-react';
+import { Loader2, Clock, Flame, CheckCircle2, ChefHat } from 'lucide-react';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
