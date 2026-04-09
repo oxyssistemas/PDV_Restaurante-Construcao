@@ -33,6 +33,11 @@ import WaiterReservations from "./pages/waiter/Reservations";
 import KitchenLayout from "./components/layouts/KitchenLayout";
 import KitchenQueue from "./pages/kitchen/KitchenQueue";
 
+import CashierLayout from "./components/layouts/CashierLayout";
+import CashRegisterPage from "./pages/cashier/CashRegister";
+import PaymentsPage from "./pages/cashier/Payments";
+import CashMovementsPage from "./pages/cashier/CashMovements";
+
 const queryClient = new QueryClient();
 
 const App = () => (
