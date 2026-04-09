@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Clock, Flame, CheckCircle2, ChefHat } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -22,6 +22,32 @@ export default function KitchenQueue() {
   const { currentRole } = useAuth();
   const restaurantId = currentRole?.restaurant_id;
   const queryClient = useQueryClient();
+
+  const playNotificationSound = useCallback(() => {
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      osc.type = 'sine';
+      gain.gain.value = 0.3;
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+      setTimeout(() => {
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.frequency.value = 1100;
+        osc2.type = 'sine';
+        gain2.gain.value = 0.3;
+        osc2.start();
+        osc2.stop(ctx.currentTime + 0.2);
+      }, 180);
+    } catch {}
+  }, []);
 
   const { data: orderItems, isLoading } = useQuery({
     queryKey: ['kitchen-queue', restaurantId],
@@ -44,12 +70,17 @@ export default function KitchenQueue() {
     if (!restaurantId) return;
     const channel = supabase
       .channel('kitchen-queue-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_items' }, () => {
+        playNotificationSound();
+        toast.info('🆕 Novo pedido recebido!', { duration: 4000 });
+        queryClient.invalidateQueries({ queryKey: ['kitchen-queue', restaurantId] });
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'order_items' }, () => {
         queryClient.invalidateQueries({ queryKey: ['kitchen-queue', restaurantId] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [restaurantId, queryClient]);
+  }, [restaurantId, queryClient, playNotificationSound]);
 
   const updateStatus = useMutation({
     mutationFn: async ({ itemId, newStatus }: { itemId: string; newStatus: string }) => {
@@ -62,12 +93,25 @@ export default function KitchenQueue() {
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-queue', restaurantId] });
       if (vars.newStatus === 'ready') {
-        toast.success('Item marcado como pronto!');
+        toast.success('✅ Item marcado como pronto — garçom notificado!');
       }
     },
-    onError: () => {
-      toast.error('Erro ao atualizar status.');
+    onError: () => toast.error('Erro ao atualizar status.'),
+  });
+
+  const markAllPreparing = useMutation({
+    mutationFn: async (itemIds: string[]) => {
+      const { error } = await supabase
+        .from('order_items')
+        .update({ status: 'preparing' as any })
+        .in('id', itemIds);
+      if (error) throw error;
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kitchen-queue', restaurantId] });
+      toast.success('Todos os itens da mesa em preparo!');
+    },
+    onError: () => toast.error('Erro ao atualizar itens.'),
   });
 
   if (isLoading) {
@@ -89,18 +133,26 @@ export default function KitchenQueue() {
   };
 
   const getNextLabel = (current: string): string => {
-    if (current === 'pending') return 'Iniciar Preparo';
-    if (current === 'preparing') return 'Marcar Pronto';
+    if (current === 'pending') return 'Iniciar';
+    if (current === 'preparing') return 'Pronto';
     return '';
   };
 
+  const pendingCount = orderItems?.filter(i => i.status === 'pending').length || 0;
+  const preparingCount = orderItems?.filter(i => i.status === 'preparing').length || 0;
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <h2 className="text-2xl font-bold">Fila de Pedidos</h2>
-        <Badge variant="outline" className="text-sm">
-          {orderItems?.length || 0} itens na fila
-        </Badge>
+        <div className="flex gap-2">
+          <Badge variant="outline" className="text-sm bg-yellow-500/10 text-yellow-600 border-yellow-500/30">
+            <Clock className="h-3 w-3 mr-1" /> {pendingCount} pendentes
+          </Badge>
+          <Badge variant="outline" className="text-sm bg-orange-500/10 text-orange-600 border-orange-500/30">
+            <Flame className="h-3 w-3 mr-1" /> {preparingCount} preparando
+          </Badge>
+        </div>
       </div>
 
       {grouped.size === 0 ? (
@@ -113,6 +165,7 @@ export default function KitchenQueue() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {Array.from(grouped.entries()).map(([tableId, items]) => {
             const tableNumber = (items![0] as any).orders?.restaurant_tables?.number || '?';
+            const pendingIds = items!.filter(i => i.status === 'pending').map(i => i.id);
             return (
               <Card key={tableId} className="border-2">
                 <CardHeader className="pb-2">
@@ -122,6 +175,17 @@ export default function KitchenQueue() {
                       {formatDistanceToNow(new Date(items![0].created_at), { addSuffix: true, locale: ptBR })}
                     </span>
                   </CardTitle>
+                  {pendingIds.length > 1 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs w-full mt-1"
+                      disabled={markAllPreparing.isPending}
+                      onClick={() => markAllPreparing.mutate(pendingIds)}
+                    >
+                      <Flame className="h-3 w-3 mr-1" /> Iniciar todos ({pendingIds.length})
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {items!.map(item => {
@@ -167,4 +231,3 @@ export default function KitchenQueue() {
     </div>
   );
 }
-

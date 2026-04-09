@@ -2,7 +2,15 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Grid3X3, ShoppingBag, BookOpen, DollarSign } from 'lucide-react';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { Loader2, Grid3X3, ShoppingBag, BookOpen, DollarSign, TrendingUp } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { format, subDays } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+const chartConfig = {
+  revenue: { label: 'Faturamento', color: 'hsl(var(--primary))' },
+};
 
 export default function AdminDashboard() {
   const { currentRole } = useAuth();
@@ -36,6 +44,43 @@ export default function AdminDashboard() {
     },
   });
 
+  const { data: weeklyData } = useQuery({
+    queryKey: ['admin-weekly-revenue', restaurantId],
+    enabled: !!restaurantId,
+    queryFn: async () => {
+      const days: { date: string; label: string; revenue: number }[] = [];
+      const now = new Date();
+
+      for (let i = 6; i >= 0; i--) {
+        const d = subDays(now, i);
+        const dateStr = format(d, 'yyyy-MM-dd');
+        days.push({
+          date: dateStr,
+          label: format(d, 'EEE', { locale: ptBR }),
+          revenue: 0,
+        });
+      }
+
+      const startDate = days[0].date;
+      const endDate = days[days.length - 1].date;
+
+      const { data: payments } = await supabase
+        .from('payments')
+        .select('amount, created_at')
+        .eq('restaurant_id', restaurantId!)
+        .gte('created_at', `${startDate}T00:00:00`)
+        .lte('created_at', `${endDate}T23:59:59`);
+
+      payments?.forEach(p => {
+        const pDate = p.created_at.split('T')[0];
+        const day = days.find(d => d.date === pDate);
+        if (day) day.revenue += Number(p.amount);
+      });
+
+      return days;
+    },
+  });
+
   if (isLoading) {
     return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
@@ -64,6 +109,40 @@ export default function AdminDashboard() {
           </Card>
         ))}
       </div>
+
+      {/* Weekly Revenue Chart */}
+      <Card className="mt-6">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-lg">Evolução Semanal</CardTitle>
+            <p className="text-sm text-muted-foreground">Faturamento dos últimos 7 dias</p>
+          </div>
+          <TrendingUp className="h-5 w-5 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          {weeklyData && weeklyData.length > 0 ? (
+            <ChartContainer config={chartConfig} className="h-[280px] w-full">
+              <BarChart data={weeklyData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} className="capitalize" />
+                <YAxis tickLine={false} axisLine={false} tickFormatter={(v) => `R$${v}`} width={60} />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      formatter={(value) => [`R$ ${Number(value).toFixed(2)}`, 'Faturamento']}
+                    />
+                  }
+                />
+                <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ChartContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[280px] text-muted-foreground">
+              Sem dados de pagamento para exibir
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
