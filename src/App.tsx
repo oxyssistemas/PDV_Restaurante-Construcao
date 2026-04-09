@@ -95,11 +95,15 @@ const App = () => (
             }>
               <Route index element={<KitchenQueue />} />
             </Route>
-            <Route path="/cashier/*" element={
+            <Route path="/cashier" element={
               <ProtectedRoute allowedRoles={['cashier']}>
-                <PlaceholderPortal name="Caixa" />
+                <CashierLayout />
               </ProtectedRoute>
-            } />
+            }>
+              <Route index element={<CashRegisterPage />} />
+              <Route path="payments" element={<PaymentsPage />} />
+              <Route path="movements" element={<CashMovementsPage />} />
+            </Route>
             <Route path="/finance/*" element={
               <ProtectedRoute allowedRoles={['finance']}>
                 <PlaceholderPortal name="Financeiro" />
