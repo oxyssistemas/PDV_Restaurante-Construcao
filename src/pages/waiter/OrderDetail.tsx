@@ -38,6 +38,7 @@ export default function OrderDetail() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
 
   const { data: order, isLoading: orderLoading } = useQuery({
     queryKey: ['order-detail', orderId],
