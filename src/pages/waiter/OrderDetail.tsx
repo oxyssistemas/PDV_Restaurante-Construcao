@@ -213,11 +213,45 @@ export default function OrderDetail() {
         <Button variant="ghost" size="icon" onClick={() => navigate('/waiter/orders')}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold">Mesa {(order as any)?.restaurant_tables?.number || '?'}</h1>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold truncate">
+              Mesa {(order as any)?.restaurant_tables?.number || '?'}
+              {(order as any)?.customer_name ? ` — ${(order as any).customer_name}` : ''}
+            </h1>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              title="Renomear comanda"
+              onClick={() => setNameDraft((order as any)?.customer_name || '')}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </div>
           <p className="text-sm text-muted-foreground">Total: R$ {Number(order?.total || 0).toFixed(2)}</p>
         </div>
       </div>
+
+      <Dialog open={nameDraft !== null} onOpenChange={(o) => !o && setNameDraft(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Nome da comanda</DialogTitle>
+          </DialogHeader>
+          <Input
+            autoFocus
+            placeholder="Ex.: João, Camisa azul"
+            value={nameDraft ?? ''}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') renameOrder.mutate(nameDraft ?? ''); }}
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setNameDraft(null)}>Cancelar</Button>
+            <Button onClick={() => renameOrder.mutate(nameDraft ?? '')} disabled={renameOrder.isPending}>Salvar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
 
       <div className="space-y-3 mb-6">
         <h2 className="text-lg font-semibold">Itens do Pedido</h2>
