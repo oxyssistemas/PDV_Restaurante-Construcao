@@ -30,6 +30,7 @@ export default function TableMap() {
   const restaurantId = currentRole?.restaurant_id;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
 
   const { data: tables, isLoading } = useQuery({
     queryKey: ['waiter-tables', restaurantId],
