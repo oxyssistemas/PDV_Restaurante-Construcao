@@ -38,6 +38,11 @@ import CashRegisterPage from "./pages/cashier/CashRegister";
 import PaymentsPage from "./pages/cashier/Payments";
 import CashMovementsPage from "./pages/cashier/CashMovements";
 
+import FinanceLayout from "./components/layouts/FinanceLayout";
+import FinanceDashboard from "./pages/finance/Dashboard";
+import FinanceReports from "./pages/finance/Reports";
+import FinanceInventory from "./pages/finance/Inventory";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -104,11 +109,15 @@ const App = () => (
               <Route path="payments" element={<PaymentsPage />} />
               <Route path="movements" element={<CashMovementsPage />} />
             </Route>
-            <Route path="/finance/*" element={
+            <Route path="/finance" element={
               <ProtectedRoute allowedRoles={['finance']}>
-                <PlaceholderPortal name="Financeiro" />
+                <FinanceLayout />
               </ProtectedRoute>
-            } />
+            }>
+              <Route index element={<FinanceDashboard />} />
+              <Route path="reports" element={<FinanceReports />} />
+              <Route path="inventory" element={<FinanceInventory />} />
+            </Route>
 
             <Route path="*" element={<NotFound />} />
           </Routes>
@@ -118,15 +127,5 @@ const App = () => (
   </QueryClientProvider>
 );
 
-function PlaceholderPortal({ name }: { name: string }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="text-center space-y-2">
-        <h1 className="text-2xl font-bold">Portal: {name}</h1>
-        <p className="text-muted-foreground">Em construção — será implementado nas próximas fases.</p>
-      </div>
-    </div>
-  );
-}
 
 export default App;
