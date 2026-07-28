@@ -174,16 +174,28 @@ export default function TableMap() {
                       {tableOrders.length} comanda{tableOrders.length > 1 ? 's' : ''}
                     </div>
                     {tableOrders.map((order, idx) => (
-                      <Button
-                        key={order.id}
-                        size="sm"
-                        variant="outline"
-                        className="w-full text-xs gap-1"
-                        onClick={() => navigate(`/waiter/orders/${order.id}`)}
-                      >
-                        <Eye className="h-3 w-3" />
-                        Comanda {idx + 1} — R$ {Number(order.total).toFixed(2)}
-                      </Button>
+                      <div key={order.id} className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 text-xs gap-1 min-w-0"
+                          onClick={() => navigate(`/waiter/orders/${order.id}`)}
+                        >
+                          <Eye className="h-3 w-3 shrink-0" />
+                          <span className="truncate">
+                            {(order as any).customer_name || `Comanda ${idx + 1}`} — R$ {Number(order.total).toFixed(2)}
+                          </span>
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 shrink-0"
+                          title="Renomear comanda"
+                          onClick={() => setRenaming({ id: order.id, name: (order as any).customer_name || '' })}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      </div>
                     ))}
                     <div className="text-xs font-bold mt-1">
                       Total: R$ {totalTable.toFixed(2)}
