@@ -119,6 +119,24 @@ export default function TableMap() {
     },
   });
 
+  const renameOrder = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase
+        .from('orders')
+        .update({ customer_name: name.trim() || null })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['table-orders'] });
+      setRenaming(null);
+      toast.success('Nome da comanda atualizado!');
+    },
+    onError: () => toast.error('Não foi possível renomear a comanda.'),
+  });
+
+
+
   if (isLoading) {
     return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
