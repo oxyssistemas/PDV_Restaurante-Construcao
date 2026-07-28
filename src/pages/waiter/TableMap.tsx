@@ -4,10 +4,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Users, Plus, Eye } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Loader2, Users, Plus, Eye, Pencil } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 const statusColors: Record<string, string> = {
@@ -27,6 +30,7 @@ export default function TableMap() {
   const restaurantId = currentRole?.restaurant_id;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
 
   const { data: tables, isLoading } = useQuery({
     queryKey: ['waiter-tables', restaurantId],
@@ -49,7 +53,7 @@ export default function TableMap() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, table_id, total, status, created_at')
+        .select('id, table_id, total, status, created_at, customer_name')
         .eq('restaurant_id', restaurantId!)
         .in('status', ['pending', 'preparing', 'ready'])
         .order('created_at');
@@ -115,6 +119,24 @@ export default function TableMap() {
     },
   });
 
+  const renameOrder = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase
+        .from('orders')
+        .update({ customer_name: name.trim() || null })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['table-orders'] });
+      setRenaming(null);
+      toast.success('Nome da comanda atualizado!');
+    },
+    onError: () => toast.error('Não foi possível renomear a comanda.'),
+  });
+
+
+
   if (isLoading) {
     return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
@@ -152,16 +174,28 @@ export default function TableMap() {
                       {tableOrders.length} comanda{tableOrders.length > 1 ? 's' : ''}
                     </div>
                     {tableOrders.map((order, idx) => (
-                      <Button
-                        key={order.id}
-                        size="sm"
-                        variant="outline"
-                        className="w-full text-xs gap-1"
-                        onClick={() => navigate(`/waiter/orders/${order.id}`)}
-                      >
-                        <Eye className="h-3 w-3" />
-                        Comanda {idx + 1} — R$ {Number(order.total).toFixed(2)}
-                      </Button>
+                      <div key={order.id} className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 text-xs gap-1 min-w-0"
+                          onClick={() => navigate(`/waiter/orders/${order.id}`)}
+                        >
+                          <Eye className="h-3 w-3 shrink-0" />
+                          <span className="truncate">
+                            {(order as any).customer_name || `Comanda ${idx + 1}`} — R$ {Number(order.total).toFixed(2)}
+                          </span>
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 shrink-0"
+                          title="Renomear comanda"
+                          onClick={() => setRenaming({ id: order.id, name: (order as any).customer_name || '' })}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      </div>
                     ))}
                     <div className="text-xs font-bold mt-1">
                       Total: R$ {totalTable.toFixed(2)}
@@ -190,6 +224,34 @@ export default function TableMap() {
       {(!tables || tables.length === 0) && (
         <p className="text-center text-muted-foreground mt-8">Nenhuma mesa cadastrada. Peça ao admin para configurar as mesas.</p>
       )}
+
+      <Dialog open={!!renaming} onOpenChange={(o) => !o && setRenaming(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Nome da comanda</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="comanda-nome">Identificação</Label>
+            <Input
+              id="comanda-nome"
+              autoFocus
+              placeholder="Ex.: João, Camisa azul, Aniversário"
+              value={renaming?.name ?? ''}
+              onChange={(e) => setRenaming(r => r && { ...r, name: e.target.value })}
+              onKeyDown={(e) => { if (e.key === 'Enter' && renaming) renameOrder.mutate(renaming); }}
+            />
+            <p className="text-xs text-muted-foreground">Deixe em branco para voltar à numeração padrão.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenaming(null)}>Cancelar</Button>
+            <Button onClick={() => renaming && renameOrder.mutate(renaming)} disabled={renameOrder.isPending}>
+              {renameOrder.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }

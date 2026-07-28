@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Loader2, Plus, Minus, Send, ArrowLeft } from 'lucide-react';
+import { Loader2, Plus, Minus, Send, ArrowLeft, Pencil } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -38,6 +38,7 @@ export default function OrderDetail() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
 
   const { data: order, isLoading: orderLoading } = useQuery({
     queryKey: ['order-detail', orderId],
@@ -197,6 +198,26 @@ export default function OrderDetail() {
     },
   });
 
+  const renameOrder = useMutation({
+    mutationFn: async (name: string) => {
+      const { error } = await supabase
+        .from('orders')
+        .update({ customer_name: name.trim() || null })
+        .eq('id', orderId!);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['order-detail', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['table-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['waiter-orders'] });
+      setNameDraft(null);
+      toast({ title: 'Nome da comanda atualizado!' });
+    },
+    onError: () => toast({ title: 'Erro', description: 'Não foi possível renomear a comanda.', variant: 'destructive' }),
+  });
+
+
+
   const filteredMenu = menuItems?.filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -213,11 +234,45 @@ export default function OrderDetail() {
         <Button variant="ghost" size="icon" onClick={() => navigate('/waiter/orders')}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold">Mesa {(order as any)?.restaurant_tables?.number || '?'}</h1>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold truncate">
+              Mesa {(order as any)?.restaurant_tables?.number || '?'}
+              {(order as any)?.customer_name ? ` — ${(order as any).customer_name}` : ''}
+            </h1>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              title="Renomear comanda"
+              onClick={() => setNameDraft((order as any)?.customer_name || '')}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </div>
           <p className="text-sm text-muted-foreground">Total: R$ {Number(order?.total || 0).toFixed(2)}</p>
         </div>
       </div>
+
+      <Dialog open={nameDraft !== null} onOpenChange={(o) => !o && setNameDraft(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Nome da comanda</DialogTitle>
+          </DialogHeader>
+          <Input
+            autoFocus
+            placeholder="Ex.: João, Camisa azul"
+            value={nameDraft ?? ''}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') renameOrder.mutate(nameDraft ?? ''); }}
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setNameDraft(null)}>Cancelar</Button>
+            <Button onClick={() => renameOrder.mutate(nameDraft ?? '')} disabled={renameOrder.isPending}>Salvar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
 
       <div className="space-y-3 mb-6">
         <h2 className="text-lg font-semibold">Itens do Pedido</h2>

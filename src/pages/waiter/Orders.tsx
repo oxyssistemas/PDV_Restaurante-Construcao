@@ -78,8 +78,9 @@ export default function WaiterOrders() {
             <Card key={order.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">
+                  <CardTitle className="text-lg truncate">
                     Mesa {(order as any).restaurant_tables?.number || '?'}
+                    {(order as any).customer_name ? ` — ${(order as any).customer_name}` : ''}
                   </CardTitle>
                   <Badge variant={statusVariant[order.status]}>
                     {statusLabels[order.status]}
