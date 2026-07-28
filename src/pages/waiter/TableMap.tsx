@@ -224,6 +224,34 @@ export default function TableMap() {
       {(!tables || tables.length === 0) && (
         <p className="text-center text-muted-foreground mt-8">Nenhuma mesa cadastrada. Peça ao admin para configurar as mesas.</p>
       )}
+
+      <Dialog open={!!renaming} onOpenChange={(o) => !o && setRenaming(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Nome da comanda</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="comanda-nome">Identificação</Label>
+            <Input
+              id="comanda-nome"
+              autoFocus
+              placeholder="Ex.: João, Camisa azul, Aniversário"
+              value={renaming?.name ?? ''}
+              onChange={(e) => setRenaming(r => r && { ...r, name: e.target.value })}
+              onKeyDown={(e) => { if (e.key === 'Enter' && renaming) renameOrder.mutate(renaming); }}
+            />
+            <p className="text-xs text-muted-foreground">Deixe em branco para voltar à numeração padrão.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenaming(null)}>Cancelar</Button>
+            <Button onClick={() => renaming && renameOrder.mutate(renaming)} disabled={renameOrder.isPending}>
+              {renameOrder.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
