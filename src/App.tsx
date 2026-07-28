@@ -109,11 +109,15 @@ const App = () => (
               <Route path="payments" element={<PaymentsPage />} />
               <Route path="movements" element={<CashMovementsPage />} />
             </Route>
-            <Route path="/finance/*" element={
+            <Route path="/finance" element={
               <ProtectedRoute allowedRoles={['finance']}>
-                <PlaceholderPortal name="Financeiro" />
+                <FinanceLayout />
               </ProtectedRoute>
-            } />
+            }>
+              <Route index element={<FinanceDashboard />} />
+              <Route path="reports" element={<FinanceReports />} />
+              <Route path="inventory" element={<FinanceInventory />} />
+            </Route>
 
             <Route path="*" element={<NotFound />} />
           </Routes>
