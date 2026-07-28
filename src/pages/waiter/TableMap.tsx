@@ -53,7 +53,7 @@ export default function TableMap() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, table_id, total, status, created_at')
+        .select('id, table_id, total, status, created_at, customer_name')
         .eq('restaurant_id', restaurantId!)
         .in('status', ['pending', 'preparing', 'ready'])
         .order('created_at');
