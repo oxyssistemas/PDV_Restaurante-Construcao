@@ -127,15 +127,5 @@ const App = () => (
   </QueryClientProvider>
 );
 
-function PlaceholderPortal({ name }: { name: string }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="text-center space-y-2">
-        <h1 className="text-2xl font-bold">Portal: {name}</h1>
-        <p className="text-muted-foreground">Em construção — será implementado nas próximas fases.</p>
-      </div>
-    </div>
-  );
-}
 
 export default App;
