@@ -38,6 +38,11 @@ import CashRegisterPage from "./pages/cashier/CashRegister";
 import PaymentsPage from "./pages/cashier/Payments";
 import CashMovementsPage from "./pages/cashier/CashMovements";
 
+import FinanceLayout from "./components/layouts/FinanceLayout";
+import FinanceDashboard from "./pages/finance/Dashboard";
+import FinanceReports from "./pages/finance/Reports";
+import FinanceInventory from "./pages/finance/Inventory";
+
 const queryClient = new QueryClient();
 
 const App = () => (
