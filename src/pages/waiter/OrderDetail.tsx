@@ -198,6 +198,26 @@ export default function OrderDetail() {
     },
   });
 
+  const renameOrder = useMutation({
+    mutationFn: async (name: string) => {
+      const { error } = await supabase
+        .from('orders')
+        .update({ customer_name: name.trim() || null })
+        .eq('id', orderId!);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['order-detail', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['table-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['waiter-orders'] });
+      setNameDraft(null);
+      toast({ title: 'Nome da comanda atualizado!' });
+    },
+    onError: () => toast({ title: 'Erro', description: 'Não foi possível renomear a comanda.', variant: 'destructive' }),
+  });
+
+
+
   const filteredMenu = menuItems?.filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
