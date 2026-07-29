@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { UtensilsCrossed, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import oxysLogo from '@/assets/oxys-logo.png.asset.json';
 
 export default function Login() {
   const { user, loading, signIn } = useAuth();
@@ -38,11 +39,13 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-xl border-0">
         <CardHeader className="text-center space-y-4 pb-2">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-            <UtensilsCrossed className="h-8 w-8" />
-          </div>
+          <img
+            src={oxysLogo.url}
+            alt="Oxys Restaurante"
+            className="mx-auto h-28 w-auto object-contain"
+          />
           <div>
-            <CardTitle className="text-2xl font-bold tracking-tight">RestaurantPDV</CardTitle>
+            <CardTitle className="text-2xl font-bold tracking-tight">Oxys Restaurante</CardTitle>
             <CardDescription className="text-muted-foreground mt-1">
               Sistema de gestão para restaurantes
             </CardDescription>
