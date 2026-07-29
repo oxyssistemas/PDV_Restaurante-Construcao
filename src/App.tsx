@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+import DocumentTitle from "./components/DocumentTitle";
 import SuperAdminLayout from "./components/layouts/SuperAdminLayout";
 import SuperAdminDashboard from "./pages/super-admin/Dashboard";
 import Restaurants from "./pages/super-admin/Restaurants";
