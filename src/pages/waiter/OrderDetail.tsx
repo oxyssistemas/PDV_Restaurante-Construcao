@@ -185,15 +185,10 @@ export default function OrderDetail() {
         .from('orders')
         .update({ status: 'delivered' as const })
         .eq('id', orderId!);
-      if (order?.table_id) {
-        await supabase
-          .from('restaurant_tables')
-          .update({ status: 'free' as const })
-          .eq('id', order.table_id);
-      }
+      // A mesa só é liberada pelo caixa após o pagamento.
     },
     onSuccess: () => {
-      toast({ title: 'Mesa fechada!', description: 'Conta enviada para o caixa.' });
+      toast({ title: 'Comanda fechada!', description: 'Conta enviada para o caixa. A mesa será liberada após o pagamento.' });
       navigate('/waiter');
     },
   });
