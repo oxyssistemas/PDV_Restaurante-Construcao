@@ -423,7 +423,7 @@ export default function OrderDetail() {
 
         {allDelivered && (
           <Button variant="destructive" className="gap-1" onClick={() => closeTable.mutate()} disabled={closeTable.isPending}>
-            Fechar Mesa
+            Fechar Comanda
           </Button>
         )}
       </div>
