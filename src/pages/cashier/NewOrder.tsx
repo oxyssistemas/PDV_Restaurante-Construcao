@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import {
   Loader2, Plus, Minus, Search, Trash2, ArrowRight, MessageSquarePlus, Users,
-  MoreHorizontal, XCircle, Percent, Inbox, ArrowDownUp, ArrowUpDown, UserCog, ShoppingCart,
+  MoreHorizontal, ShoppingCart,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -23,7 +23,7 @@ import { useNavigate } from 'react-router-dom';
 interface CartItem { id: string; name: string; price: number; quantity: number; }
 
 export default function CashierNewOrder() {
-  const { user, currentRole, signOut } = useAuth();
+  const { user, currentRole } = useAuth();
   const restaurantId = currentRole?.restaurant_id;
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -35,10 +35,7 @@ export default function CashierNewOrder() {
   const [orderId, setOrderId] = useState<string>('new');
   const [customerName, setCustomerName] = useState('');
   const [notes, setNotes] = useState('');
-  const [discount, setDiscount] = useState(0);
-  const [payMethod, setPayMethod] = useState<string>('cash');
   const [noteOpen, setNoteOpen] = useState(false);
-  const [discountOpen, setDiscountOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const customerRef = useRef<HTMLInputElement>(null);
 
@@ -98,7 +95,7 @@ export default function CashierNewOrder() {
   );
 
   const subtotal = cart.reduce((s, c) => s + c.price * c.quantity, 0);
-  const total = Math.max(subtotal - discount, 0);
+  const total = subtotal;
   const selectedTable = tables?.find(t => t.id === tableId);
 
   const add = (item: any) => setCart(prev => {
@@ -160,7 +157,7 @@ export default function CashierNewOrder() {
         .eq('id', targetOrderId);
     },
     onSuccess: () => {
-      setCart([]); setCustomerName(''); setOrderId('new'); setNotes(''); setDiscount(0);
+      setCart([]); setCustomerName(''); setOrderId('new'); setNotes('');
       queryClient.invalidateQueries({ queryKey: ['cashier-order-open'] });
       queryClient.invalidateQueries({ queryKey: ['cashier-open-orders'] });
       toast.success('Pedido enviado para a cozinha!');
@@ -270,7 +267,6 @@ export default function CashierNewOrder() {
 
         <div className="space-y-1 text-sm">
           <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>R$ {subtotal.toFixed(2)}</span></div>
-          <div className="flex justify-between text-muted-foreground"><span>Desconto</span><span>- R$ {discount.toFixed(2)}</span></div>
           <div className="flex justify-between text-muted-foreground"><span>Taxa</span><span>R$ 0,00</span></div>
         </div>
 
@@ -390,20 +386,6 @@ export default function CashierNewOrder() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={discountOpen} onOpenChange={setDiscountOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Desconto (R$)</DialogTitle></DialogHeader>
-          <Input
-            type="number"
-            min={0}
-            step="0.01"
-            value={discount || ''}
-            onChange={e => setDiscount(Number(e.target.value) || 0)}
-          />
-          <p className="text-xs text-muted-foreground">O desconto é exibido no resumo do caixa; o valor lançado na comanda segue o subtotal dos itens.</p>
-          <DialogFooter><Button onClick={() => setDiscountOpen(false)}>Aplicar</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
