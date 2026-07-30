@@ -133,7 +133,7 @@ export default function CashierLayout() {
           <span className="font-semibold">Caixa</span>
         </div>
 
-        <main className="pdv-scroll min-h-0 flex-1 overflow-auto">
+        <main className="pdv-scroll min-h-0 flex-1 overflow-auto p-4 md:p-6">
           <Outlet />
         </main>
 
