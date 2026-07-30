@@ -6,44 +6,44 @@
 
 @layer base {
   :root {
-    --background: 220 12% 8%;
+    --background: 222 47% 11%;
     --foreground: 30 12% 96%;
 
-    --card: 220 10% 12%;
+    --card: 221 39% 11%;
     --card-foreground: 30 12% 96%;
 
-    --popover: 220 10% 12%;
+    --popover: 221 39% 11%;
     --popover-foreground: 30 12% 96%;
 
-    --primary: 22 95% 55%;
+    --primary: 25 95% 53%;
     --primary-foreground: 220 20% 8%;
 
-    --secondary: 220 8% 18%;
+    --secondary: 215 28% 17%;
     --secondary-foreground: 30 10% 92%;
 
-    --muted: 220 8% 16%;
+    --muted: 217 33% 15%;
     --muted-foreground: 30 6% 65%;
 
-    --accent: 22 95% 55%;
+    --accent: 25 95% 53%;
     --accent-foreground: 220 20% 8%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 8% 20%;
-    --input: 220 8% 20%;
-    --ring: 22 95% 55%;
+    --border: 215 28% 17%;
+    --input: 215 28% 17%;
+    --ring: 25 95% 53%;
 
-    --radius: 0.85rem;
+    --radius: 1rem;
 
-    --sidebar-background: 220 12% 10%;
+    --sidebar-background: 221 39% 9%;
     --sidebar-foreground: 30 8% 85%;
-    --sidebar-primary: 22 95% 55%;
+    --sidebar-primary: 25 95% 53%;
     --sidebar-primary-foreground: 220 20% 8%;
-    --sidebar-accent: 220 10% 16%;
+    --sidebar-accent: 215 28% 17%;
     --sidebar-accent-foreground: 30 10% 95%;
-    --sidebar-border: 220 8% 18%;
-    --sidebar-ring: 22 95% 55%;
+    --sidebar-border: 215 28% 17%;
+    --sidebar-ring: 25 95% 53%;
 
     --success: 150 60% 42%;
     --success-foreground: 0 0% 100%;
@@ -54,42 +54,42 @@
   }
 
   .dark {
-    --background: 220 12% 8%;
+    --background: 222 47% 11%;
     --foreground: 30 12% 96%;
 
-    --card: 220 10% 12%;
+    --card: 221 39% 11%;
     --card-foreground: 30 12% 96%;
 
-    --popover: 220 10% 12%;
+    --popover: 221 39% 11%;
     --popover-foreground: 30 12% 96%;
 
-    --primary: 22 95% 55%;
+    --primary: 25 95% 53%;
     --primary-foreground: 220 20% 8%;
 
-    --secondary: 220 8% 18%;
+    --secondary: 215 28% 17%;
     --secondary-foreground: 30 10% 92%;
 
-    --muted: 220 8% 16%;
+    --muted: 217 33% 15%;
     --muted-foreground: 30 6% 65%;
 
-    --accent: 22 95% 55%;
+    --accent: 25 95% 53%;
     --accent-foreground: 220 20% 8%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 8% 20%;
-    --input: 220 8% 20%;
-    --ring: 22 95% 55%;
+    --border: 215 28% 17%;
+    --input: 215 28% 17%;
+    --ring: 25 95% 53%;
 
-    --sidebar-background: 220 12% 10%;
+    --sidebar-background: 221 39% 9%;
     --sidebar-foreground: 30 8% 85%;
-    --sidebar-primary: 22 95% 55%;
+    --sidebar-primary: 25 95% 53%;
     --sidebar-primary-foreground: 220 20% 8%;
-    --sidebar-accent: 220 10% 16%;
+    --sidebar-accent: 215 28% 17%;
     --sidebar-accent-foreground: 30 10% 95%;
-    --sidebar-border: 220 8% 18%;
-    --sidebar-ring: 22 95% 55%;
+    --sidebar-border: 215 28% 17%;
+    --sidebar-ring: 25 95% 53%;
   }
 }
 
@@ -105,6 +105,36 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: -0.02em;
   }
+}
+
+@layer utilities {
+  .pdv-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  .pdv-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+  .pdv-scroll::-webkit-scrollbar-track { background: transparent; }
+  .pdv-scroll::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 9999px;
+  }
+  .pdv-scroll::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary) / 0.6); }
+
+  .pdv-card {
+    @apply rounded-2xl border border-border bg-card shadow-[0_1px_2px_hsl(0_0%_0%/0.4)] transition-all duration-200;
+  }
+  .pdv-card-hover {
+    @apply hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-[0_10px_30px_-12px_hsl(var(--primary)/0.45)];
+  }
+  .pdv-ripple {
+    @apply relative overflow-hidden;
+  }
+  .pdv-ripple::after {
+    content: '';
+    @apply pointer-events-none absolute inset-0 opacity-0 bg-foreground/10 transition-opacity duration-200;
+  }
+  .pdv-ripple:active::after { @apply opacity-100 duration-0; }
 }
