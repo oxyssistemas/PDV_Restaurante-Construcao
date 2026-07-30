@@ -168,36 +168,16 @@ export default function CashierNewOrder() {
     onError: (e: any) => toast.error(e.message || 'Erro ao lançar pedido.'),
   });
 
-  const quickActions = [
-    { key: 'F5', label: 'Cancelar item', icon: XCircle, color: 'text-destructive', bg: 'bg-destructive/10',
-      run: () => { if (!cart.length) return toast.info('Comanda vazia'); removeItem(cart[cart.length - 1].id); toast.success('Último item removido'); } },
-    { key: 'F6', label: 'Desconto', icon: Percent, color: 'text-[hsl(var(--warning))]', bg: 'bg-[hsl(var(--warning))]/10', run: () => setDiscountOpen(true) },
-    { key: 'F7', label: 'Observação', icon: MessageSquarePlus, color: 'text-[hsl(var(--info))]', bg: 'bg-[hsl(var(--info))]/10', run: () => setNoteOpen(true) },
-    { key: 'F8', label: 'Clientes', icon: Users, color: 'text-primary', bg: 'bg-primary/10', run: () => customerRef.current?.focus() },
-    { key: 'F9', label: 'Abrir gaveta', icon: Inbox, color: 'text-[hsl(var(--success))]', bg: 'bg-[hsl(var(--success))]/10', run: () => toast.success('Gaveta acionada') },
-    { key: 'F10', label: 'Sangria', icon: ArrowDownUp, color: 'text-destructive', bg: 'bg-destructive/10', run: () => navigate('/cashier/movements') },
-    { key: 'F11', label: 'Suprimento', icon: ArrowUpDown, color: 'text-[hsl(var(--success))]', bg: 'bg-[hsl(var(--success))]/10', run: () => navigate('/cashier/movements') },
-    { key: 'F12', label: 'Trocar usuário', icon: UserCog, color: 'text-[hsl(var(--info))]', bg: 'bg-[hsl(var(--info))]/10', run: async () => { await signOut(); navigate('/login'); } },
-  ];
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const action = quickActions.find(a => a.key === e.key);
       if (e.key === 'F2') { e.preventDefault(); searchRef.current?.focus(); return; }
       if (e.key === 'F3') { e.preventDefault(); customerRef.current?.focus(); return; }
-      if (e.key === 'F4') { e.preventDefault(); if (cart.length && tableId) send.mutate(); return; }
-      if (action) { e.preventDefault(); action.run(); }
+      if (e.key === 'F4') { e.preventDefault(); if (cart.length && tableId) send.mutate(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  const payments = [
-    { id: 'cash', label: 'Dinheiro' },
-    { id: 'credit_card', label: 'Cartão' },
-    { id: 'pix', label: 'PIX' },
-    { id: 'other', label: 'Outros' },
-  ];
 
   const cartPanel = (
     <div className="flex h-full flex-col gap-4">
