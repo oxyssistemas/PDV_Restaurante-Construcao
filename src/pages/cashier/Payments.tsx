@@ -378,20 +378,12 @@ export default function Payments() {
             })}
           </div>
         )}
+
+        <div className="xl:hidden">{paymentPanel}</div>
       </div>
 
       <aside className="hidden w-[430px] shrink-0 xl:block">{paymentPanel}</aside>
 
-      <div className="fixed inset-x-0 bottom-14 z-30 px-4 xl:hidden">
-        {selectedTable && tableOrders.length > 0 && (
-          <div className="pdv-card flex items-center justify-between gap-3 p-3">
-            <span className="text-sm font-semibold text-primary">R$ {total.toFixed(2)}</span>
-            <span className="truncate text-xs text-muted-foreground">Mesa {selectedTable.number}</span>
-          </div>
-        )}
-      </div>
-
-      <div className="w-full max-w-md xl:hidden" hidden={!selectedTable}>{null}</div>
     </div>
   );
 }
