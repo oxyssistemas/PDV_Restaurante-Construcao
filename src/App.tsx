@@ -109,7 +109,7 @@ const App = () => (
               <Route index element={<KitchenQueue />} />
             </Route>
             <Route path="/cashier" element={
-              <ProtectedRoute allowedRoles={['cashier']}>
+              <ProtectedRoute allowedRoles={['cashier','admin']}>
                 <CashierLayout />
               </ProtectedRoute>
             }>
