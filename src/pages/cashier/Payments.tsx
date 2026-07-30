@@ -65,7 +65,7 @@ export default function Payments() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, table_id, total, status, customer_name, created_at')
+        .select('id, table_id, total, status, customer_name, created_at, created_by_name, created_by_role')
         .eq('restaurant_id', restaurantId!)
         .in('status', ['pending', 'preparing', 'ready', 'delivered'])
         .order('created_at');
