@@ -25,9 +25,11 @@ const roleLabels: Record<string, string> = {
   kitchen: 'Cozinha',
   cashier: 'Caixa',
   finance: 'Financeiro',
+  delivery: 'Delivery',
 };
 
-const creatableRoles = ['waiter', 'kitchen', 'cashier', 'finance'] as const;
+const creatableRoles = ['waiter', 'kitchen', 'cashier', 'finance', 'delivery'] as const;
+
 
 export default function UsersPage() {
   const { currentRole, user } = useAuth();

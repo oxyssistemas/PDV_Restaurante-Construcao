@@ -10,6 +10,8 @@ import { Loader2, ReceiptText, Banknote, CreditCard, Smartphone, Users } from 'l
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { authorLabel } from '@/lib/orders';
+
 
 const methods = [
   { value: 'cash', label: 'Dinheiro', icon: Banknote },
@@ -65,7 +67,7 @@ export default function Payments() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, table_id, total, status, customer_name, created_at')
+        .select('id, table_id, total, status, customer_name, created_at, created_by_name, created_by_role')
         .eq('restaurant_id', restaurantId!)
         .in('status', ['pending', 'preparing', 'ready', 'delivered'])
         .order('created_at');
@@ -199,12 +201,16 @@ export default function Payments() {
                     const orderTotal = orderItems.reduce((s, i) => s + Number(i.unit_price) * i.quantity, 0);
                     return (
                       <div key={order.id} className="rounded-lg border p-3">
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-between mb-1">
                           <span className="font-semibold text-sm truncate">
                             {order.customer_name || `Comanda ${idx + 1}`}
                           </span>
                           <Badge variant="outline">R$ {orderTotal.toFixed(2)}</Badge>
                         </div>
+                        <div className="mb-2 text-[11px] text-muted-foreground">
+                          Lançado por {authorLabel(order as any)}
+                        </div>
+
                         {orderItems.length ? (
                           <ul className="space-y-1 text-sm">
                             {orderItems.map(i => (

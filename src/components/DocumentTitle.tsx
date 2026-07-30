@@ -21,12 +21,16 @@ const TITLES: { match: RegExp; title: string }[] = [
   { match: /^\/waiter/, title: "Mapa de Mesas" },
   { match: /^\/kitchen/, title: "Cozinha" },
   { match: /^\/cashier\/payments/, title: "Pagamentos" },
+  { match: /^\/cashier\/orders/, title: "Lançar Pedido" },
   { match: /^\/cashier\/movements/, title: "Movimentações" },
   { match: /^\/cashier/, title: "Caixa" },
   { match: /^\/finance\/reports/, title: "Relatórios" },
   { match: /^\/finance\/inventory/, title: "Estoque" },
   { match: /^\/finance/, title: "Financeiro" },
+  { match: /^\/delivery\/new/, title: "Novo Pedido Delivery" },
+  { match: /^\/delivery/, title: "Delivery" },
   { match: /^\/$/, title: "Sistema PDV para Restaurantes" },
+
 ];
 
 const DocumentTitle = () => {

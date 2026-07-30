@@ -1,19 +1,16 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { DollarSign, LogOut, Menu, Wallet, ArrowDownUp, ReceiptText, ClipboardList } from 'lucide-react';
+import { Bike, LogOut, Menu, ListOrdered, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 
 const navItems = [
-  { to: '/cashier', icon: Wallet, label: 'Caixa', end: true },
-  { to: '/cashier/payments', icon: ReceiptText, label: 'Pagamentos', end: false },
-  { to: '/cashier/orders', icon: ClipboardList, label: 'Lançar Pedido', end: false },
-  { to: '/cashier/movements', icon: ArrowDownUp, label: 'Movimentações', end: false },
+  { to: '/delivery', icon: ListOrdered, label: 'Pedidos', end: true },
+  { to: '/delivery/new', icon: PlusCircle, label: 'Novo Pedido', end: false },
 ];
 
-
-export default function CashierLayout() {
+export default function DeliveryLayout() {
   const { signOut, user } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -27,9 +24,9 @@ export default function CashierLayout() {
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center gap-3 px-6 border-b border-sidebar-border">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-          <DollarSign className="h-5 w-5" />
+          <Bike className="h-5 w-5" />
         </div>
-        <span className="font-bold text-lg tracking-tight">Caixa</span>
+        <span className="font-bold text-lg tracking-tight">Delivery</span>
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navItems.map(item => (
@@ -70,7 +67,7 @@ export default function CashierLayout() {
       <main className="flex-1 overflow-auto">
         <div className="flex h-14 items-center gap-4 border-b px-4 lg:hidden">
           <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}><Menu className="h-5 w-5" /></Button>
-          <span className="font-semibold">Caixa</span>
+          <span className="font-semibold">Delivery</span>
         </div>
         <div className="p-4 md:p-6"><Outlet /></div>
       </main>

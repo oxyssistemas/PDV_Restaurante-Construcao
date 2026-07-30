@@ -38,11 +38,17 @@ import CashierLayout from "./components/layouts/CashierLayout";
 import CashRegisterPage from "./pages/cashier/CashRegister";
 import PaymentsPage from "./pages/cashier/Payments";
 import CashMovementsPage from "./pages/cashier/CashMovements";
+import CashierNewOrder from "./pages/cashier/NewOrder";
 
 import FinanceLayout from "./components/layouts/FinanceLayout";
 import FinanceDashboard from "./pages/finance/Dashboard";
 import FinanceReports from "./pages/finance/Reports";
 import FinanceInventory from "./pages/finance/Inventory";
+
+import DeliveryLayout from "./components/layouts/DeliveryLayout";
+import DeliveryOrders from "./pages/delivery/DeliveryOrders";
+import NewDelivery from "./pages/delivery/NewDelivery";
+
 
 const queryClient = new QueryClient();
 
@@ -109,6 +115,7 @@ const App = () => (
             }>
               <Route index element={<CashRegisterPage />} />
               <Route path="payments" element={<PaymentsPage />} />
+              <Route path="orders" element={<CashierNewOrder />} />
               <Route path="movements" element={<CashMovementsPage />} />
             </Route>
             <Route path="/finance" element={
@@ -120,6 +127,15 @@ const App = () => (
               <Route path="reports" element={<FinanceReports />} />
               <Route path="inventory" element={<FinanceInventory />} />
             </Route>
+            <Route path="/delivery" element={
+              <ProtectedRoute allowedRoles={['delivery', 'admin']}>
+                <DeliveryLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<DeliveryOrders />} />
+              <Route path="new" element={<NewDelivery />} />
+            </Route>
+
 
             <Route path="*" element={<NotFound />} />
           </Routes>

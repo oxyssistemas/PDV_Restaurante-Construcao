@@ -12,6 +12,8 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { authorFields } from '@/lib/orders';
+
 
 const statusColors: Record<string, string> = {
   free: 'bg-green-500/20 border-green-500 text-green-700',
@@ -102,10 +104,13 @@ export default function TableMap() {
           restaurant_id: restaurantId!,
           waiter_id: user!.id,
           status: 'pending' as const,
+          order_type: 'dine_in',
+          ...authorFields(user, currentRole?.role),
         })
         .select()
         .single();
       if (orderError) throw orderError;
+
       return order;
     },
     onSuccess: (order) => {

@@ -2,19 +2,22 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
-  UtensilsCrossed, LayoutDashboard, BookOpen, Grid3X3, Users, Package, Settings, LogOut, Menu,
+  UtensilsCrossed, LayoutDashboard, BookOpen, Grid3X3, Users, Package, Settings, LogOut, Menu, Bike,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
+import NotificationsBell from '@/components/NotificationsBell';
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { to: '/admin/menu', icon: BookOpen, label: 'Cardápio', end: false },
   { to: '/admin/tables', icon: Grid3X3, label: 'Mesas', end: false },
   { to: '/admin/inventory', icon: Package, label: 'Estoque', end: false },
+  { to: '/delivery', icon: Bike, label: 'Delivery', end: false },
   { to: '/admin/users', icon: Users, label: 'Usuários', end: false },
   { to: '/admin/settings', icon: Settings, label: 'Configurações', end: false },
 ];
+
 
 export default function AdminLayout() {
   const { signOut, user } = useAuth();
@@ -84,15 +87,17 @@ export default function AdminLayout() {
         {sidebar}
       </aside>
       <main className="flex-1 overflow-auto">
-        <div className="flex h-14 items-center gap-4 border-b px-4 lg:hidden">
-          <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
+        <div className="flex h-14 items-center gap-4 border-b px-4">
+          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
             <Menu className="h-5 w-5" />
           </Button>
-          <span className="font-semibold">Admin</span>
+          <span className="font-semibold lg:hidden">Admin</span>
+          <div className="ml-auto"><NotificationsBell /></div>
         </div>
         <div className="p-6">
           <Outlet />
         </div>
+
       </main>
     </div>
   );
