@@ -658,6 +658,7 @@ export type Database = {
         | "kitchen"
         | "cashier"
         | "finance"
+        | "delivery"
       cash_movement_type: "sangria" | "suprimento"
       inventory_movement_type: "entry" | "exit"
       order_item_status:
@@ -810,6 +811,7 @@ export const Constants = {
         "kitchen",
         "cashier",
         "finance",
+        "delivery",
       ],
       cash_movement_type: ["sangria", "suprimento"],
       inventory_movement_type: ["entry", "exit"],
