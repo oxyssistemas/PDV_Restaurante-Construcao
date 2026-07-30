@@ -239,6 +239,58 @@ export type Database = {
           },
         ]
       }
+      menu_item_ingredients: {
+        Row: {
+          created_at: string
+          id: string
+          inventory_id: string
+          menu_item_id: string
+          quantity: number
+          restaurant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          inventory_id: string
+          menu_item_id: string
+          quantity?: number
+          restaurant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          inventory_id?: string
+          menu_item_id?: string
+          quantity?: number
+          restaurant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_item_ingredients_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_item_ingredients_menu_item_id_fkey"
+            columns: ["menu_item_id"]
+            isOneToOne: false
+            referencedRelation: "menu_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_item_ingredients_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       menu_items: {
         Row: {
           available: boolean
@@ -286,6 +338,47 @@ export type Database = {
           },
           {
             foreignKeyName: "menu_items_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          read: boolean
+          restaurant_id: string
+          target_roles: string[]
+          title: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          read?: boolean
+          restaurant_id: string
+          target_roles?: string[]
+          title: string
+          type?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          read?: boolean
+          restaurant_id?: string
+          target_roles?: string[]
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
@@ -347,39 +440,63 @@ export type Database = {
       orders: {
         Row: {
           created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          created_by_role: string | null
+          customer_address: string | null
           customer_name: string | null
+          customer_phone: string | null
+          delivery_fee: number
+          delivery_status: string
           id: string
           notes: string | null
+          order_type: string
           restaurant_id: string
           status: Database["public"]["Enums"]["order_status"]
-          table_id: string
+          table_id: string | null
           total: number
           updated_at: string
-          waiter_id: string
+          waiter_id: string | null
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          created_by_role?: string | null
+          customer_address?: string | null
           customer_name?: string | null
+          customer_phone?: string | null
+          delivery_fee?: number
+          delivery_status?: string
           id?: string
           notes?: string | null
+          order_type?: string
           restaurant_id: string
           status?: Database["public"]["Enums"]["order_status"]
-          table_id: string
+          table_id?: string | null
           total?: number
           updated_at?: string
-          waiter_id: string
+          waiter_id?: string | null
         }
         Update: {
           created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          created_by_role?: string | null
+          customer_address?: string | null
           customer_name?: string | null
+          customer_phone?: string | null
+          delivery_fee?: number
+          delivery_status?: string
           id?: string
           notes?: string | null
+          order_type?: string
           restaurant_id?: string
           status?: Database["public"]["Enums"]["order_status"]
-          table_id?: string
+          table_id?: string | null
           total?: number
           updated_at?: string
-          waiter_id?: string
+          waiter_id?: string | null
         }
         Relationships: [
           {
