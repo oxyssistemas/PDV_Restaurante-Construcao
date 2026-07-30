@@ -11,6 +11,8 @@ import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { authorLabel } from '@/lib/orders';
+
 
 interface CartItem {
   menu_item_id: string;
@@ -246,6 +248,8 @@ export default function OrderDetail() {
             </Button>
           </div>
           <p className="text-sm text-muted-foreground">Total: R$ {Number(order?.total || 0).toFixed(2)}</p>
+          <p className="text-xs text-muted-foreground">Lançado por {authorLabel((order || {}) as any)}</p>
+
         </div>
       </div>
 
