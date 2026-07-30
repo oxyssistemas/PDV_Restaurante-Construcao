@@ -38,11 +38,17 @@ import CashierLayout from "./components/layouts/CashierLayout";
 import CashRegisterPage from "./pages/cashier/CashRegister";
 import PaymentsPage from "./pages/cashier/Payments";
 import CashMovementsPage from "./pages/cashier/CashMovements";
+import CashierNewOrder from "./pages/cashier/NewOrder";
 
 import FinanceLayout from "./components/layouts/FinanceLayout";
 import FinanceDashboard from "./pages/finance/Dashboard";
 import FinanceReports from "./pages/finance/Reports";
 import FinanceInventory from "./pages/finance/Inventory";
+
+import DeliveryLayout from "./components/layouts/DeliveryLayout";
+import DeliveryOrders from "./pages/delivery/DeliveryOrders";
+import NewDelivery from "./pages/delivery/NewDelivery";
+
 
 const queryClient = new QueryClient();
 
