@@ -2,19 +2,22 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
-  UtensilsCrossed, LayoutDashboard, BookOpen, Grid3X3, Users, Package, Settings, LogOut, Menu,
+  UtensilsCrossed, LayoutDashboard, BookOpen, Grid3X3, Users, Package, Settings, LogOut, Menu, Bike,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
+import NotificationsBell from '@/components/NotificationsBell';
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { to: '/admin/menu', icon: BookOpen, label: 'Cardápio', end: false },
   { to: '/admin/tables', icon: Grid3X3, label: 'Mesas', end: false },
   { to: '/admin/inventory', icon: Package, label: 'Estoque', end: false },
+  { to: '/delivery', icon: Bike, label: 'Delivery', end: false },
   { to: '/admin/users', icon: Users, label: 'Usuários', end: false },
   { to: '/admin/settings', icon: Settings, label: 'Configurações', end: false },
 ];
+
 
 export default function AdminLayout() {
   const { signOut, user } = useAuth();
