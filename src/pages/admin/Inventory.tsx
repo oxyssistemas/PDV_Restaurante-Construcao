@@ -40,14 +40,17 @@ export default function InventoryPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-inventory'] });
-      toast({ title: 'Produto removido' });
+      toast({ title: 'Ingrediente removido' });
     },
   });
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">Estoque</h1>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Estoque de Ingredientes</h1>
+          <p className="text-sm text-muted-foreground">Cadastre aqui os ingredientes usados nas fichas técnicas do cardápio (baixa automática).</p>
+        </div>
         <InventoryDialog restaurantId={restaurantId!} />
       </div>
 
@@ -59,7 +62,7 @@ export default function InventoryPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Produto</TableHead>
+                  <TableHead>Ingrediente</TableHead>
                   <TableHead>Quantidade</TableHead>
                   <TableHead>Unidade</TableHead>
                   <TableHead>Custo/Un</TableHead>
@@ -95,7 +98,7 @@ export default function InventoryPage() {
                 })}
                 {inventory?.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum produto cadastrado</TableCell>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum ingrediente cadastrado</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -137,7 +140,7 @@ function InventoryDialog({ restaurantId, editItem }: { restaurantId: string; edi
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
     } else {
       queryClient.invalidateQueries({ queryKey: ['admin-inventory'] });
-      toast({ title: editItem ? 'Produto atualizado' : 'Produto criado' });
+      toast({ title: editItem ? 'Ingrediente atualizado' : 'Ingrediente criado' });
       setOpen(false);
     }
     setLoading(false);
@@ -149,11 +152,11 @@ function InventoryDialog({ restaurantId, editItem }: { restaurantId: string; edi
         {editItem ? (
           <Button variant="ghost" size="icon"><Pencil className="h-4 w-4" /></Button>
         ) : (
-          <Button className="gap-2"><Plus className="h-4 w-4" /> Novo Produto</Button>
+          <Button className="gap-2"><Plus className="h-4 w-4" /> Novo Ingrediente</Button>
         )}
       </DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>{editItem ? 'Editar' : 'Novo'} Produto</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{editItem ? 'Editar' : 'Novo'} Ingrediente</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>Nome *</Label>
