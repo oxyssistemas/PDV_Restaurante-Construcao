@@ -1,15 +1,17 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { DollarSign, LogOut, Menu, Wallet, ArrowDownUp, ReceiptText } from 'lucide-react';
+import { DollarSign, LogOut, Menu, Wallet, ArrowDownUp, ReceiptText, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 
 const navItems = [
   { to: '/cashier', icon: Wallet, label: 'Caixa', end: true },
   { to: '/cashier/payments', icon: ReceiptText, label: 'Pagamentos', end: false },
+  { to: '/cashier/orders', icon: ClipboardList, label: 'Lançar Pedido', end: false },
   { to: '/cashier/movements', icon: ArrowDownUp, label: 'Movimentações', end: false },
 ];
+
 
 export default function CashierLayout() {
   const { signOut, user } = useAuth();

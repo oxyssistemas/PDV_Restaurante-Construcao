@@ -115,6 +115,7 @@ const App = () => (
             }>
               <Route index element={<CashRegisterPage />} />
               <Route path="payments" element={<PaymentsPage />} />
+              <Route path="orders" element={<CashierNewOrder />} />
               <Route path="movements" element={<CashMovementsPage />} />
             </Route>
             <Route path="/finance" element={
@@ -126,6 +127,15 @@ const App = () => (
               <Route path="reports" element={<FinanceReports />} />
               <Route path="inventory" element={<FinanceInventory />} />
             </Route>
+            <Route path="/delivery" element={
+              <ProtectedRoute allowedRoles={['delivery', 'admin']}>
+                <DeliveryLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<DeliveryOrders />} />
+              <Route path="new" element={<NewDelivery />} />
+            </Route>
+
 
             <Route path="*" element={<NotFound />} />
           </Routes>

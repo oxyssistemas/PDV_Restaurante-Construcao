@@ -26,6 +26,8 @@ export default function Index() {
       case 'kitchen': return <Navigate to="/kitchen" replace />;
       case 'cashier': return <Navigate to="/cashier" replace />;
       case 'finance': return <Navigate to="/finance" replace />;
+      case 'delivery': return <Navigate to="/delivery" replace />;
+
     }
   }
 

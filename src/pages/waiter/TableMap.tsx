@@ -102,10 +102,13 @@ export default function TableMap() {
           restaurant_id: restaurantId!,
           waiter_id: user!.id,
           status: 'pending' as const,
+          order_type: 'dine_in',
+          ...authorFields(user, currentRole?.role),
         })
         .select()
         .single();
       if (orderError) throw orderError;
+
       return order;
     },
     onSuccess: (order) => {
