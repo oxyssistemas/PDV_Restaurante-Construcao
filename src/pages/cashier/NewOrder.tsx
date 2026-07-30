@@ -424,7 +424,7 @@ export default function CashierNewOrder() {
                   <a.icon className="h-4 w-4" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium">{a.label}</span>
+                  <span className="block text-sm font-medium leading-tight">{a.label}</span>
                   <span className="block text-[11px] text-muted-foreground">{a.key}</span>
                 </span>
               </motion.button>
