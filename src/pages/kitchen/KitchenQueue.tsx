@@ -9,6 +9,8 @@ import { useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { authorLabel } from '@/lib/orders';
+
 
 const statusConfig = {
   pending: { label: 'Pendente', icon: Clock, color: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30' },
@@ -119,13 +121,14 @@ export default function KitchenQueue() {
     return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
-  // Group by order/table
+  // Group by order (mesa ou delivery)
   const grouped = new Map<string, typeof orderItems>();
   orderItems?.forEach(item => {
-    const key = (item as any).orders?.table_id || 'unknown';
+    const key = (item as any).orders?.id || 'unknown';
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key)!.push(item);
   });
+
 
   const getNextStatus = (current: string): string | null => {
     if (current === 'pending') return 'preparing';
@@ -164,18 +167,24 @@ export default function KitchenQueue() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from(grouped.entries()).map(([tableId, items]) => {
-            const tableNumber = (items![0] as any).orders?.restaurant_tables?.number || '?';
+          {Array.from(grouped.entries()).map(([orderKey, items]) => {
+            const order = (items![0] as any).orders;
+            const isDelivery = order?.order_type === 'delivery';
+            const heading = isDelivery
+              ? `Delivery — ${order?.customer_name || 'Cliente'}`
+              : `Mesa ${order?.restaurant_tables?.number || '?'}${order?.customer_name ? ` — ${order.customer_name}` : ''}`;
             const pendingIds = items!.filter(i => i.status === 'pending').map(i => i.id);
             return (
-              <Card key={tableId} className="border-2">
+              <Card key={orderKey} className={`border-2 ${isDelivery ? 'border-primary/60' : ''}`}>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center justify-between">
-                    <span>Mesa {tableNumber}</span>
-                    <span className="text-xs text-muted-foreground font-normal">
+                  <CardTitle className="text-lg flex items-center justify-between gap-2">
+                    <span className="truncate">{heading}</span>
+                    <span className="text-xs text-muted-foreground font-normal shrink-0">
                       {formatDistanceToNow(new Date(items![0].created_at), { addSuffix: true, locale: ptBR })}
                     </span>
                   </CardTitle>
+                  <p className="text-xs text-muted-foreground">Lançado por {authorLabel(order || {})}</p>
+
                   {pendingIds.length > 1 && (
                     <Button
                       size="sm"
