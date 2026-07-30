@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import {
   Loader2, Plus, Minus, Search, Trash2, ArrowRight, MessageSquarePlus, Users,
-  MoreHorizontal, XCircle, Percent, Inbox, ArrowDownUp, ArrowUpDown, UserCog, ShoppingCart,
+  MoreHorizontal, ShoppingCart,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -23,7 +23,7 @@ import { useNavigate } from 'react-router-dom';
 interface CartItem { id: string; name: string; price: number; quantity: number; }
 
 export default function CashierNewOrder() {
-  const { user, currentRole, signOut } = useAuth();
+  const { user, currentRole } = useAuth();
   const restaurantId = currentRole?.restaurant_id;
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -35,10 +35,7 @@ export default function CashierNewOrder() {
   const [orderId, setOrderId] = useState<string>('new');
   const [customerName, setCustomerName] = useState('');
   const [notes, setNotes] = useState('');
-  const [discount, setDiscount] = useState(0);
-  const [payMethod, setPayMethod] = useState<string>('cash');
   const [noteOpen, setNoteOpen] = useState(false);
-  const [discountOpen, setDiscountOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const customerRef = useRef<HTMLInputElement>(null);
 
@@ -98,7 +95,7 @@ export default function CashierNewOrder() {
   );
 
   const subtotal = cart.reduce((s, c) => s + c.price * c.quantity, 0);
-  const total = Math.max(subtotal - discount, 0);
+  const total = subtotal;
   const selectedTable = tables?.find(t => t.id === tableId);
 
   const add = (item: any) => setCart(prev => {
@@ -160,7 +157,7 @@ export default function CashierNewOrder() {
         .eq('id', targetOrderId);
     },
     onSuccess: () => {
-      setCart([]); setCustomerName(''); setOrderId('new'); setNotes(''); setDiscount(0);
+      setCart([]); setCustomerName(''); setOrderId('new'); setNotes('');
       queryClient.invalidateQueries({ queryKey: ['cashier-order-open'] });
       queryClient.invalidateQueries({ queryKey: ['cashier-open-orders'] });
       toast.success('Pedido enviado para a cozinha!');
@@ -168,36 +165,16 @@ export default function CashierNewOrder() {
     onError: (e: any) => toast.error(e.message || 'Erro ao lançar pedido.'),
   });
 
-  const quickActions = [
-    { key: 'F5', label: 'Cancelar item', icon: XCircle, color: 'text-destructive', bg: 'bg-destructive/10',
-      run: () => { if (!cart.length) return toast.info('Comanda vazia'); removeItem(cart[cart.length - 1].id); toast.success('Último item removido'); } },
-    { key: 'F6', label: 'Desconto', icon: Percent, color: 'text-[hsl(var(--warning))]', bg: 'bg-[hsl(var(--warning))]/10', run: () => setDiscountOpen(true) },
-    { key: 'F7', label: 'Observação', icon: MessageSquarePlus, color: 'text-[hsl(var(--info))]', bg: 'bg-[hsl(var(--info))]/10', run: () => setNoteOpen(true) },
-    { key: 'F8', label: 'Clientes', icon: Users, color: 'text-primary', bg: 'bg-primary/10', run: () => customerRef.current?.focus() },
-    { key: 'F9', label: 'Abrir gaveta', icon: Inbox, color: 'text-[hsl(var(--success))]', bg: 'bg-[hsl(var(--success))]/10', run: () => toast.success('Gaveta acionada') },
-    { key: 'F10', label: 'Sangria', icon: ArrowDownUp, color: 'text-destructive', bg: 'bg-destructive/10', run: () => navigate('/cashier/movements') },
-    { key: 'F11', label: 'Suprimento', icon: ArrowUpDown, color: 'text-[hsl(var(--success))]', bg: 'bg-[hsl(var(--success))]/10', run: () => navigate('/cashier/movements') },
-    { key: 'F12', label: 'Trocar usuário', icon: UserCog, color: 'text-[hsl(var(--info))]', bg: 'bg-[hsl(var(--info))]/10', run: async () => { await signOut(); navigate('/login'); } },
-  ];
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const action = quickActions.find(a => a.key === e.key);
       if (e.key === 'F2') { e.preventDefault(); searchRef.current?.focus(); return; }
       if (e.key === 'F3') { e.preventDefault(); customerRef.current?.focus(); return; }
-      if (e.key === 'F4') { e.preventDefault(); if (cart.length && tableId) send.mutate(); return; }
-      if (action) { e.preventDefault(); action.run(); }
+      if (e.key === 'F4') { e.preventDefault(); if (cart.length && tableId) send.mutate(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  const payments = [
-    { id: 'cash', label: 'Dinheiro' },
-    { id: 'credit_card', label: 'Cartão' },
-    { id: 'pix', label: 'PIX' },
-    { id: 'other', label: 'Outros' },
-  ];
 
   const cartPanel = (
     <div className="flex h-full flex-col gap-4">
@@ -290,7 +267,6 @@ export default function CashierNewOrder() {
 
         <div className="space-y-1 text-sm">
           <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>R$ {subtotal.toFixed(2)}</span></div>
-          <div className="flex justify-between text-muted-foreground"><span>Desconto</span><span>- R$ {discount.toFixed(2)}</span></div>
           <div className="flex justify-between text-muted-foreground"><span>Taxa</span><span>R$ 0,00</span></div>
         </div>
 
@@ -299,22 +275,10 @@ export default function CashierNewOrder() {
           <span className="text-3xl font-bold text-primary">R$ {total.toFixed(2)}</span>
         </div>
 
-        <div className="grid grid-cols-4 gap-2">
-          {payments.map(p => (
-            <button
-              key={p.id}
-              onClick={() => setPayMethod(p.id)}
-              className={cn(
-                'pdv-ripple rounded-xl border px-2 py-2.5 text-xs font-medium transition-all duration-200',
-                payMethod === p.id
-                  ? 'border-primary bg-primary/15 text-primary'
-                  : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
-              )}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+          O recebimento é feito na aba <span className="font-medium text-foreground">Pagamentos</span>.
         </div>
+
 
         <Button
           className="pdv-ripple h-14 w-full gap-2 rounded-2xl text-base font-semibold"
@@ -410,27 +374,6 @@ export default function CashierNewOrder() {
           {!filtered.length && <p className="text-sm text-muted-foreground">Nenhum produto encontrado.</p>}
         </div>
 
-        <div>
-          <h2 className="mb-2 text-sm font-semibold text-muted-foreground">Ações rápidas</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {quickActions.map(a => (
-              <motion.button
-                key={a.key}
-                whileTap={{ scale: 0.97 }}
-                onClick={a.run}
-                className="pdv-card pdv-card-hover pdv-ripple flex items-center gap-3 p-3 text-left"
-              >
-                <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', a.bg, a.color)}>
-                  <a.icon className="h-4 w-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium leading-tight">{a.label}</span>
-                  <span className="block text-[11px] text-muted-foreground">{a.key}</span>
-                </span>
-              </motion.button>
-            ))}
-          </div>
-        </div>
       </div>
 
       <aside className="hidden w-[430px] shrink-0 xl:block">{cartPanel}</aside>
@@ -443,20 +386,6 @@ export default function CashierNewOrder() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={discountOpen} onOpenChange={setDiscountOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Desconto (R$)</DialogTitle></DialogHeader>
-          <Input
-            type="number"
-            min={0}
-            step="0.01"
-            value={discount || ''}
-            onChange={e => setDiscount(Number(e.target.value) || 0)}
-          />
-          <p className="text-xs text-muted-foreground">O desconto é exibido no resumo do caixa; o valor lançado na comanda segue o subtotal dos itens.</p>
-          <DialogFooter><Button onClick={() => setDiscountOpen(false)}>Aplicar</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
