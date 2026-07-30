@@ -299,22 +299,10 @@ export default function CashierNewOrder() {
           <span className="text-3xl font-bold text-primary">R$ {total.toFixed(2)}</span>
         </div>
 
-        <div className="grid grid-cols-4 gap-2">
-          {payments.map(p => (
-            <button
-              key={p.id}
-              onClick={() => setPayMethod(p.id)}
-              className={cn(
-                'pdv-ripple rounded-xl border px-2 py-2.5 text-xs font-medium transition-all duration-200',
-                payMethod === p.id
-                  ? 'border-primary bg-primary/15 text-primary'
-                  : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
-              )}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+          O recebimento é feito na aba <span className="font-medium text-foreground">Pagamentos</span>.
         </div>
+
 
         <Button
           className="pdv-ripple h-14 w-full gap-2 rounded-2xl text-base font-semibold"
