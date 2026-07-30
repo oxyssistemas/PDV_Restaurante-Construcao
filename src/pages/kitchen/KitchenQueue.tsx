@@ -56,10 +56,11 @@ export default function KitchenQueue() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('order_items')
-        .select('*, menu_items(name), orders!inner(table_id, restaurant_id, restaurant_tables(number))')
+        .select('*, menu_items(name), orders!inner(id, table_id, restaurant_id, order_type, customer_name, created_by_name, created_by_role, restaurant_tables(number))')
         .eq('orders.restaurant_id', restaurantId!)
         .in('status', ['pending', 'preparing'])
         .order('created_at', { ascending: true });
+
       if (error) throw error;
       return data;
     },
