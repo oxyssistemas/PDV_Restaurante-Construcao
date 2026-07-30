@@ -410,27 +410,6 @@ export default function CashierNewOrder() {
           {!filtered.length && <p className="text-sm text-muted-foreground">Nenhum produto encontrado.</p>}
         </div>
 
-        <div>
-          <h2 className="mb-2 text-sm font-semibold text-muted-foreground">Ações rápidas</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {quickActions.map(a => (
-              <motion.button
-                key={a.key}
-                whileTap={{ scale: 0.97 }}
-                onClick={a.run}
-                className="pdv-card pdv-card-hover pdv-ripple flex items-center gap-3 p-3 text-left"
-              >
-                <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', a.bg, a.color)}>
-                  <a.icon className="h-4 w-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium leading-tight">{a.label}</span>
-                  <span className="block text-[11px] text-muted-foreground">{a.key}</span>
-                </span>
-              </motion.button>
-            ))}
-          </div>
-        </div>
       </div>
 
       <aside className="hidden w-[430px] shrink-0 xl:block">{cartPanel}</aside>
