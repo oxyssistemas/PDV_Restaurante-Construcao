@@ -239,6 +239,58 @@ export type Database = {
           },
         ]
       }
+      menu_item_components: {
+        Row: {
+          component_item_id: string
+          created_at: string
+          id: string
+          parent_item_id: string
+          quantity: number
+          restaurant_id: string
+          updated_at: string
+        }
+        Insert: {
+          component_item_id: string
+          created_at?: string
+          id?: string
+          parent_item_id: string
+          quantity?: number
+          restaurant_id: string
+          updated_at?: string
+        }
+        Update: {
+          component_item_id?: string
+          created_at?: string
+          id?: string
+          parent_item_id?: string
+          quantity?: number
+          restaurant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_item_components_component_item_id_fkey"
+            columns: ["component_item_id"]
+            isOneToOne: false
+            referencedRelation: "menu_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_item_components_parent_item_id_fkey"
+            columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "menu_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_item_components_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       menu_item_ingredients: {
         Row: {
           created_at: string
@@ -299,6 +351,7 @@ export type Database = {
           description: string | null
           id: string
           image_url: string | null
+          is_combo: boolean
           name: string
           price: number
           restaurant_id: string
@@ -311,6 +364,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_combo?: boolean
           name: string
           price: number
           restaurant_id: string
@@ -323,6 +377,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_combo?: boolean
           name?: string
           price?: number
           restaurant_id?: string

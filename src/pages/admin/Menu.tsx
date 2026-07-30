@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
@@ -111,7 +112,7 @@ export default function MenuPage() {
 
           <TabsContent value="items">
             <div className="flex justify-end mb-4">
-              <ItemDialog restaurantId={restaurantId!} categories={categories || []} />
+              <ItemDialog restaurantId={restaurantId!} categories={categories || []} inventory={inventory || []} allItems={items || []} />
             </div>
             <Card className="border-0 shadow-md">
               <CardContent className="p-0">
@@ -133,7 +134,10 @@ export default function MenuPage() {
                           <MenuImage path={item.image_url} alt={item.name} className="h-11 w-11" />
                         </TableCell>
                         <TableCell className="font-medium">
-                          <div>{item.name}</div>
+                          <div className="flex items-center gap-2">
+                            {item.name}
+                            {(item as any).is_combo && <Badge variant="secondary">Combo</Badge>}
+                          </div>
                           {item.description && <div className="text-xs text-muted-foreground truncate max-w-[200px]">{item.description}</div>}
                         </TableCell>
                         <TableCell>{(item as any).menu_categories?.name || '—'}</TableCell>
@@ -145,8 +149,7 @@ export default function MenuPage() {
                           />
                         </TableCell>
                         <TableCell className="text-right whitespace-nowrap">
-                          <RecipeDialog restaurantId={restaurantId!} item={item} inventory={inventory || []} />
-                          <ItemDialog restaurantId={restaurantId!} categories={categories || []} editItem={item} />
+                          <ItemDialog restaurantId={restaurantId!} categories={categories || []} inventory={inventory || []} allItems={items || []} editItem={item} />
                           <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteItem.mutate(item.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -266,17 +269,39 @@ function CategoryDialog({ restaurantId, editCategory }: { restaurantId: string; 
   );
 }
 
-function ItemDialog({ restaurantId, categories, editItem }: { restaurantId: string; categories: any[]; editItem?: any }) {
+type IngRow = { inventory_id: string; quantity: string };
+type CompRow = { component_item_id: string; quantity: string };
+
+function ItemDialog({
+  restaurantId, categories, inventory, allItems, editItem,
+}: { restaurantId: string; categories: any[]; inventory: any[]; allItems: any[]; editItem?: any }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(editItem?.name || '');
   const [description, setDescription] = useState(editItem?.description || '');
   const [price, setPrice] = useState(editItem ? String(editItem.price) : '');
   const [categoryId, setCategoryId] = useState(editItem?.category_id || '');
   const [imagePath, setImagePath] = useState<string | null>(editItem?.image_url || null);
+  const [isCombo, setIsCombo] = useState<boolean>(!!editItem?.is_combo);
+  const [ingredients, setIngredients] = useState<IngRow[]>([]);
+  const [components, setComponents] = useState<CompRow[]>([]);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
   const { data: previewUrl } = useMenuImageUrl(imagePath);
+
+  useQuery({
+    queryKey: ['item-composition', editItem?.id, open],
+    enabled: open && !!editItem?.id,
+    queryFn: async () => {
+      const [{ data: ings }, { data: comps }] = await Promise.all([
+        supabase.from('menu_item_ingredients').select('inventory_id, quantity').eq('menu_item_id', editItem.id),
+        supabase.from('menu_item_components').select('component_item_id, quantity').eq('parent_item_id', editItem.id),
+      ]);
+      setIngredients((ings || []).map(i => ({ inventory_id: i.inventory_id, quantity: String(Number(i.quantity)) })));
+      setComponents((comps || []).map(c => ({ component_item_id: c.component_item_id, quantity: String(Number(c.quantity)) })));
+      return true;
+    },
+  });
 
   const handleUpload = async (file: File) => {
     setUploading(true);
@@ -292,6 +317,11 @@ function ItemDialog({ restaurantId, categories, editItem }: { restaurantId: stri
     setUploading(false);
   };
 
+  const comboPrice = components.reduce((sum, c) => {
+    const it = allItems.find(i => i.id === c.component_item_id);
+    return sum + (it ? Number(it.price) * (Number(c.quantity) || 0) : 0);
+  }, 0);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -301,20 +331,54 @@ function ItemDialog({ restaurantId, categories, editItem }: { restaurantId: stri
       price: Number(price),
       category_id: categoryId || null,
       image_url: imagePath,
+      is_combo: isCombo,
       restaurant_id: restaurantId,
     };
 
-    const { error } = editItem
-      ? await supabase.from('menu_items').update(payload).eq('id', editItem.id)
-      : await supabase.from('menu_items').insert(payload);
+    const { data: saved, error } = editItem
+      ? await supabase.from('menu_items').update(payload).eq('id', editItem.id).select('id').single()
+      : await supabase.from('menu_items').insert(payload).select('id').single();
 
-    if (error) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
-    } else {
-      queryClient.invalidateQueries({ queryKey: ['menu-items'] });
-      toast({ title: editItem ? 'Item atualizado' : 'Item criado' });
-      setOpen(false);
-      if (!editItem) { setName(''); setDescription(''); setPrice(''); setCategoryId(''); setImagePath(null); }
+    if (error || !saved) {
+      toast({ title: 'Erro', description: error?.message, variant: 'destructive' });
+      setLoading(false);
+      return;
+    }
+
+    const itemId = saved.id;
+    await supabase.from('menu_item_ingredients').delete().eq('menu_item_id', itemId);
+    await supabase.from('menu_item_components').delete().eq('parent_item_id', itemId);
+
+    const validIngs = isCombo ? [] : ingredients.filter(i => i.inventory_id && Number(i.quantity) > 0);
+    const validComps = isCombo ? components.filter(c => c.component_item_id && Number(c.quantity) > 0) : [];
+
+    if (validIngs.length) {
+      const { error: ingError } = await supabase.from('menu_item_ingredients').insert(
+        validIngs.map(i => ({
+          restaurant_id: restaurantId, menu_item_id: itemId,
+          inventory_id: i.inventory_id, quantity: Number(i.quantity),
+        }))
+      );
+      if (ingError) toast({ title: 'Erro nos ingredientes', description: ingError.message, variant: 'destructive' });
+    }
+
+    if (validComps.length) {
+      const { error: compError } = await supabase.from('menu_item_components').insert(
+        validComps.map(c => ({
+          restaurant_id: restaurantId, parent_item_id: itemId,
+          component_item_id: c.component_item_id, quantity: Number(c.quantity),
+        }))
+      );
+      if (compError) toast({ title: 'Erro no combo', description: compError.message, variant: 'destructive' });
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['menu-items'] });
+    queryClient.invalidateQueries({ queryKey: ['item-composition'] });
+    toast({ title: editItem ? 'Item atualizado' : 'Item criado' });
+    setOpen(false);
+    if (!editItem) {
+      setName(''); setDescription(''); setPrice(''); setCategoryId(''); setImagePath(null);
+      setIsCombo(false); setIngredients([]); setComponents([]);
     }
     setLoading(false);
   };
@@ -328,7 +392,7 @@ function ItemDialog({ restaurantId, categories, editItem }: { restaurantId: stri
           <Button className="gap-2"><Plus className="h-4 w-4" /> Novo Item</Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-auto">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-auto">
         <DialogHeader><DialogTitle>{editItem ? 'Editar' : 'Novo'} Item</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex items-center gap-4">
@@ -358,6 +422,15 @@ function ItemDialog({ restaurantId, categories, editItem }: { restaurantId: stri
               )}
             </div>
           </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div>
+              <Label className="text-sm font-medium">Combo</Label>
+              <p className="text-xs text-muted-foreground">Combos são montados juntando itens já cadastrados no cardápio.</p>
+            </div>
+            <Switch checked={isCombo} onCheckedChange={setIsCombo} />
+          </div>
+
           <div className="space-y-2">
             <Label>Nome *</Label>
             <Input value={name} onChange={e => setName(e.target.value)} required />
@@ -370,6 +443,12 @@ function ItemDialog({ restaurantId, categories, editItem }: { restaurantId: stri
             <div className="space-y-2">
               <Label>Preço (R$) *</Label>
               <Input type="number" step="0.01" min="0" value={price} onChange={e => setPrice(e.target.value)} required />
+              {isCombo && components.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Soma dos itens: R$ {comboPrice.toFixed(2)}{' '}
+                  <button type="button" className="underline" onClick={() => setPrice(comboPrice.toFixed(2))}>usar</button>
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Categoria</Label>
@@ -383,6 +462,90 @@ function ItemDialog({ restaurantId, categories, editItem }: { restaurantId: stri
               </Select>
             </div>
           </div>
+
+          {!isCombo ? (
+            <div className="space-y-2 rounded-lg border p-3">
+              <div className="flex items-center gap-2">
+                <Boxes className="h-4 w-4 text-primary" />
+                <Label className="text-sm font-medium">Ingredientes do estoque</Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Informe o consumo por unidade vendida — a baixa no estoque é automática a cada pedido.
+              </p>
+              {!inventory.length && (
+                <p className="text-xs text-muted-foreground">Cadastre ingredientes na aba Estoque primeiro.</p>
+              )}
+              {ingredients.map((row, idx) => {
+                const inv = inventory.find(i => i.id === row.inventory_id);
+                return (
+                  <div key={idx} className="grid grid-cols-[1fr_110px_auto] items-center gap-2">
+                    <Select
+                      value={row.inventory_id}
+                      onValueChange={v => setIngredients(prev => prev.map((r, i) => i === idx ? { ...r, inventory_id: v } : r))}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Selecione o ingrediente" /></SelectTrigger>
+                      <SelectContent>
+                        {inventory.map(i => <SelectItem key={i.id} value={i.id}>{i.name} ({i.unit})</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <div className="relative">
+                      <Input
+                        type="number" step="0.001" min="0" value={row.quantity}
+                        onChange={e => setIngredients(prev => prev.map((r, i) => i === idx ? { ...r, quantity: e.target.value } : r))}
+                      />
+                      {inv && <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">{inv.unit}</span>}
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" className="text-destructive"
+                      onClick={() => setIngredients(prev => prev.filter((_, i) => i !== idx))}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                );
+              })}
+              <Button type="button" variant="outline" size="sm" className="gap-2"
+                onClick={() => setIngredients(prev => [...prev, { inventory_id: '', quantity: '1' }])}>
+                <Plus className="h-4 w-4" /> Adicionar ingrediente
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2 rounded-lg border p-3">
+              <div className="flex items-center gap-2">
+                <Boxes className="h-4 w-4 text-primary" />
+                <Label className="text-sm font-medium">Itens do combo</Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                A baixa de estoque do combo usa os ingredientes de cada item selecionado.
+              </p>
+              {components.map((row, idx) => (
+                <div key={idx} className="grid grid-cols-[1fr_110px_auto] items-center gap-2">
+                  <Select
+                    value={row.component_item_id}
+                    onValueChange={v => setComponents(prev => prev.map((r, i) => i === idx ? { ...r, component_item_id: v } : r))}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Selecione o item" /></SelectTrigger>
+                    <SelectContent>
+                      {allItems.filter(i => !i.is_combo && i.id !== editItem?.id).map(i => (
+                        <SelectItem key={i.id} value={i.id}>{i.name} — R$ {Number(i.price).toFixed(2)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number" step="1" min="1" value={row.quantity}
+                    onChange={e => setComponents(prev => prev.map((r, i) => i === idx ? { ...r, quantity: e.target.value } : r))}
+                  />
+                  <Button type="button" variant="ghost" size="icon" className="text-destructive"
+                    onClick={() => setComponents(prev => prev.filter((_, i) => i !== idx))}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button type="button" variant="outline" size="sm" className="gap-2"
+                onClick={() => setComponents(prev => [...prev, { component_item_id: '', quantity: '1' }])}>
+                <Plus className="h-4 w-4" /> Adicionar item ao combo
+              </Button>
+            </div>
+          )}
+
           <DialogFooter>
             <Button type="submit" disabled={loading || uploading} className="gap-2">
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -390,104 +553,6 @@ function ItemDialog({ restaurantId, categories, editItem }: { restaurantId: stri
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function RecipeDialog({ restaurantId, item, inventory }: { restaurantId: string; item: any; inventory: any[] }) {
-  const [open, setOpen] = useState(false);
-  const [inventoryId, setInventoryId] = useState('');
-  const [quantity, setQuantity] = useState('1');
-  const queryClient = useQueryClient();
-
-  const { data: recipe } = useQuery({
-    queryKey: ['recipe', item.id],
-    enabled: open,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('menu_item_ingredients')
-        .select('*, inventory(name, unit)')
-        .eq('menu_item_id', item.id);
-      return data || [];
-    },
-  });
-
-  const addIngredient = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from('menu_item_ingredients').insert({
-        restaurant_id: restaurantId,
-        menu_item_id: item.id,
-        inventory_id: inventoryId,
-        quantity: Number(quantity),
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recipe', item.id] });
-      setInventoryId(''); setQuantity('1');
-      toast({ title: 'Ingrediente vinculado' });
-    },
-    onError: (e: any) => toast({ title: 'Erro', description: e.message, variant: 'destructive' }),
-  });
-
-  const removeIngredient = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('menu_item_ingredients').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['recipe', item.id] }),
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" title="Ficha técnica (baixa de estoque)">
-          <Boxes className="h-4 w-4" />
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-auto">
-        <DialogHeader><DialogTitle>Ficha técnica — {item.name}</DialogTitle></DialogHeader>
-        <p className="text-sm text-muted-foreground">
-          Os insumos abaixo têm baixa automática no estoque a cada pedido lançado.
-        </p>
-
-        <div className="space-y-2">
-          {recipe?.length ? recipe.map(r => (
-            <div key={r.id} className="flex items-center justify-between rounded-lg border p-2 text-sm">
-              <span>{(r as any).inventory?.name}</span>
-              <div className="flex items-center gap-3">
-                <span className="text-muted-foreground">
-                  {Number(r.quantity)} {(r as any).inventory?.unit} / unidade
-                </span>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeIngredient.mutate(r.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )) : <p className="text-sm text-muted-foreground">Nenhum insumo vinculado.</p>}
-        </div>
-
-        <div className="grid grid-cols-[1fr_100px_auto] items-end gap-2 border-t pt-4">
-          <div className="space-y-1">
-            <Label className="text-xs">Insumo</Label>
-            <Select value={inventoryId} onValueChange={setInventoryId}>
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                {inventory.map(i => (
-                  <SelectItem key={i.id} value={i.id}>{i.name} ({i.unit})</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Qtd.</Label>
-            <Input type="number" step="0.001" min="0" value={quantity} onChange={e => setQuantity(e.target.value)} />
-          </div>
-          <Button disabled={!inventoryId || addIngredient.isPending} onClick={() => addIngredient.mutate()}>
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
       </DialogContent>
     </Dialog>
   );
