@@ -87,15 +87,17 @@ export default function AdminLayout() {
         {sidebar}
       </aside>
       <main className="flex-1 overflow-auto">
-        <div className="flex h-14 items-center gap-4 border-b px-4 lg:hidden">
-          <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
+        <div className="flex h-14 items-center gap-4 border-b px-4">
+          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
             <Menu className="h-5 w-5" />
           </Button>
-          <span className="font-semibold">Admin</span>
+          <span className="font-semibold lg:hidden">Admin</span>
+          <div className="ml-auto"><NotificationsBell /></div>
         </div>
         <div className="p-6">
           <Outlet />
         </div>
+
       </main>
     </div>
   );

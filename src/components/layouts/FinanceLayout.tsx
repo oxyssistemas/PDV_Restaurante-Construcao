@@ -66,12 +66,14 @@ export default function FinanceLayout() {
         {sidebar}
       </aside>
       <main className="flex-1 overflow-auto">
-        <div className="flex h-14 items-center gap-4 border-b px-4 lg:hidden">
-          <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}><Menu className="h-5 w-5" /></Button>
-          <span className="font-semibold">Financeiro</span>
+        <div className="flex h-14 items-center gap-4 border-b px-4">
+          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}><Menu className="h-5 w-5" /></Button>
+          <span className="font-semibold lg:hidden">Financeiro</span>
+          <div className="ml-auto"><NotificationsBell /></div>
         </div>
         <div className="p-4 md:p-6"><Outlet /></div>
       </main>
+
     </div>
   );
 }
