@@ -4,6 +4,8 @@ import { cn } from '@/lib/utils';
 import { LineChart, LogOut, Menu, FileBarChart, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
+import NotificationsBell from '@/components/NotificationsBell';
+
 
 const navItems = [
   { to: '/finance', icon: LineChart, label: 'Dashboard', end: true },
