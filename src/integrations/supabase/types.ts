@@ -204,6 +204,36 @@ export type Database = {
           },
         ]
       }
+      login_attempts: {
+        Row: {
+          attempts: number
+          created_at: string
+          email: string
+          id: string
+          last_attempt_at: string
+          locked_until: string | null
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          email: string
+          id?: string
+          last_attempt_at?: string
+          locked_until?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          email?: string
+          id?: string
+          last_attempt_at?: string
+          locked_until?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       menu_categories: {
         Row: {
           created_at: string
@@ -805,6 +835,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      clear_login_attempts: { Args: { _email: string }; Returns: undefined }
       get_user_restaurant_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -817,6 +848,8 @@ export type Database = {
         Args: { _restaurant_id: string }
         Returns: boolean
       }
+      login_lock_seconds: { Args: { _email: string }; Returns: number }
+      register_login_failure: { Args: { _email: string }; Returns: number }
       user_belongs_to_restaurant: {
         Args: { _restaurant_id: string; _user_id: string }
         Returns: boolean
