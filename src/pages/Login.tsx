@@ -140,6 +140,14 @@ export default function Login() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {remaining > 0 && (
+              <div className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+                <ShieldAlert className="h-4 w-4 mt-0.5 text-destructive shrink-0" />
+                <span className="text-destructive">
+                  Muitas tentativas de login. Tente novamente em <strong>{formatTime(remaining)}</strong>.
+                </span>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -148,6 +156,7 @@ export default function Login() {
                 placeholder="seu@email.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
+                disabled={remaining > 0}
                 required
               />
             </div>
@@ -159,14 +168,25 @@ export default function Login() {
                 placeholder="••••••••"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
+                disabled={remaining > 0}
                 required
               />
             </div>
-            <Button type="submit" className="w-full h-11 text-base font-semibold" disabled={submitting}>
+            {remaining === 0 && attemptsLeft < MAX_ATTEMPTS && (
+              <p className="text-xs text-muted-foreground">
+                {attemptsLeft} tentativa(s) restante(s) antes do bloqueio temporário.
+              </p>
+            )}
+            <Button
+              type="submit"
+              className="w-full h-11 text-base font-semibold"
+              disabled={submitting || remaining > 0}
+            >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Entrar
+              {remaining > 0 ? `Bloqueado (${formatTime(remaining)})` : 'Entrar'}
             </Button>
           </form>
+
         </CardContent>
       </Card>
     </div>
