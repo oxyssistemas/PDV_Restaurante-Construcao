@@ -1,61 +1,52 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { toast } from 'sonner';
+import {
+  Loader2, Search, Plus, Users, Clock, Receipt, UtensilsCrossed, User2,
+} from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Loader2, Users, Plus, Eye, Pencil } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
-import { useEffect, useState } from 'react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { authorFields } from '@/lib/orders';
-
-
-const statusColors: Record<string, string> = {
-  free: 'bg-green-500/20 border-green-500 text-green-700',
-  occupied: 'bg-red-500/20 border-red-500 text-red-700',
-  reserved: 'bg-yellow-500/20 border-yellow-500 text-yellow-700',
-};
-
-const statusLabels: Record<string, string> = {
-  free: 'Livre',
-  occupied: 'Ocupada',
-  reserved: 'Reservada',
-};
+import { brl, tableStatusMeta, timeLabel, waiterFilters, TableUiStatus } from '@/lib/waiter';
 
 export default function TableMap() {
   const { currentRole, user } = useAuth();
   const restaurantId = currentRole?.restaurant_id;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<'all' | TableUiStatus>('all');
+  const [newOpen, setNewOpen] = useState(false);
+  const [newTableId, setNewTableId] = useState('');
+  const [newCustomer, setNewCustomer] = useState('');
 
   const { data: tables, isLoading } = useQuery({
     queryKey: ['waiter-tables', restaurantId],
     enabled: !!restaurantId,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('restaurant_tables')
-        .select('*')
-        .eq('restaurant_id', restaurantId!)
-        .order('number');
+        .from('restaurant_tables').select('*').eq('restaurant_id', restaurantId!).order('number');
       if (error) throw error;
       return data;
     },
   });
 
-  // Get active orders per table
-  const { data: activeOrders } = useQuery({
+  const { data: orders } = useQuery({
     queryKey: ['table-orders', restaurantId],
     enabled: !!restaurantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, table_id, total, status, created_at, customer_name')
+        .select('id, table_id, total, status, created_at, customer_name, created_by_name')
         .eq('restaurant_id', restaurantId!)
         .in('status', ['pending', 'preparing', 'ready'])
         .order('created_at');
@@ -64,199 +55,240 @@ export default function TableMap() {
     },
   });
 
-  // Group orders by table
-  const ordersByTable = new Map<string, typeof activeOrders>();
-  activeOrders?.forEach(order => {
-    if (!ordersByTable.has(order.table_id)) ordersByTable.set(order.table_id, []);
-    ordersByTable.get(order.table_id)!.push(order);
+  const orderIds = (orders || []).map(o => o.id);
+
+  const { data: items } = useQuery({
+    queryKey: ['table-order-items', orderIds.join(',')],
+    enabled: orderIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('order_items').select('id, order_id, quantity, status').in('order_id', orderIds);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: alerts } = useQuery({
+    queryKey: ['waiter-table-alerts', restaurantId],
+    enabled: !!restaurantId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('notifications')
+        .select('id, type, message, read, created_at')
+        .eq('restaurant_id', restaurantId!)
+        .in('type', ['bill_request', 'manager_call'])
+        .eq('read', false);
+      return data || [];
+    },
   });
 
   useEffect(() => {
     if (!restaurantId) return;
     const channel = supabase
-      .channel('table-status')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_tables', filter: `restaurant_id=eq.${restaurantId}` }, () => {
-        queryClient.invalidateQueries({ queryKey: ['waiter-tables', restaurantId] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` }, () => {
-        queryClient.invalidateQueries({ queryKey: ['table-orders', restaurantId] });
-      })
+      .channel('waiter-tables-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_tables', filter: `restaurant_id=eq.${restaurantId}` },
+        () => queryClient.invalidateQueries({ queryKey: ['waiter-tables', restaurantId] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` },
+        () => queryClient.invalidateQueries({ queryKey: ['table-orders', restaurantId] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' },
+        () => queryClient.invalidateQueries({ queryKey: ['table-order-items'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `restaurant_id=eq.${restaurantId}` },
+        () => queryClient.invalidateQueries({ queryKey: ['waiter-table-alerts', restaurantId] }))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [restaurantId, queryClient]);
 
-  const addOrder = useMutation({
-    mutationFn: async (tableId: string) => {
+  const cards = useMemo(() => {
+    return (tables || []).map(table => {
+      const tableOrders = (orders || []).filter(o => o.table_id === table.id);
+      const tableItems = (items || []).filter(i => tableOrders.some(o => o.id === i.order_id));
+      const totals = tableOrders.reduce((s, o) => s + Number(o.total), 0);
+      const itemCount = tableItems.reduce((s, i) => s + i.quantity, 0);
+      const openedAt = tableOrders[0]?.created_at ?? null;
+      const calling = (alerts || []).some(a => (a.message || '').includes(`Mesa ${table.number} `));
+
+      let status: TableUiStatus = 'free';
+      if (calling) status = 'calling';
+      else if (tableItems.some(i => i.status === 'ready')) status = 'ready';
+      else if (tableItems.some(i => i.status === 'pending' || i.status === 'preparing')) status = 'sent';
+      else if (tableOrders.length || table.status !== 'free') status = 'occupied';
+
+      return { table, tableOrders, totals, itemCount, openedAt, status };
+    });
+  }, [tables, orders, items, alerts]);
+
+  const visible = cards.filter(c => {
+    if (filter !== 'all' && c.status !== filter) return false;
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return String(c.table.number).includes(q) ||
+      c.tableOrders.some(o => (o.customer_name || '').toLowerCase().includes(q));
+  });
+
+  const openOrder = useMutation({
+    mutationFn: async ({ tableId, customer }: { tableId: string; customer?: string }) => {
       const table = tables?.find(t => t.id === tableId);
-      // If table is free, mark as occupied
       if (table?.status === 'free') {
-        const { error: tableError } = await supabase
-          .from('restaurant_tables')
-          .update({ status: 'occupied' as const })
-          .eq('id', tableId);
-        if (tableError) throw tableError;
+        await supabase.from('restaurant_tables').update({ status: 'occupied' as const }).eq('id', tableId);
       }
-
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          table_id: tableId,
-          restaurant_id: restaurantId!,
-          waiter_id: user!.id,
-          status: 'pending' as const,
-          order_type: 'dine_in',
-          ...authorFields(user, currentRole?.role),
-        })
-        .select()
-        .single();
-      if (orderError) throw orderError;
-
-      return order;
+      const { data, error } = await supabase.from('orders').insert({
+        table_id: tableId,
+        restaurant_id: restaurantId!,
+        waiter_id: user!.id,
+        status: 'pending' as const,
+        order_type: 'dine_in',
+        customer_name: customer?.trim() || null,
+        ...authorFields(user, currentRole?.role),
+      }).select().single();
+      if (error) throw error;
+      return data;
     },
     onSuccess: (order) => {
+      setNewOpen(false); setNewCustomer(''); setNewTableId('');
       queryClient.invalidateQueries({ queryKey: ['waiter-tables'] });
       queryClient.invalidateQueries({ queryKey: ['table-orders'] });
-      toast.success('Comanda criada!');
       navigate(`/waiter/orders/${order.id}`);
     },
-    onError: () => {
-      toast.error('Não foi possível criar a comanda.');
-    },
+    onError: () => toast.error('Não foi possível abrir a comanda.'),
   });
 
-  const renameOrder = useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const { error } = await supabase
-        .from('orders')
-        .update({ customer_name: name.trim() || null })
-        .eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['table-orders'] });
-      setRenaming(null);
-      toast.success('Nome da comanda atualizado!');
-    },
-    onError: () => toast.error('Não foi possível renomear a comanda.'),
-  });
-
-
+  const handleCard = (c: (typeof cards)[number]) => {
+    if (c.tableOrders.length === 1) return navigate(`/waiter/orders/${c.tableOrders[0].id}`);
+    if (c.tableOrders.length > 1) return navigate(`/waiter/orders?table=${c.table.id}`);
+    openOrder.mutate({ tableId: c.table.id });
+  };
 
   if (isLoading) {
-    return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight mb-6">Mapa de Mesas</h1>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {tables?.map(table => {
-          const tableOrders = ordersByTable.get(table.id) || [];
-          const totalTable = tableOrders.reduce((s, o) => s + Number(o.total), 0);
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="mr-auto">
+          <h1 className="text-2xl font-bold tracking-tight">Oxys PDV</h1>
+          <p className="text-xs text-muted-foreground">Atendimento • Salão</p>
+        </div>
+        <div className="relative min-w-[220px] flex-1 md:max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="h-12 rounded-2xl pl-9"
+            placeholder="Buscar mesa ou cliente..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <Button className="h-12 gap-2 rounded-2xl px-5 text-base" onClick={() => setNewOpen(true)}>
+          <Plus className="h-5 w-5" /> Nova Mesa
+        </Button>
+      </div>
 
+      <div className="pdv-scroll flex gap-2 overflow-x-auto pb-1">
+        {waiterFilters.map(f => (
+          <button
+            key={f.value}
+            onClick={() => setFilter(f.value)}
+            className={cn(
+              'pdv-ripple shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition-all',
+              filter === f.value
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
+            )}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        {visible.map(c => {
+          const meta = tableStatusMeta[c.status];
+          const main = c.tableOrders[0];
           return (
-            <Card
-              key={table.id}
-              className={cn(
-                'border-2 transition-all hover:shadow-lg',
-                statusColors[table.status]
-              )}
+            <motion.button
+              key={c.table.id}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleCard(c)}
+              className={cn('pdv-card pdv-card-hover pdv-ripple border-2 p-5 text-left', meta.card)}
             >
-              <CardContent className="p-4 text-center">
-                <div className="text-3xl font-bold mb-1">{table.number}</div>
-                <div className="flex items-center justify-center gap-1 text-xs mb-2">
-                  <Users className="h-3 w-3" />
-                  {table.capacity}
-                </div>
-                <Badge variant="outline" className="text-xs">
-                  {statusLabels[table.status]}
-                </Badge>
-
-                {/* Show active orders (comandas) */}
-                {tableOrders.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    <div className="text-xs text-muted-foreground font-medium">
-                      {tableOrders.length} comanda{tableOrders.length > 1 ? 's' : ''}
-                    </div>
-                    {tableOrders.map((order, idx) => (
-                      <div key={order.id} className="flex items-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1 text-xs gap-1 min-w-0"
-                          onClick={() => navigate(`/waiter/orders/${order.id}`)}
-                        >
-                          <Eye className="h-3 w-3 shrink-0" />
-                          <span className="truncate">
-                            {(order as any).customer_name || `Comanda ${idx + 1}`} — R$ {Number(order.total).toFixed(2)}
-                          </span>
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 shrink-0"
-                          title="Renomear comanda"
-                          onClick={() => setRenaming({ id: order.id, name: (order as any).customer_name || '' })}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                    <div className="text-xs font-bold mt-1">
-                      Total: R$ {totalTable.toFixed(2)}
-                    </div>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-4xl font-bold leading-none">{c.table.number}</div>
+                  <div className="mt-1 truncate text-sm text-muted-foreground">
+                    {main?.customer_name || (c.tableOrders.length > 1 ? `${c.tableOrders.length} comandas` : 'Sem cliente')}
                   </div>
-                )}
-
-                {/* Add new order button */}
-                <div className="mt-2">
-                  <Button
-                    size="sm"
-                    variant="default"
-                    className="w-full text-xs gap-1"
-                    onClick={() => addOrder.mutate(table.id)}
-                    disabled={addOrder.isPending}
-                  >
-                    <Plus className="h-3 w-3" />
-                    {table.status === 'free' ? 'Abrir Mesa' : 'Nova Comanda'}
-                  </Button>
                 </div>
-              </CardContent>
-            </Card>
+                <span className={cn('flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium', meta.chip)}>
+                  <span className={cn('h-2 w-2 rounded-full', meta.dot)} />
+                  {meta.label}
+                </span>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Users className="h-4 w-4" /> {c.table.capacity} pessoas
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Clock className="h-4 w-4" /> {c.openedAt ? timeLabel(c.openedAt) : '--:--'}
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <UtensilsCrossed className="h-4 w-4" /> {c.itemCount} itens
+                </div>
+                <div className="flex items-center gap-2 truncate text-muted-foreground">
+                  <User2 className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{main?.created_by_name?.split('@')[0] || '—'}</span>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Receipt className="h-4 w-4" /> Parcial
+                </span>
+                <span className="text-xl font-bold text-primary">{brl(c.totals)}</span>
+              </div>
+            </motion.button>
           );
         })}
       </div>
-      {(!tables || tables.length === 0) && (
-        <p className="text-center text-muted-foreground mt-8">Nenhuma mesa cadastrada. Peça ao admin para configurar as mesas.</p>
+
+      {!visible.length && (
+        <p className="py-12 text-center text-muted-foreground">Nenhuma mesa encontrada com esse filtro.</p>
       )}
 
-      <Dialog open={!!renaming} onOpenChange={(o) => !o && setRenaming(null)}>
+      <Dialog open={newOpen} onOpenChange={setNewOpen}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Nome da comanda</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="comanda-nome">Identificação</Label>
-            <Input
-              id="comanda-nome"
-              autoFocus
-              placeholder="Ex.: João, Camisa azul, Aniversário"
-              value={renaming?.name ?? ''}
-              onChange={(e) => setRenaming(r => r && { ...r, name: e.target.value })}
-              onKeyDown={(e) => { if (e.key === 'Enter' && renaming) renameOrder.mutate(renaming); }}
-            />
-            <p className="text-xs text-muted-foreground">Deixe em branco para voltar à numeração padrão.</p>
+          <DialogHeader><DialogTitle>Abrir nova mesa</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Mesa</Label>
+              <Select value={newTableId} onValueChange={setNewTableId}>
+                <SelectTrigger className="h-12 rounded-xl"><SelectValue placeholder="Selecione a mesa" /></SelectTrigger>
+                <SelectContent>
+                  {tables?.map(t => (
+                    <SelectItem key={t.id} value={t.id}>
+                      Mesa {t.number} • {t.capacity} lugares
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Cliente (opcional)</Label>
+              <Input className="h-12 rounded-xl" placeholder="Ex.: João" value={newCustomer} onChange={e => setNewCustomer(e.target.value)} />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRenaming(null)}>Cancelar</Button>
-            <Button onClick={() => renaming && renameOrder.mutate(renaming)} disabled={renameOrder.isPending}>
-              {renameOrder.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Salvar
+            <Button variant="outline" className="rounded-xl" onClick={() => setNewOpen(false)}>Cancelar</Button>
+            <Button
+              className="rounded-xl"
+              disabled={!newTableId || openOrder.isPending}
+              onClick={() => openOrder.mutate({ tableId: newTableId, customer: newCustomer })}
+            >
+              {openOrder.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Abrir comanda
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-
   );
 }
