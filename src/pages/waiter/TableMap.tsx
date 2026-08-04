@@ -175,8 +175,8 @@ export default function TableMap() {
 
   const mergeTables = useMutation({
     mutationFn: async (ids: string[]) => {
-      const groupId = (tables || []).find(t => ids.includes(t.id) && (t as any).merge_group_id)?.['merge_group_id' as never]
-        || crypto.randomUUID();
+      const existing = (tables || []).find(t => ids.includes(t.id) && (t as any).merge_group_id);
+      const groupId = (existing as any)?.merge_group_id || crypto.randomUUID();
       const { error } = await supabase.from('restaurant_tables')
         .update({ merge_group_id: groupId } as any).in('id', ids);
       if (error) throw error;
