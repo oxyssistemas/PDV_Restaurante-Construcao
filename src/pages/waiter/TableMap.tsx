@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   Loader2, Search, Plus, Users, Clock, Receipt, UtensilsCrossed, User2,
+  Pencil, Link2, Unlink, Check, X, ChevronRight,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,6 +29,9 @@ export default function TableMap() {
   const [newOpen, setNewOpen] = useState(false);
   const [newTableId, setNewTableId] = useState('');
   const [newCustomer, setNewCustomer] = useState('');
+  const [mergeMode, setMergeMode] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
 
   const { data: tables, isLoading } = useQuery({
     queryKey: ['waiter-tables', restaurantId],
@@ -100,12 +104,16 @@ export default function TableMap() {
 
   const cards = useMemo(() => {
     return (tables || []).map(table => {
-      const tableOrders = (orders || []).filter(o => o.table_id === table.id);
+      const group = (table as any).merge_group_id as string | null;
+      const groupTables = group ? (tables || []).filter(t => (t as any).merge_group_id === group) : [table];
+      const groupIds = groupTables.map(t => t.id);
+      const tableOrders = (orders || []).filter(o => o.table_id && groupIds.includes(o.table_id));
       const tableItems = (items || []).filter(i => tableOrders.some(o => o.id === i.order_id));
       const totals = tableOrders.reduce((s, o) => s + Number(o.total), 0);
       const itemCount = tableItems.reduce((s, i) => s + i.quantity, 0);
       const openedAt = tableOrders[0]?.created_at ?? null;
       const calling = (alerts || []).some(a => (a.message || '').includes(`Mesa ${table.number} `));
+      const capacity = groupTables.reduce((s, t) => s + t.capacity, 0);
 
       let status: TableUiStatus = 'free';
       if (calling) status = 'calling';
@@ -113,7 +121,7 @@ export default function TableMap() {
       else if (tableItems.some(i => i.status === 'pending' || i.status === 'preparing')) status = 'sent';
       else if (tableOrders.length || table.status !== 'free') status = 'occupied';
 
-      return { table, tableOrders, totals, itemCount, openedAt, status };
+      return { table, tableOrders, totals, itemCount, openedAt, status, group, groupTables, capacity };
     });
   }, [tables, orders, items, alerts]);
 
@@ -152,7 +160,53 @@ export default function TableMap() {
     onError: () => toast.error('Não foi possível abrir a comanda.'),
   });
 
+  const renameOrder = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase.from('orders').update({ customer_name: name.trim() || null }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setRenaming(null);
+      queryClient.invalidateQueries({ queryKey: ['table-orders'] });
+      toast.success('Comanda renomeada!');
+    },
+    onError: () => toast.error('Não foi possível renomear a comanda.'),
+  });
+
+  const mergeTables = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const existing = (tables || []).find(t => ids.includes(t.id) && (t as any).merge_group_id);
+      const groupId = (existing as any)?.merge_group_id || crypto.randomUUID();
+      const { error } = await supabase.from('restaurant_tables')
+        .update({ merge_group_id: groupId } as any).in('id', ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setMergeMode(false); setSelected([]);
+      queryClient.invalidateQueries({ queryKey: ['waiter-tables'] });
+      toast.success('Mesas unidas!');
+    },
+    onError: () => toast.error('Não foi possível unir as mesas.'),
+  });
+
+  const splitTables = useMutation({
+    mutationFn: async (groupId: string) => {
+      const { error } = await supabase.from('restaurant_tables')
+        .update({ merge_group_id: null } as any).eq('merge_group_id', groupId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['waiter-tables'] });
+      toast.success('Mesas separadas!');
+    },
+    onError: () => toast.error('Não foi possível separar as mesas.'),
+  });
+
+  const toggleSelect = (id: string) =>
+    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
   const handleCard = (c: (typeof cards)[number]) => {
+    if (mergeMode) return toggleSelect(c.table.id);
     if (c.tableOrders.length === 1) return navigate(`/waiter/orders/${c.tableOrders[0].id}`);
     if (c.tableOrders.length > 1) return navigate(`/waiter/orders?table=${c.table.id}`);
     openOrder.mutate({ tableId: c.table.id });
@@ -178,10 +232,34 @@ export default function TableMap() {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
+        <Button
+          variant={mergeMode ? 'default' : 'outline'}
+          className="h-12 gap-2 rounded-2xl px-5"
+          onClick={() => { setMergeMode(m => !m); setSelected([]); }}
+        >
+          <Link2 className="h-5 w-5" /> {mergeMode ? 'Cancelar união' : 'Unir mesas'}
+        </Button>
         <Button className="h-12 gap-2 rounded-2xl px-5 text-base" onClick={() => setNewOpen(true)}>
           <Plus className="h-5 w-5" /> Nova Mesa
         </Button>
       </div>
+
+      {mergeMode && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-primary/40 bg-primary/5 p-4">
+          <span className="text-sm text-muted-foreground">
+            Selecione 2 ou mais mesas para unir. {selected.length} selecionada(s).
+          </span>
+          <div className="ml-auto flex gap-2">
+            <Button variant="ghost" className="gap-2 rounded-xl" onClick={() => { setMergeMode(false); setSelected([]); }}>
+              <X className="h-4 w-4" /> Cancelar
+            </Button>
+            <Button className="gap-2 rounded-xl" disabled={selected.length < 2 || mergeTables.isPending}
+              onClick={() => mergeTables.mutate(selected)}>
+              {mergeTables.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Unir mesas
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="pdv-scroll flex gap-2 overflow-x-auto pb-1">
         {waiterFilters.map(f => (
@@ -203,19 +281,27 @@ export default function TableMap() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {visible.map(c => {
           const meta = tableStatusMeta[c.status];
-          const main = c.tableOrders[0];
+          const isSelected = selected.includes(c.table.id);
+          const others = c.groupTables.filter(t => t.id !== c.table.id).map(t => t.number);
           return (
-            <motion.button
+            <motion.div
               key={c.table.id}
-              whileTap={{ scale: 0.98 }}
+              whileTap={{ scale: 0.99 }}
               onClick={() => handleCard(c)}
-              className={cn('pdv-card pdv-card-hover pdv-ripple border-2 p-5 text-left', meta.card)}
+              role="button"
+              className={cn(
+                'pdv-card pdv-card-hover pdv-ripple cursor-pointer border-2 p-5 text-left',
+                meta.card,
+                mergeMode && isSelected && 'border-primary ring-2 ring-primary/40'
+              )}
             >
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <div className="text-4xl font-bold leading-none">{c.table.number}</div>
                   <div className="mt-1 truncate text-sm text-muted-foreground">
-                    {main?.customer_name || (c.tableOrders.length > 1 ? `${c.tableOrders.length} comandas` : 'Sem cliente')}
+                    {c.tableOrders.length > 1
+                      ? `${c.tableOrders.length} comandas`
+                      : c.tableOrders[0]?.customer_name || (c.tableOrders.length ? 'Sem cliente' : 'Mesa livre')}
                   </div>
                 </div>
                 <span className={cn('flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium', meta.chip)}>
@@ -224,9 +310,15 @@ export default function TableMap() {
                 </span>
               </div>
 
+              {!!others.length && (
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-primary">
+                  <Link2 className="h-3.5 w-3.5" /> Unida com mesa{others.length > 1 ? 's' : ''} {others.join(', ')}
+                </div>
+              )}
+
               <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Users className="h-4 w-4" /> {c.table.capacity} pessoas
+                  <Users className="h-4 w-4" /> {c.capacity} pessoas
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Clock className="h-4 w-4" /> {c.openedAt ? timeLabel(c.openedAt) : '--:--'}
@@ -236,9 +328,32 @@ export default function TableMap() {
                 </div>
                 <div className="flex items-center gap-2 truncate text-muted-foreground">
                   <User2 className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{main?.created_by_name?.split('@')[0] || '—'}</span>
+                  <span className="truncate">{c.tableOrders[0]?.created_by_name?.split('@')[0] || '—'}</span>
                 </div>
               </div>
+
+              {!!c.tableOrders.length && (
+                <div className="mt-4 space-y-1 border-t border-border pt-3">
+                  {c.tableOrders.map(o => (
+                    <div key={o.id} className="flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-muted/40">
+                      <button
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm"
+                        onClick={e => { e.stopPropagation(); navigate(`/waiter/orders/${o.id}`); }}
+                      >
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <span className="truncate">{o.customer_name || 'Comanda sem nome'}</span>
+                        <span className="ml-auto shrink-0 text-xs text-muted-foreground">{brl(Number(o.total))}</span>
+                      </button>
+                      <Button
+                        variant="ghost" size="icon" className="h-7 w-7 shrink-0"
+                        onClick={e => { e.stopPropagation(); setRenaming({ id: o.id, name: o.customer_name || '' }); }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
                 <span className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -246,7 +361,32 @@ export default function TableMap() {
                 </span>
                 <span className="text-xl font-bold text-primary">{brl(c.totals)}</span>
               </div>
-            </motion.button>
+
+              {!mergeMode && (
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    className="h-11 flex-1 gap-2 rounded-xl"
+                    variant={c.tableOrders.length ? 'outline' : 'default'}
+                    disabled={openOrder.isPending}
+                    onClick={e => {
+                      e.stopPropagation();
+                      setNewTableId(c.table.id); setNewCustomer(''); setNewOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                    {c.tableOrders.length ? 'Nova comanda' : 'Criar comanda'}
+                  </Button>
+                  {c.group && (
+                    <Button
+                      variant="outline" className="h-11 gap-2 rounded-xl"
+                      onClick={e => { e.stopPropagation(); splitTables.mutate(c.group!); }}
+                    >
+                      <Unlink className="h-4 w-4" /> Separar
+                    </Button>
+                  )}
+                </div>
+              )}
+            </motion.div>
           );
         })}
       </div>
@@ -257,7 +397,7 @@ export default function TableMap() {
 
       <Dialog open={newOpen} onOpenChange={setNewOpen}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Abrir nova mesa</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Abrir nova comanda</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Mesa</Label>
@@ -273,8 +413,8 @@ export default function TableMap() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Cliente (opcional)</Label>
-              <Input className="h-12 rounded-xl" placeholder="Ex.: João" value={newCustomer} onChange={e => setNewCustomer(e.target.value)} />
+              <Label className="text-xs">Nome da comanda (opcional)</Label>
+              <Input className="h-12 rounded-xl" placeholder="Ex.: João / Conta 1" value={newCustomer} onChange={e => setNewCustomer(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
@@ -285,6 +425,31 @@ export default function TableMap() {
               onClick={() => openOrder.mutate({ tableId: newTableId, customer: newCustomer })}
             >
               {openOrder.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Abrir comanda
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!renaming} onOpenChange={o => !o && setRenaming(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Renomear comanda</DialogTitle></DialogHeader>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Nome da comanda</Label>
+            <Input
+              className="h-12 rounded-xl"
+              placeholder="Ex.: Maria / Conta 2"
+              value={renaming?.name || ''}
+              onChange={e => setRenaming(r => r && { ...r, name: e.target.value })}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => setRenaming(null)}>Cancelar</Button>
+            <Button
+              className="rounded-xl"
+              disabled={renameOrder.isPending}
+              onClick={() => renaming && renameOrder.mutate(renaming)}
+            >
+              {renameOrder.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Salvar
             </Button>
           </DialogFooter>
         </DialogContent>
