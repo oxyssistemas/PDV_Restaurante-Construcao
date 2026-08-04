@@ -726,6 +726,7 @@ export type Database = {
           capacity: number
           created_at: string
           id: string
+          merge_group_id: string | null
           number: number
           restaurant_id: string
           status: Database["public"]["Enums"]["table_status"]
@@ -735,6 +736,7 @@ export type Database = {
           capacity?: number
           created_at?: string
           id?: string
+          merge_group_id?: string | null
           number: number
           restaurant_id: string
           status?: Database["public"]["Enums"]["table_status"]
@@ -744,6 +746,7 @@ export type Database = {
           capacity?: number
           created_at?: string
           id?: string
+          merge_group_id?: string | null
           number?: number
           restaurant_id?: string
           status?: Database["public"]["Enums"]["table_status"]
