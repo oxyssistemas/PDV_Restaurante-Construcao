@@ -1,14 +1,11 @@
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { LogOut, ChefHat } from 'lucide-react';
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export default function KitchenLayout() {
-  const { signOut, currentRole } = useAuth();
-  const navigate = useNavigate();
+  const { currentRole } = useAuth();
   const restaurantId = currentRole?.restaurant_id;
 
   useEffect(() => {
@@ -24,7 +21,7 @@ export default function KitchenLayout() {
           schema: 'public',
           table: 'order_items',
         },
-        (payload) => {
+        () => {
           toast.info('🆕 Novo pedido recebido!', { duration: 4000 });
         }
       )
@@ -34,19 +31,8 @@ export default function KitchenLayout() {
   }, [restaurantId]);
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <ChefHat className="h-6 w-6 text-primary" />
-          <h1 className="text-xl font-bold">Cozinha</h1>
-        </div>
-        <Button variant="ghost" size="sm" onClick={async () => { await signOut(); navigate('/login'); }}>
-          <LogOut className="h-4 w-4 mr-1" /> Sair
-        </Button>
-      </header>
-      <main className="p-4">
-        <Outlet />
-      </main>
+    <div className="h-screen w-full overflow-hidden bg-background text-foreground">
+      <Outlet />
     </div>
   );
 }
