@@ -14,6 +14,7 @@ const navItems = [
   { to: '/admin/tables', icon: Grid3X3, label: 'Mesas', end: false },
   { to: '/admin/inventory', icon: Package, label: 'Estoque', end: false },
   { to: '/delivery', icon: Bike, label: 'Delivery', end: false },
+  { to: '/admin/couriers', icon: Bike, label: 'Entregadores', end: false },
   { to: '/admin/users', icon: Users, label: 'Usuários', end: false },
   { to: '/admin/settings', icon: Settings, label: 'Configurações', end: false },
 ];
