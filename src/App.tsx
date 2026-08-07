@@ -141,6 +141,13 @@ const App = () => (
               <Route index element={<DeliveryOrders />} />
               <Route path="new" element={<NewDelivery />} />
             </Route>
+            <Route path="/courier" element={
+              <ProtectedRoute allowedRoles={['courier']}>
+                <CourierLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<MyDeliveries />} />
+            </Route>
 
 
             <Route path="*" element={<NotFound />} />
