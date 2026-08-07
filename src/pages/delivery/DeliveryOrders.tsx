@@ -43,6 +43,31 @@ export default function DeliveryOrders() {
       return data || [];
     },
   });
+  const { data: couriers } = useQuery({
+    queryKey: ['couriers', restaurantId],
+    enabled: !!restaurantId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('couriers')
+        .select('*')
+        .eq('restaurant_id', restaurantId!)
+        .eq('active', true)
+        .order('name');
+      return data || [];
+    },
+  });
+
+  const assignCourier = useMutation({
+    mutationFn: async ({ id, courierId }: { id: string; courierId: string }) => {
+      const { error } = await supabase.from('orders').update({ courier_id: courierId }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['delivery-orders', restaurantId] });
+      toast.success('Entregador atribuído!');
+    },
+    onError: () => toast.error('Erro ao atribuir entregador.'),
+  });
 
   useEffect(() => {
     if (!restaurantId) return;
