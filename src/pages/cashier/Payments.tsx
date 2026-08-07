@@ -389,6 +389,16 @@ export default function Payments() {
 
       <aside className="hidden w-[430px] shrink-0 xl:block">{paymentPanel}</aside>
 
+      {restaurantId && (
+        <DeliverySaleDialog
+          open={deliverySaleOpen}
+          onOpenChange={setDeliverySaleOpen}
+          restaurantId={restaurantId}
+          cashRegisterId={activeRegister?.id}
+        />
+      )}
+
+
     </div>
   );
 }
