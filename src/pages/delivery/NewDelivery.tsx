@@ -98,6 +98,7 @@ export default function NewDelivery() {
           customer_address: address.trim(),
           delivery_fee: parseFloat(fee) || 0,
           total: subtotal,
+          courier_id: courierId,
           ...authorFields(user, currentRole?.role),
         })
         .select()
