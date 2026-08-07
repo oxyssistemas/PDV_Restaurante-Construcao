@@ -10,6 +10,9 @@ import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { authorLabel, deliveryStatusLabels } from '@/lib/orders';
+import { courierStatusLabels, courierDotClass } from '@/lib/delivery';
+import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const columns: { key: string; label: string; next?: string; nextLabel?: string }[] = [
   { key: 'pending', label: 'Aguardando', next: 'preparing', nextLabel: 'Em preparo' },
