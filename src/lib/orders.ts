@@ -1,5 +1,5 @@
 export type AppRoleName =
-  | 'super_admin' | 'admin' | 'waiter' | 'kitchen' | 'cashier' | 'finance' | 'delivery';
+  | 'super_admin' | 'admin' | 'waiter' | 'kitchen' | 'cashier' | 'finance' | 'delivery' | 'courier';
 
 export const roleLabels: Record<string, string> = {
   super_admin: 'Super Admin',
@@ -9,6 +9,7 @@ export const roleLabels: Record<string, string> = {
   cashier: 'Caixa',
   finance: 'Financeiro',
   delivery: 'Delivery',
+  courier: 'Entregador',
 };
 
 export const orderTypeLabels: Record<string, string> = {
