@@ -28,7 +28,22 @@ export default function NewDelivery() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
-  const [fee, setFee] = useState('0');
+  const [courierId, setCourierId] = useState<string | null>(null);
+
+  const { data: couriers } = useQuery({
+    queryKey: ['couriers', restaurantId],
+    enabled: !!restaurantId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('couriers')
+        .select('*')
+        .eq('restaurant_id', restaurantId!)
+        .eq('active', true)
+        .order('name');
+      return data || [];
+    },
+  });
+
 
   const { data: menuItems, isLoading } = useQuery({
     queryKey: ['delivery-menu', restaurantId],
