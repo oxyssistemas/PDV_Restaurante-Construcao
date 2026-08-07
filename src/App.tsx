@@ -49,6 +49,10 @@ import DeliveryLayout from "./components/layouts/DeliveryLayout";
 import DeliveryOrders from "./pages/delivery/DeliveryOrders";
 import NewDelivery from "./pages/delivery/NewDelivery";
 
+import CourierLayout from "./components/layouts/CourierLayout";
+import MyDeliveries from "./pages/courier/MyDeliveries";
+import CouriersPage from "./pages/admin/Couriers";
+
 
 const queryClient = new QueryClient();
 
