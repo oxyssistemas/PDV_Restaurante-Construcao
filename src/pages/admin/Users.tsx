@@ -26,9 +26,10 @@ const roleLabels: Record<string, string> = {
   cashier: 'Caixa',
   finance: 'Financeiro',
   delivery: 'Delivery',
+  courier: 'Entregador',
 };
 
-const creatableRoles = ['waiter', 'kitchen', 'cashier', 'finance', 'delivery'] as const;
+const creatableRoles = ['waiter', 'kitchen', 'cashier', 'finance', 'delivery', 'courier'] as const;
 
 
 export default function UsersPage() {

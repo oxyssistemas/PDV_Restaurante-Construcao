@@ -49,6 +49,10 @@ import DeliveryLayout from "./components/layouts/DeliveryLayout";
 import DeliveryOrders from "./pages/delivery/DeliveryOrders";
 import NewDelivery from "./pages/delivery/NewDelivery";
 
+import CourierLayout from "./components/layouts/CourierLayout";
+import MyDeliveries from "./pages/courier/MyDeliveries";
+import CouriersPage from "./pages/admin/Couriers";
+
 
 const queryClient = new QueryClient();
 
@@ -86,8 +90,10 @@ const App = () => (
               <Route path="tables" element={<TablesPage />} />
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="users" element={<UsersPage />} />
+              <Route path="couriers" element={<CouriersPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
+
 
             {/* Placeholder routes for other portals */}
             <Route path="/waiter" element={
@@ -134,6 +140,13 @@ const App = () => (
             }>
               <Route index element={<DeliveryOrders />} />
               <Route path="new" element={<NewDelivery />} />
+            </Route>
+            <Route path="/courier" element={
+              <ProtectedRoute allowedRoles={['courier']}>
+                <CourierLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<MyDeliveries />} />
             </Route>
 
 

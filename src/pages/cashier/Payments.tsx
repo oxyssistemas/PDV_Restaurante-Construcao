@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Loader2, ReceiptText, Banknote, CreditCard, Smartphone, Users, Search, MoreHorizontal, Wallet,
+  Loader2, ReceiptText, Banknote, CreditCard, Smartphone, Users, Search, MoreHorizontal, Wallet, Bike,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { authorLabel } from '@/lib/orders';
+import DeliverySaleDialog from '@/components/delivery/DeliverySaleDialog';
 
 const methods = [
   { value: 'cash', label: 'Dinheiro', icon: Banknote },
@@ -29,6 +30,7 @@ export default function Payments() {
   const [method, setMethod] = useState<string>('');
   const [receivedAmount, setReceivedAmount] = useState('');
   const [search, setSearch] = useState('');
+  const [deliverySaleOpen, setDeliverySaleOpen] = useState(false);
 
   const { data: activeRegister } = useQuery({
     queryKey: ['cash-register-active', restaurantId],
@@ -331,6 +333,9 @@ export default function Payments() {
               onChange={e => setSearch(e.target.value)}
             />
           </div>
+          <Button className="h-11 gap-2 rounded-2xl" onClick={() => setDeliverySaleOpen(true)}>
+            <Bike className="h-4 w-4" /> Cliente delivery
+          </Button>
           <Button variant="outline" size="icon" className="h-11 w-11 rounded-2xl" onClick={() => toast.info('Mais opções em breve')}>
             <MoreHorizontal className="h-4 w-4" />
           </Button>
@@ -383,6 +388,16 @@ export default function Payments() {
       </div>
 
       <aside className="hidden w-[430px] shrink-0 xl:block">{paymentPanel}</aside>
+
+      {restaurantId && (
+        <DeliverySaleDialog
+          open={deliverySaleOpen}
+          onOpenChange={setDeliverySaleOpen}
+          restaurantId={restaurantId}
+          cashRegisterId={activeRegister?.id}
+        />
+      )}
+
 
     </div>
   );

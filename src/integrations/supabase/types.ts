@@ -112,6 +112,56 @@ export type Database = {
           },
         ]
       }
+      couriers: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          phone: string | null
+          plate: string | null
+          restaurant_id: string
+          status: string
+          updated_at: string
+          user_id: string | null
+          vehicle: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          phone?: string | null
+          plate?: string | null
+          restaurant_id: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          vehicle?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          plate?: string | null
+          restaurant_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          vehicle?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "couriers_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           cost_per_unit: number | null
@@ -524,6 +574,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          courier_id: string | null
           created_at: string
           created_by: string | null
           created_by_name: string | null
@@ -544,6 +595,7 @@ export type Database = {
           waiter_id: string | null
         }
         Insert: {
+          courier_id?: string | null
           created_at?: string
           created_by?: string | null
           created_by_name?: string | null
@@ -564,6 +616,7 @@ export type Database = {
           waiter_id?: string | null
         }
         Update: {
+          courier_id?: string | null
           created_at?: string
           created_by?: string | null
           created_by_name?: string | null
@@ -584,6 +637,13 @@ export type Database = {
           waiter_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_courier_id_fkey"
+            columns: ["courier_id"]
+            isOneToOne: false
+            referencedRelation: "couriers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_restaurant_id_fkey"
             columns: ["restaurant_id"]
@@ -867,6 +927,7 @@ export type Database = {
         | "cashier"
         | "finance"
         | "delivery"
+        | "courier"
       cash_movement_type: "sangria" | "suprimento"
       inventory_movement_type: "entry" | "exit"
       order_item_status:
@@ -1020,6 +1081,7 @@ export const Constants = {
         "cashier",
         "finance",
         "delivery",
+        "courier",
       ],
       cash_movement_type: ["sangria", "suprimento"],
       inventory_movement_type: ["entry", "exit"],

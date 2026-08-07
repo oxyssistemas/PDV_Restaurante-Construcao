@@ -10,6 +10,9 @@ import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { authorLabel, deliveryStatusLabels } from '@/lib/orders';
+import { courierStatusLabels, courierDotClass } from '@/lib/delivery';
+import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const columns: { key: string; label: string; next?: string; nextLabel?: string }[] = [
   { key: 'pending', label: 'Aguardando', next: 'preparing', nextLabel: 'Em preparo' },
@@ -39,6 +42,31 @@ export default function DeliveryOrders() {
       if (error) throw error;
       return data || [];
     },
+  });
+  const { data: couriers } = useQuery({
+    queryKey: ['couriers', restaurantId],
+    enabled: !!restaurantId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('couriers')
+        .select('*')
+        .eq('restaurant_id', restaurantId!)
+        .eq('active', true)
+        .order('name');
+      return data || [];
+    },
+  });
+
+  const assignCourier = useMutation({
+    mutationFn: async ({ id, courierId }: { id: string; courierId: string }) => {
+      const { error } = await supabase.from('orders').update({ courier_id: courierId }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['delivery-orders', restaurantId] });
+      toast.success('Entregador atribuído!');
+    },
+    onError: () => toast.error('Erro ao atribuir entregador.'),
   });
 
   useEffect(() => {
@@ -126,6 +154,24 @@ export default function DeliveryOrders() {
                         <div className="mt-1 text-[10px] text-muted-foreground">
                           Lançado por {authorLabel(o as any)} · {deliveryStatusLabels[o.delivery_status]}
                         </div>
+                        <Select
+                          value={(o as any).courier_id || undefined}
+                          onValueChange={v => assignCourier.mutate({ id: o.id, courierId: v })}
+                        >
+                          <SelectTrigger className="mt-2 h-8 text-xs">
+                            <SelectValue placeholder="Atribuir entregador" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(couriers || []).map(c => (
+                              <SelectItem key={c.id} value={c.id}>
+                                <span className="flex items-center gap-2">
+                                  <span className={cn('h-2 w-2 rounded-full', courierDotClass(c.status))} />
+                                  {c.name} · {courierStatusLabels[c.status]}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <div className="mt-2 flex gap-2">
                           {col.next && (
                             <Button size="sm" className="flex-1 gap-1" disabled={setStatus.isPending}
