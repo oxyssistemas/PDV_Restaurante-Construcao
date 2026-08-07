@@ -331,6 +331,9 @@ export default function Payments() {
               onChange={e => setSearch(e.target.value)}
             />
           </div>
+          <Button className="h-11 gap-2 rounded-2xl" onClick={() => setDeliverySaleOpen(true)}>
+            <Bike className="h-4 w-4" /> Cliente delivery
+          </Button>
           <Button variant="outline" size="icon" className="h-11 w-11 rounded-2xl" onClick={() => toast.info('Mais opções em breve')}>
             <MoreHorizontal className="h-4 w-4" />
           </Button>
