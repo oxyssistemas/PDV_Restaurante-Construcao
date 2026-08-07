@@ -181,6 +181,27 @@ export default function NewDelivery() {
               <Label>Taxa de entrega (R$)</Label>
               <Input type="number" step="0.01" min="0" value={fee} onChange={e => setFee(e.target.value)} />
             </div>
+            <div className="space-y-2">
+              <Label>Entregador</Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {(couriers || []).map(c => (
+                  <button key={c.id} type="button" onClick={() => setCourierId(courierId === c.id ? null : c.id)}
+                    className={cn(
+                      'flex items-center gap-2 rounded-xl border p-2 text-left text-xs transition-colors',
+                      courierId === c.id ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'
+                    )}>
+                    <span className={cn('h-2 w-2 shrink-0 rounded-full', courierDotClass(c.status))} />
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">{c.name}</span>
+                      <span className="block truncate text-muted-foreground">
+                        {courierStatusLabels[c.status]}{c.plate ? ` · ${c.plate}` : ''}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+                {!couriers?.length && <p className="text-xs text-muted-foreground">Nenhum entregador cadastrado.</p>}
+              </div>
+            </div>
 
             <div className="space-y-2 border-t pt-3">
               {cart.length ? cart.map(c => (
