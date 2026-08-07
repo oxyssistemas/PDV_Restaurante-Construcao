@@ -154,6 +154,24 @@ export default function DeliveryOrders() {
                         <div className="mt-1 text-[10px] text-muted-foreground">
                           Lançado por {authorLabel(o as any)} · {deliveryStatusLabels[o.delivery_status]}
                         </div>
+                        <Select
+                          value={(o as any).courier_id || undefined}
+                          onValueChange={v => assignCourier.mutate({ id: o.id, courierId: v })}
+                        >
+                          <SelectTrigger className="mt-2 h-8 text-xs">
+                            <SelectValue placeholder="Atribuir entregador" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(couriers || []).map(c => (
+                              <SelectItem key={c.id} value={c.id}>
+                                <span className="flex items-center gap-2">
+                                  <span className={cn('h-2 w-2 rounded-full', courierDotClass(c.status))} />
+                                  {c.name} · {courierStatusLabels[c.status]}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <div className="mt-2 flex gap-2">
                           {col.next && (
                             <Button size="sm" className="flex-1 gap-1" disabled={setStatus.isPending}
