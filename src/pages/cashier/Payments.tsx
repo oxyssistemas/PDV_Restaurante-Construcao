@@ -30,6 +30,7 @@ export default function Payments() {
   const [method, setMethod] = useState<string>('');
   const [receivedAmount, setReceivedAmount] = useState('');
   const [search, setSearch] = useState('');
+  const [deliverySaleOpen, setDeliverySaleOpen] = useState(false);
 
   const { data: activeRegister } = useQuery({
     queryKey: ['cash-register-active', restaurantId],
