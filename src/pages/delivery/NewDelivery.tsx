@@ -12,6 +12,8 @@ import { Loader2, Plus, Minus, Send, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import MenuImage from '@/components/MenuImage';
 import { authorFields } from '@/lib/orders';
+import { cn } from '@/lib/utils';
+import { courierStatusLabels, courierDotClass } from '@/lib/delivery';
 
 interface CartItem { id: string; name: string; price: number; quantity: number; }
 
