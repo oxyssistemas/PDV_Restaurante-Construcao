@@ -28,6 +28,7 @@ export default function NewDelivery() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [fee, setFee] = useState('0');
   const [courierId, setCourierId] = useState<string | null>(null);
 
   const { data: couriers } = useQuery({
