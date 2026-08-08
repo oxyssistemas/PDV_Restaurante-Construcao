@@ -35,7 +35,7 @@ export default function MyDeliveries() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('*, order_items(id, quantity, unit_price, menu_items(name))')
+        .select('*, order_items(id, quantity, unit_price, status, menu_items(name))')
         .eq('courier_id', courier!.id)
         .in('delivery_status', ['pending', 'preparing', 'out_for_delivery'])
         .order('created_at', { ascending: true });
@@ -46,11 +46,15 @@ export default function MyDeliveries() {
 
   useEffect(() => {
     if (!courier?.id) return;
+    const invalidate = () => {
+      queryClient.invalidateQueries({ queryKey: ['courier-orders', courier.id] });
+      queryClient.invalidateQueries({ queryKey: ['my-courier'] });
+    };
     const channel = supabase
       .channel('courier-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['courier-orders', courier.id] });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'couriers' }, invalidate)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [courier?.id, queryClient]);
