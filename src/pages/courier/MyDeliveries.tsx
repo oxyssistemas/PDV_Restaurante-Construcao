@@ -133,6 +133,8 @@ export default function MyDeliveries() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {orders.map(o => {
             const items = (o as any).order_items || [];
+            const activeItems = items.filter((i: any) => i.status !== 'cancelled');
+            const isReady = activeItems.length > 0 && activeItems.every((i: any) => ['ready', 'delivered'].includes(i.status));
             return (
               <div key={o.id} className="rounded-2xl border border-border bg-card p-4">
                 <div className="flex items-start justify-between gap-2">
