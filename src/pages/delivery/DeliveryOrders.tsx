@@ -71,25 +71,43 @@ export default function DeliveryOrders() {
 
   useEffect(() => {
     if (!restaurantId) return;
+    const invalidate = () => {
+      queryClient.invalidateQueries({ queryKey: ['delivery-orders', restaurantId] });
+      queryClient.invalidateQueries({ queryKey: ['couriers', restaurantId] });
+    };
     const channel = supabase
       .channel('delivery-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` }, () => {
-        queryClient.invalidateQueries({ queryKey: ['delivery-orders', restaurantId] });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'couriers', filter: `restaurant_id=eq.${restaurantId}` }, invalidate)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [restaurantId, queryClient]);
 
   const setStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+    mutationFn: async ({ id, status, courierId }: { id: string; status: string; courierId?: string | null }) => {
       const payload: any = { delivery_status: status };
       if (status === 'delivered') payload.status = 'delivered';
       if (status === 'cancelled') payload.status = 'cancelled';
       const { error } = await supabase.from('orders').update(payload).eq('id', id);
       if (error) throw error;
+
+      if (courierId) {
+        if (status === 'out_for_delivery') {
+          await supabase.from('couriers').update({ status: 'on_route' }).eq('id', courierId);
+        } else if (status === 'delivered' || status === 'cancelled') {
+          const stillOnRoute = (orders || []).some(
+            o => o.id !== id && (o as any).courier_id === courierId && o.delivery_status === 'out_for_delivery'
+          );
+          if (!stillOnRoute) {
+            await supabase.from('couriers').update({ status: 'free' }).eq('id', courierId);
+          }
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['delivery-orders', restaurantId] });
+      queryClient.invalidateQueries({ queryKey: ['couriers', restaurantId] });
       toast.success('Status atualizado!');
     },
     onError: () => toast.error('Erro ao atualizar status.'),
@@ -124,6 +142,10 @@ export default function DeliveryOrders() {
                   {!list.length && <p className="text-xs text-muted-foreground">Vazio</p>}
                   {list.map(o => {
                     const items = (o as any).order_items || [];
+                    const activeItems = items.filter((i: any) => i.status !== 'cancelled');
+                    const isReady = activeItems.length > 0 && activeItems.every((i: any) => ['ready', 'delivered'].includes(i.status));
+                    const courierId = (o as any).courier_id as string | null;
+                    const blockRoute = col.next === 'out_for_delivery' && (!isReady || !courierId);
                     return (
                       <div key={o.id} className="rounded-xl border p-3">
                         <div className="flex items-start justify-between gap-2">
@@ -174,14 +196,16 @@ export default function DeliveryOrders() {
                         </Select>
                         <div className="mt-2 flex gap-2">
                           {col.next && (
-                            <Button size="sm" className="flex-1 gap-1" disabled={setStatus.isPending}
-                              onClick={() => setStatus.mutate({ id: o.id, status: col.next! })}>
-                              <CheckCircle2 className="h-3 w-3" /> {col.nextLabel}
+                            <Button size="sm" className="flex-1 gap-1" disabled={setStatus.isPending || blockRoute}
+                              title={blockRoute ? (!courierId ? 'Atribua um entregador' : 'Aguardando a cozinha marcar como pronto') : undefined}
+                              onClick={() => setStatus.mutate({ id: o.id, status: col.next!, courierId })}>
+                              <CheckCircle2 className="h-3 w-3" />{' '}
+                              {blockRoute ? (!courierId ? 'Sem entregador' : 'Aguardando cozinha') : col.nextLabel}
                             </Button>
                           )}
                           {col.key !== 'delivered' && (
                             <Button size="sm" variant="ghost" className="text-destructive" title="Cancelar"
-                              onClick={() => setStatus.mutate({ id: o.id, status: 'cancelled' })}>
+                              onClick={() => setStatus.mutate({ id: o.id, status: 'cancelled', courierId })}>
                               <XCircle className="h-4 w-4" />
                             </Button>
                           )}

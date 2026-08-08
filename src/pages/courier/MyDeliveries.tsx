@@ -35,7 +35,7 @@ export default function MyDeliveries() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('*, order_items(id, quantity, unit_price, menu_items(name))')
+        .select('*, order_items(id, quantity, unit_price, status, menu_items(name))')
         .eq('courier_id', courier!.id)
         .in('delivery_status', ['pending', 'preparing', 'out_for_delivery'])
         .order('created_at', { ascending: true });
@@ -46,11 +46,15 @@ export default function MyDeliveries() {
 
   useEffect(() => {
     if (!courier?.id) return;
+    const invalidate = () => {
+      queryClient.invalidateQueries({ queryKey: ['courier-orders', courier.id] });
+      queryClient.invalidateQueries({ queryKey: ['my-courier'] });
+    };
     const channel = supabase
       .channel('courier-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['courier-orders', courier.id] });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'couriers' }, invalidate)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [courier?.id, queryClient]);
@@ -129,6 +133,8 @@ export default function MyDeliveries() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {orders.map(o => {
             const items = (o as any).order_items || [];
+            const activeItems = items.filter((i: any) => i.status !== 'cancelled');
+            const isReady = activeItems.length > 0 && activeItems.every((i: any) => ['ready', 'delivered'].includes(i.status));
             return (
               <div key={o.id} className="rounded-2xl border border-border bg-card p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -170,9 +176,10 @@ export default function MyDeliveries() {
 
                 <div className="mt-3 flex gap-2">
                   {o.delivery_status !== 'out_for_delivery' ? (
-                    <Button className="flex-1 gap-2" disabled={setOrderStatus.isPending}
+                    <Button className="flex-1 gap-2" disabled={setOrderStatus.isPending || !isReady}
+                      title={isReady ? undefined : 'Aguardando a cozinha marcar o pedido como pronto'}
                       onClick={() => setOrderStatus.mutate({ id: o.id, status: 'out_for_delivery' })}>
-                      <Navigation className="h-4 w-4" /> Iniciar rota
+                      <Navigation className="h-4 w-4" /> {isReady ? 'Iniciar rota' : 'Aguardando cozinha'}
                     </Button>
                   ) : (
                     <Button className="flex-1 gap-2" disabled={setOrderStatus.isPending}
