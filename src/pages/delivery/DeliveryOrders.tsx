@@ -142,6 +142,10 @@ export default function DeliveryOrders() {
                   {!list.length && <p className="text-xs text-muted-foreground">Vazio</p>}
                   {list.map(o => {
                     const items = (o as any).order_items || [];
+                    const activeItems = items.filter((i: any) => i.status !== 'cancelled');
+                    const isReady = activeItems.length > 0 && activeItems.every((i: any) => ['ready', 'delivered'].includes(i.status));
+                    const courierId = (o as any).courier_id as string | null;
+                    const blockRoute = col.next === 'out_for_delivery' && (!isReady || !courierId);
                     return (
                       <div key={o.id} className="rounded-xl border p-3">
                         <div className="flex items-start justify-between gap-2">
