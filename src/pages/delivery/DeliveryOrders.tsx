@@ -196,14 +196,16 @@ export default function DeliveryOrders() {
                         </Select>
                         <div className="mt-2 flex gap-2">
                           {col.next && (
-                            <Button size="sm" className="flex-1 gap-1" disabled={setStatus.isPending}
-                              onClick={() => setStatus.mutate({ id: o.id, status: col.next! })}>
-                              <CheckCircle2 className="h-3 w-3" /> {col.nextLabel}
+                            <Button size="sm" className="flex-1 gap-1" disabled={setStatus.isPending || blockRoute}
+                              title={blockRoute ? (!courierId ? 'Atribua um entregador' : 'Aguardando a cozinha marcar como pronto') : undefined}
+                              onClick={() => setStatus.mutate({ id: o.id, status: col.next!, courierId })}>
+                              <CheckCircle2 className="h-3 w-3" />{' '}
+                              {blockRoute ? (!courierId ? 'Sem entregador' : 'Aguardando cozinha') : col.nextLabel}
                             </Button>
                           )}
                           {col.key !== 'delivered' && (
                             <Button size="sm" variant="ghost" className="text-destructive" title="Cancelar"
-                              onClick={() => setStatus.mutate({ id: o.id, status: 'cancelled' })}>
+                              onClick={() => setStatus.mutate({ id: o.id, status: 'cancelled', courierId })}>
                               <XCircle className="h-4 w-4" />
                             </Button>
                           )}
