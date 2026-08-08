@@ -176,9 +176,10 @@ export default function MyDeliveries() {
 
                 <div className="mt-3 flex gap-2">
                   {o.delivery_status !== 'out_for_delivery' ? (
-                    <Button className="flex-1 gap-2" disabled={setOrderStatus.isPending}
+                    <Button className="flex-1 gap-2" disabled={setOrderStatus.isPending || !isReady}
+                      title={isReady ? undefined : 'Aguardando a cozinha marcar o pedido como pronto'}
                       onClick={() => setOrderStatus.mutate({ id: o.id, status: 'out_for_delivery' })}>
-                      <Navigation className="h-4 w-4" /> Iniciar rota
+                      <Navigation className="h-4 w-4" /> {isReady ? 'Iniciar rota' : 'Aguardando cozinha'}
                     </Button>
                   ) : (
                     <Button className="flex-1 gap-2" disabled={setOrderStatus.isPending}
