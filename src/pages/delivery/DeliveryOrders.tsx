@@ -71,25 +71,43 @@ export default function DeliveryOrders() {
 
   useEffect(() => {
     if (!restaurantId) return;
+    const invalidate = () => {
+      queryClient.invalidateQueries({ queryKey: ['delivery-orders', restaurantId] });
+      queryClient.invalidateQueries({ queryKey: ['couriers', restaurantId] });
+    };
     const channel = supabase
       .channel('delivery-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` }, () => {
-        queryClient.invalidateQueries({ queryKey: ['delivery-orders', restaurantId] });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'couriers', filter: `restaurant_id=eq.${restaurantId}` }, invalidate)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [restaurantId, queryClient]);
 
   const setStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+    mutationFn: async ({ id, status, courierId }: { id: string; status: string; courierId?: string | null }) => {
       const payload: any = { delivery_status: status };
       if (status === 'delivered') payload.status = 'delivered';
       if (status === 'cancelled') payload.status = 'cancelled';
       const { error } = await supabase.from('orders').update(payload).eq('id', id);
       if (error) throw error;
+
+      if (courierId) {
+        if (status === 'out_for_delivery') {
+          await supabase.from('couriers').update({ status: 'on_route' }).eq('id', courierId);
+        } else if (status === 'delivered' || status === 'cancelled') {
+          const stillOnRoute = (orders || []).some(
+            o => o.id !== id && (o as any).courier_id === courierId && o.delivery_status === 'out_for_delivery'
+          );
+          if (!stillOnRoute) {
+            await supabase.from('couriers').update({ status: 'free' }).eq('id', courierId);
+          }
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['delivery-orders', restaurantId] });
+      queryClient.invalidateQueries({ queryKey: ['couriers', restaurantId] });
       toast.success('Status atualizado!');
     },
     onError: () => toast.error('Erro ao atualizar status.'),
