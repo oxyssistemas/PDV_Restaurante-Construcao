@@ -23,6 +23,8 @@ import TablesPage from "./pages/admin/Tables";
 import InventoryPage from "./pages/admin/Inventory";
 import UsersPage from "./pages/admin/Users";
 import SettingsPage from "./pages/admin/Settings";
+import CrmPage from "./pages/admin/Crm";
+import FinanceCrmPage from "./pages/finance/FinanceCrm";
 
 import WaiterLayout from "./components/layouts/WaiterLayout";
 import TableMap from "./pages/waiter/TableMap";
