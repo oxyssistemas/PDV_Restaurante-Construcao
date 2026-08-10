@@ -14,6 +14,125 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounts_payable: {
+        Row: {
+          amount: number
+          category: string | null
+          created_at: string
+          created_by: string | null
+          description: string
+          due_date: string
+          id: string
+          notes: string | null
+          paid_at: string | null
+          payment_method: string | null
+          restaurant_id: string
+          status: Database["public"]["Enums"]["payable_status"]
+          supplier_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description: string
+          due_date: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_method?: string | null
+          restaurant_id: string
+          status?: Database["public"]["Enums"]["payable_status"]
+          supplier_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          due_date?: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_method?: string | null
+          restaurant_id?: string
+          status?: Database["public"]["Enums"]["payable_status"]
+          supplier_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_payable_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_payable_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_logs: {
+        Row: {
+          action: string
+          after_data: Json | null
+          before_data: Json | null
+          created_at: string
+          entity: string
+          entity_id: string | null
+          id: string
+          restaurant_id: string
+          summary: string | null
+          user_email: string | null
+          user_id: string | null
+          user_role: string | null
+        }
+        Insert: {
+          action: string
+          after_data?: Json | null
+          before_data?: Json | null
+          created_at?: string
+          entity: string
+          entity_id?: string | null
+          id?: string
+          restaurant_id: string
+          summary?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_role?: string | null
+        }
+        Update: {
+          action?: string
+          after_data?: Json | null
+          before_data?: Json | null
+          created_at?: string
+          entity?: string
+          entity_id?: string | null
+          id?: string
+          restaurant_id?: string
+          summary?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cash_movements: {
         Row: {
           amount: number
@@ -155,6 +274,165 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "couriers_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
+          address: string | null
+          birthdate: string | null
+          created_at: string
+          document: string | null
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          restaurant_id: string
+          tags: string[]
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          birthdate?: string | null
+          created_at?: string
+          document?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          restaurant_id: string
+          tags?: string[]
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          birthdate?: string | null
+          created_at?: string
+          document?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          restaurant_id?: string
+          tags?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fiscal_invoices: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          customer_address: string | null
+          customer_document: string | null
+          customer_email: string | null
+          customer_id: string | null
+          customer_name: string | null
+          discount: number
+          id: string
+          issued_at: string | null
+          items: Json
+          notes: string | null
+          number: string | null
+          order_id: string | null
+          pdf_url: string | null
+          provider: string | null
+          provider_ref: string | null
+          restaurant_id: string
+          series: string | null
+          status: Database["public"]["Enums"]["fiscal_invoice_status"]
+          subtotal: number
+          tax_total: number
+          total: number
+          updated_at: string
+          xml_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          customer_address?: string | null
+          customer_document?: string | null
+          customer_email?: string | null
+          customer_id?: string | null
+          customer_name?: string | null
+          discount?: number
+          id?: string
+          issued_at?: string | null
+          items?: Json
+          notes?: string | null
+          number?: string | null
+          order_id?: string | null
+          pdf_url?: string | null
+          provider?: string | null
+          provider_ref?: string | null
+          restaurant_id: string
+          series?: string | null
+          status?: Database["public"]["Enums"]["fiscal_invoice_status"]
+          subtotal?: number
+          tax_total?: number
+          total?: number
+          updated_at?: string
+          xml_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          customer_address?: string | null
+          customer_document?: string | null
+          customer_email?: string | null
+          customer_id?: string | null
+          customer_name?: string | null
+          discount?: number
+          id?: string
+          issued_at?: string | null
+          items?: Json
+          notes?: string | null
+          number?: string | null
+          order_id?: string | null
+          pdf_url?: string | null
+          provider?: string | null
+          provider_ref?: string | null
+          restaurant_id?: string
+          series?: string | null
+          status?: Database["public"]["Enums"]["fiscal_invoice_status"]
+          subtotal?: number
+          tax_total?: number
+          total?: number
+          updated_at?: string
+          xml_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiscal_invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiscal_invoices_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiscal_invoices_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
@@ -861,6 +1139,62 @@ export type Database = {
         }
         Relationships: []
       }
+      suppliers: {
+        Row: {
+          active: boolean
+          address: string | null
+          category: string | null
+          contact_name: string | null
+          created_at: string
+          document: string | null
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          restaurant_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          address?: string | null
+          category?: string | null
+          contact_name?: string | null
+          created_at?: string
+          document?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          restaurant_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          address?: string | null
+          category?: string | null
+          contact_name?: string | null
+          created_at?: string
+          document?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          restaurant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suppliers_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -929,6 +1263,12 @@ export type Database = {
         | "delivery"
         | "courier"
       cash_movement_type: "sangria" | "suprimento"
+      fiscal_invoice_status:
+        | "draft"
+        | "pending"
+        | "issued"
+        | "cancelled"
+        | "error"
       inventory_movement_type: "entry" | "exit"
       order_item_status:
         | "pending"
@@ -942,6 +1282,7 @@ export type Database = {
         | "ready"
         | "delivered"
         | "cancelled"
+      payable_status: "open" | "paid" | "cancelled"
       payment_method: "cash" | "credit_card" | "debit_card" | "pix"
       reservation_status: "confirmed" | "cancelled" | "completed" | "no_show"
       restaurant_status: "active" | "blocked"
@@ -1084,6 +1425,13 @@ export const Constants = {
         "courier",
       ],
       cash_movement_type: ["sangria", "suprimento"],
+      fiscal_invoice_status: [
+        "draft",
+        "pending",
+        "issued",
+        "cancelled",
+        "error",
+      ],
       inventory_movement_type: ["entry", "exit"],
       order_item_status: [
         "pending",
@@ -1093,6 +1441,7 @@ export const Constants = {
         "cancelled",
       ],
       order_status: ["pending", "preparing", "ready", "delivered", "cancelled"],
+      payable_status: ["open", "paid", "cancelled"],
       payment_method: ["cash", "credit_card", "debit_card", "pix"],
       reservation_status: ["confirmed", "cancelled", "completed", "no_show"],
       restaurant_status: ["active", "blocked"],

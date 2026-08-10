@@ -23,6 +23,8 @@ import TablesPage from "./pages/admin/Tables";
 import InventoryPage from "./pages/admin/Inventory";
 import UsersPage from "./pages/admin/Users";
 import SettingsPage from "./pages/admin/Settings";
+import CrmPage from "./pages/admin/Crm";
+import FinanceCrmPage from "./pages/finance/FinanceCrm";
 
 import WaiterLayout from "./components/layouts/WaiterLayout";
 import TableMap from "./pages/waiter/TableMap";
@@ -86,6 +88,7 @@ const App = () => (
               </ProtectedRoute>
             }>
               <Route index element={<AdminDashboard />} />
+              <Route path="crm" element={<CrmPage />} />
               <Route path="menu" element={<MenuPage />} />
               <Route path="tables" element={<TablesPage />} />
               <Route path="inventory" element={<InventoryPage />} />
@@ -130,6 +133,7 @@ const App = () => (
               </ProtectedRoute>
             }>
               <Route index element={<FinanceDashboard />} />
+              <Route path="crm" element={<FinanceCrmPage />} />
               <Route path="reports" element={<FinanceReports />} />
               <Route path="inventory" element={<FinanceInventory />} />
             </Route>
