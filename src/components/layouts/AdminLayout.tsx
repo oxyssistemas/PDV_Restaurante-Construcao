@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
-  UtensilsCrossed, LayoutDashboard, BookOpen, Grid3X3, Users, Package, Settings, LogOut, Menu, Bike,
+  UtensilsCrossed, LayoutDashboard, BookOpen, Grid3X3, Users, Package, Settings, LogOut, Menu, Bike, Building2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -10,6 +10,7 @@ import NotificationsBell from '@/components/NotificationsBell';
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
+  { to: '/admin/crm', icon: Building2, label: 'CRM', end: false },
   { to: '/admin/menu', icon: BookOpen, label: 'Cardápio', end: false },
   { to: '/admin/tables', icon: Grid3X3, label: 'Mesas', end: false },
   { to: '/admin/inventory', icon: Package, label: 'Estoque', end: false },

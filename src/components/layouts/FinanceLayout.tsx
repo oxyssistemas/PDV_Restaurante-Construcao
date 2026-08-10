@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { LineChart, LogOut, Menu, FileBarChart, Package } from 'lucide-react';
+import { LineChart, LogOut, Menu, FileBarChart, Package, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import NotificationsBell from '@/components/NotificationsBell';
@@ -9,6 +9,7 @@ import NotificationsBell from '@/components/NotificationsBell';
 
 const navItems = [
   { to: '/finance', icon: LineChart, label: 'Dashboard', end: true },
+  { to: '/finance/crm', icon: Building2, label: 'CRM Financeiro', end: false },
   { to: '/finance/reports', icon: FileBarChart, label: 'Relatórios', end: false },
   { to: '/finance/inventory', icon: Package, label: 'Estoque', end: false },
 ];
