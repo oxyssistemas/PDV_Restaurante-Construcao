@@ -88,6 +88,7 @@ const App = () => (
               </ProtectedRoute>
             }>
               <Route index element={<AdminDashboard />} />
+              <Route path="crm" element={<CrmPage />} />
               <Route path="menu" element={<MenuPage />} />
               <Route path="tables" element={<TablesPage />} />
               <Route path="inventory" element={<InventoryPage />} />
@@ -132,6 +133,7 @@ const App = () => (
               </ProtectedRoute>
             }>
               <Route index element={<FinanceDashboard />} />
+              <Route path="crm" element={<FinanceCrmPage />} />
               <Route path="reports" element={<FinanceReports />} />
               <Route path="inventory" element={<FinanceInventory />} />
             </Route>
