@@ -101,6 +101,16 @@ export default function OrderDetail() {
     },
   });
 
+  const { data: restaurant } = useQuery({
+    queryKey: ['restaurant-name', restaurantId],
+    enabled: !!restaurantId,
+    queryFn: async () => {
+      const { data } = await supabase.from('restaurants').select('name').eq('id', restaurantId!).maybeSingle();
+      return data;
+    },
+  });
+
+
   useEffect(() => {
     if (!orderId) return;
     const channel = supabase
