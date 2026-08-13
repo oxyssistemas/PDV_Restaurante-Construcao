@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Loader2, Plus, Minus, Trash2, Copy, MessageSquarePlus, Send, Users,
-  Clock, Pencil, ShoppingCart, BellRing, ReceiptText, ArrowLeftRight, CheckCircle2, Search,
+  Clock, Pencil, ShoppingCart, BellRing, ReceiptText, ArrowLeftRight, CheckCircle2, Search, Printer,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +20,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import MenuImage from '@/components/MenuImage';
 import { cn } from '@/lib/utils';
 import { authorLabel } from '@/lib/orders';
+import { printOrderTicket } from '@/lib/printing';
+import { logAudit } from '@/lib/audit';
 import { brl, elapsedSince } from '@/lib/waiter';
 
 interface CartItem { key: string; menu_item_id: string; name: string; price: number; quantity: number; notes: string; }
