@@ -357,6 +357,17 @@ export default function Payments() {
           Finalizar pagamento
           <span className="ml-1 rounded-md bg-primary-foreground/15 px-1.5 py-0.5 text-[11px]">F4</span>
         </Button>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" className="h-12 gap-2 rounded-xl text-xs" disabled={!tableOrders.length}
+            onClick={() => handlePrintReceipt('80mm')}>
+            <Printer className="h-4 w-4" /> Recibo 80mm
+          </Button>
+          <Button variant="outline" className="h-12 gap-2 rounded-xl text-xs" disabled={!tableOrders.length}
+            onClick={() => handlePrintReceipt('58mm')}>
+            <Printer className="h-4 w-4" /> Recibo 58mm
+          </Button>
+        </div>
       </div>
     </div>
   );
