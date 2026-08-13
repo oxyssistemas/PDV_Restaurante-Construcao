@@ -197,6 +197,39 @@ export default function Payments() {
   const selectedTable = tables?.find(t => t.id === selectedTableId);
   const visibleTables = (tables || []).filter(t => String(t.number).includes(search.trim()));
 
+  const handlePrintReceipt = (width: '58mm' | '80mm' = '80mm') => {
+    if (!tableOrders.length) return;
+    const first = tableOrders[0] as any;
+    printReceipt({
+      restaurantName: restaurant?.name || 'Oxys Restaurante',
+      width,
+      order: {
+        id: first.id,
+        created_at: first.created_at,
+        customer_name: tableOrders.map((o: any, i) => o.customer_name || `Comanda ${i + 1}`).join(' / '),
+        table_number: selectedTable?.number ?? null,
+        total,
+        created_by_name: first.created_by_name,
+        created_by_role: first.created_by_role,
+      },
+      items: (items || []).map(i => ({
+        name: (i as any).menu_items?.name || 'Item',
+        quantity: i.quantity,
+        unit_price: Number(i.unit_price),
+      })),
+      payments: method ? [{ method, amount: total }] : [],
+      change,
+    });
+    logAudit({
+      restaurantId: restaurantId!,
+      role: currentRole?.role,
+      action: 'print',
+      entity: 'payment',
+      entityId: first.id,
+      summary: `Recibo impresso • Mesa ${selectedTable?.number ?? '-'} • R$ ${total.toFixed(2)}`,
+    });
+  };
+
   const paymentPanel = (
     <div className="flex h-full flex-col gap-4">
       <div className="pdv-card p-4">
