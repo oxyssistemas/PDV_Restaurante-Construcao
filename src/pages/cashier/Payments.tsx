@@ -5,13 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Loader2, ReceiptText, Banknote, CreditCard, Smartphone, Users, Search, MoreHorizontal, Wallet, Bike,
+  Loader2, ReceiptText, Banknote, CreditCard, Smartphone, Users, Search, MoreHorizontal, Wallet, Bike, Printer,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { authorLabel } from '@/lib/orders';
+import { printReceipt } from '@/lib/printing';
+import { logAudit } from '@/lib/audit';
 import DeliverySaleDialog from '@/components/delivery/DeliverySaleDialog';
 
 const methods = [
@@ -31,6 +33,16 @@ export default function Payments() {
   const [receivedAmount, setReceivedAmount] = useState('');
   const [search, setSearch] = useState('');
   const [deliverySaleOpen, setDeliverySaleOpen] = useState(false);
+
+  const { data: restaurant } = useQuery({
+    queryKey: ['restaurant-name', restaurantId],
+    enabled: !!restaurantId,
+    queryFn: async () => {
+      const { data } = await supabase.from('restaurants').select('name').eq('id', restaurantId!).maybeSingle();
+      return data;
+    },
+  });
+
 
   const { data: activeRegister } = useQuery({
     queryKey: ['cash-register-active', restaurantId],
@@ -185,6 +197,39 @@ export default function Payments() {
   const selectedTable = tables?.find(t => t.id === selectedTableId);
   const visibleTables = (tables || []).filter(t => String(t.number).includes(search.trim()));
 
+  const handlePrintReceipt = (width: '58mm' | '80mm' = '80mm') => {
+    if (!tableOrders.length) return;
+    const first = tableOrders[0] as any;
+    printReceipt({
+      restaurantName: restaurant?.name || 'Oxys Restaurante',
+      width,
+      order: {
+        id: first.id,
+        created_at: first.created_at,
+        customer_name: tableOrders.map((o: any, i) => o.customer_name || `Comanda ${i + 1}`).join(' / '),
+        table_number: selectedTable?.number ?? null,
+        total,
+        created_by_name: first.created_by_name,
+        created_by_role: first.created_by_role,
+      },
+      items: (items || []).map(i => ({
+        name: (i as any).menu_items?.name || 'Item',
+        quantity: i.quantity,
+        unit_price: Number(i.unit_price),
+      })),
+      payments: method ? [{ method, amount: total }] : [],
+      change,
+    });
+    logAudit({
+      restaurantId: restaurantId!,
+      role: currentRole?.role,
+      action: 'print',
+      entity: 'payment',
+      entityId: first.id,
+      summary: `Recibo impresso • Mesa ${selectedTable?.number ?? '-'} • R$ ${total.toFixed(2)}`,
+    });
+  };
+
   const paymentPanel = (
     <div className="flex h-full flex-col gap-4">
       <div className="pdv-card p-4">
@@ -312,6 +357,17 @@ export default function Payments() {
           Finalizar pagamento
           <span className="ml-1 rounded-md bg-primary-foreground/15 px-1.5 py-0.5 text-[11px]">F4</span>
         </Button>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" className="h-12 gap-2 rounded-xl text-xs" disabled={!tableOrders.length}
+            onClick={() => handlePrintReceipt('80mm')}>
+            <Printer className="h-4 w-4" /> Recibo 80mm
+          </Button>
+          <Button variant="outline" className="h-12 gap-2 rounded-xl text-xs" disabled={!tableOrders.length}
+            onClick={() => handlePrintReceipt('58mm')}>
+            <Printer className="h-4 w-4" /> Recibo 58mm
+          </Button>
+        </div>
       </div>
     </div>
   );

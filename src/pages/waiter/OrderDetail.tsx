@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Loader2, Plus, Minus, Trash2, Copy, MessageSquarePlus, Send, Users,
-  Clock, Pencil, ShoppingCart, BellRing, ReceiptText, ArrowLeftRight, CheckCircle2, Search,
+  Clock, Pencil, ShoppingCart, BellRing, ReceiptText, ArrowLeftRight, CheckCircle2, Search, Printer,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +20,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import MenuImage from '@/components/MenuImage';
 import { cn } from '@/lib/utils';
 import { authorLabel } from '@/lib/orders';
+import { printOrderTicket } from '@/lib/printing';
+import { logAudit } from '@/lib/audit';
 import { brl, elapsedSince } from '@/lib/waiter';
 
 interface CartItem { key: string; menu_item_id: string; name: string; price: number; quantity: number; notes: string; }
@@ -98,6 +100,16 @@ export default function OrderDetail() {
       return data || [];
     },
   });
+
+  const { data: restaurant } = useQuery({
+    queryKey: ['restaurant-name', restaurantId],
+    enabled: !!restaurantId,
+    queryFn: async () => {
+      const { data } = await supabase.from('restaurants').select('name').eq('id', restaurantId!).maybeSingle();
+      return data;
+    },
+  });
+
 
   useEffect(() => {
     if (!orderId) return;
@@ -229,6 +241,43 @@ export default function OrderDetail() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order-items', orderId] }),
   });
 
+  const handlePrintTicket = (kind: 'full' | 'kitchen') => {
+    if (!order) return;
+    const list = kind === 'kitchen' && cart.length
+      ? cart.map(c => ({ name: c.name, quantity: c.quantity, unit_price: c.price, notes: c.notes || null }))
+      : (orderItems || []).map(i => ({
+        name: (i as any).menu_items?.name || 'Item',
+        quantity: i.quantity,
+        unit_price: Number(i.unit_price),
+        notes: i.notes,
+      }));
+    if (!list.length) { toast.error('Nenhum item para imprimir.'); return; }
+    printOrderTicket({
+      restaurantName: restaurant?.name || 'Oxys Restaurante',
+      title: kind === 'kitchen' ? 'Via da cozinha' : 'Pedido detalhado',
+      showPrices: kind !== 'kitchen',
+      order: {
+        id: (order as any).id,
+        created_at: (order as any).created_at,
+        customer_name: (order as any).customer_name,
+        table_number: table?.number ?? null,
+        total: kind === 'kitchen' ? undefined : Number((order as any).total || 0),
+        created_by_name: (order as any).created_by_name,
+        created_by_role: (order as any).created_by_role,
+      },
+      items: list,
+    });
+    logAudit({
+      restaurantId: restaurantId!,
+      role: currentRole?.role,
+      action: 'print',
+      entity: 'order',
+      entityId: (order as any).id,
+      summary: `${kind === 'kitchen' ? 'Via da cozinha' : 'Pedido detalhado'} impresso • Mesa ${table?.number ?? '-'}`,
+    });
+  };
+
+
   if (isLoading) {
     return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
@@ -340,6 +389,15 @@ export default function OrderDetail() {
         >
           <ReceiptText className="h-5 w-5" /> Solicitar Fechamento da Conta
         </Button>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" className="h-12 gap-2 rounded-xl text-xs" onClick={() => handlePrintTicket('full')}>
+            <Printer className="h-4 w-4" /> Imprimir pedido
+          </Button>
+          <Button variant="outline" className="h-12 gap-2 rounded-xl text-xs" onClick={() => handlePrintTicket('kitchen')}>
+            <Printer className="h-4 w-4" /> Via da cozinha
+          </Button>
+        </div>
         <p className="text-center text-[11px] text-muted-foreground">
           O recebimento é feito exclusivamente pelo Caixa.
         </p>
