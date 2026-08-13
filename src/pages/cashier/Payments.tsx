@@ -34,6 +34,16 @@ export default function Payments() {
   const [search, setSearch] = useState('');
   const [deliverySaleOpen, setDeliverySaleOpen] = useState(false);
 
+  const { data: restaurant } = useQuery({
+    queryKey: ['restaurant-name', restaurantId],
+    enabled: !!restaurantId,
+    queryFn: async () => {
+      const { data } = await supabase.from('restaurants').select('name').eq('id', restaurantId!).maybeSingle();
+      return data;
+    },
+  });
+
+
   const { data: activeRegister } = useQuery({
     queryKey: ['cash-register-active', restaurantId],
     enabled: !!restaurantId,
