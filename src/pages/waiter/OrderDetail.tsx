@@ -389,6 +389,15 @@ export default function OrderDetail() {
         >
           <ReceiptText className="h-5 w-5" /> Solicitar Fechamento da Conta
         </Button>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" className="h-12 gap-2 rounded-xl text-xs" onClick={() => handlePrintTicket('full')}>
+            <Printer className="h-4 w-4" /> Imprimir pedido
+          </Button>
+          <Button variant="outline" className="h-12 gap-2 rounded-xl text-xs" onClick={() => handlePrintTicket('kitchen')}>
+            <Printer className="h-4 w-4" /> Via da cozinha
+          </Button>
+        </div>
         <p className="text-center text-[11px] text-muted-foreground">
           O recebimento é feito exclusivamente pelo Caixa.
         </p>
