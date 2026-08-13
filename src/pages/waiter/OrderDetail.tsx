@@ -241,6 +241,43 @@ export default function OrderDetail() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order-items', orderId] }),
   });
 
+  const handlePrintTicket = (kind: 'full' | 'kitchen') => {
+    if (!order) return;
+    const list = kind === 'kitchen' && cart.length
+      ? cart.map(c => ({ name: c.name, quantity: c.quantity, unit_price: c.price, notes: c.notes || null }))
+      : (orderItems || []).map(i => ({
+        name: (i as any).menu_items?.name || 'Item',
+        quantity: i.quantity,
+        unit_price: Number(i.unit_price),
+        notes: i.notes,
+      }));
+    if (!list.length) { toast.error('Nenhum item para imprimir.'); return; }
+    printOrderTicket({
+      restaurantName: restaurant?.name || 'Oxys Restaurante',
+      title: kind === 'kitchen' ? 'Via da cozinha' : 'Pedido detalhado',
+      showPrices: kind !== 'kitchen',
+      order: {
+        id: (order as any).id,
+        created_at: (order as any).created_at,
+        customer_name: (order as any).customer_name,
+        table_number: table?.number ?? null,
+        total: kind === 'kitchen' ? undefined : Number((order as any).total || 0),
+        created_by_name: (order as any).created_by_name,
+        created_by_role: (order as any).created_by_role,
+      },
+      items: list,
+    });
+    logAudit({
+      restaurantId: restaurantId!,
+      role: currentRole?.role,
+      action: 'print',
+      entity: 'order',
+      entityId: (order as any).id,
+      summary: `${kind === 'kitchen' ? 'Via da cozinha' : 'Pedido detalhado'} impresso • Mesa ${table?.number ?? '-'}`,
+    });
+  };
+
+
   if (isLoading) {
     return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
