@@ -4,11 +4,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Loader2, ReceiptText, Banknote, CreditCard, Smartphone, Users, Search, MoreHorizontal, Wallet, Bike, Printer,
+  Loader2, ReceiptText, Banknote, CreditCard, Smartphone, Users, Search, MoreHorizontal, Wallet, Bike, Printer, Plus, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { authorLabel } from '@/lib/orders';
@@ -23,13 +24,20 @@ const methods = [
   { value: 'pix', label: 'PIX', icon: Smartphone },
 ];
 
+const methodLabel = (v: string) => methods.find(m => m.value === v)?.label || v;
+
+interface PayLine { id: string; method: string; amount: string }
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 export default function Payments() {
   const { user, currentRole } = useAuth();
   const restaurantId = currentRole?.restaurant_id;
   const queryClient = useQueryClient();
 
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
-  const [method, setMethod] = useState<string>('');
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [lines, setLines] = useState<PayLine[]>([]);
   const [receivedAmount, setReceivedAmount] = useState('');
   const [search, setSearch] = useState('');
   const [deliverySaleOpen, setDeliverySaleOpen] = useState(false);
@@ -42,7 +50,6 @@ export default function Payments() {
       return data;
     },
   });
-
 
   const { data: activeRegister } = useQuery({
     queryKey: ['cash-register-active', restaurantId],
@@ -74,6 +81,7 @@ export default function Payments() {
     },
   });
 
+  /** Comandas abertas + total já pago em cada uma (permite pagamento parcial). */
   const { data: openOrders } = useQuery({
     queryKey: ['cashier-open-orders', restaurantId],
     enabled: !!restaurantId,
@@ -83,18 +91,23 @@ export default function Payments() {
         .from('orders')
         .select('id, table_id, total, status, customer_name, created_at, created_by_name, created_by_role')
         .eq('restaurant_id', restaurantId!)
+        .is('archived_at', null)
         .in('status', ['pending', 'preparing', 'ready', 'delivered'])
         .order('created_at');
       if (error) throw error;
       const ids = (data || []).map(o => o.id);
       if (!ids.length) return [];
-      const { data: paid } = await supabase.from('payments').select('order_id').in('order_id', ids);
-      const paidIds = new Set((paid || []).map(p => p.order_id));
-      return (data || []).filter(o => !paidIds.has(o.id));
+      const { data: paid } = await supabase.from('payments').select('order_id, amount').in('order_id', ids);
+      const paidMap = new Map<string, number>();
+      (paid || []).forEach(p => paidMap.set(p.order_id, (paidMap.get(p.order_id) || 0) + Number(p.amount)));
+      return (data || []).map(o => ({ ...o, paid: round2(paidMap.get(o.id) || 0) }));
     },
   });
 
-  const tableOrders = (openOrders || []).filter(o => o.table_id === selectedTableId);
+  const tableOrders = useMemo(
+    () => (openOrders || []).filter(o => o.table_id === selectedTableId),
+    [openOrders, selectedTableId]
+  );
   const orderIds = tableOrders.map(o => o.id);
 
   const { data: items } = useQuery({
@@ -110,6 +123,22 @@ export default function Payments() {
     },
   });
 
+  const orderTotal = (id: string) =>
+    round2((items || []).filter(i => i.order_id === id).reduce((s, i) => s + Number(i.unit_price) * i.quantity, 0));
+
+  /** Comandas com saldo em aberto na mesa. */
+  const pendingOrders = useMemo(
+    () => tableOrders.filter(o => orderTotal(o.id) - o.paid > 0.009 || !items),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tableOrders, items]
+  );
+
+  // seleciona automaticamente todas as comandas com saldo ao trocar de mesa
+  useEffect(() => {
+    setSelectedOrderIds(tableOrders.filter(o => orderTotal(o.id) - o.paid > 0.009).map(o => o.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTableId, items]);
+
   useEffect(() => {
     if (!restaurantId) return;
     const channel = supabase
@@ -124,56 +153,118 @@ export default function Payments() {
     return () => { supabase.removeChannel(channel); };
   }, [restaurantId, queryClient]);
 
-  const total = (items || []).reduce((s, i) => s + Number(i.unit_price) * i.quantity, 0);
+  const selectedOrders = tableOrders.filter(o => selectedOrderIds.includes(o.id));
+  const selectedTotal = round2(selectedOrders.reduce((s, o) => s + orderTotal(o.id), 0));
+  const selectedPaid = round2(selectedOrders.reduce((s, o) => s + o.paid, 0));
+  const dueNow = round2(Math.max(0, selectedTotal - selectedPaid));
+
+  const linesTotal = round2(lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0));
+  const remaining = round2(dueNow - linesTotal);
+  const hasCash = lines.some(l => l.method === 'cash');
   const received = parseFloat(receivedAmount) || 0;
-  const change = method === 'cash' ? Math.max(0, received - total) : 0;
+  const cashLinesTotal = round2(lines.filter(l => l.method === 'cash').reduce((s, l) => s + (parseFloat(l.amount) || 0), 0));
+  const change = hasCash && received > 0 ? round2(Math.max(0, received - cashLinesTotal)) : 0;
+
+  const addLine = (m: string) => {
+    const rest = round2(dueNow - linesTotal);
+    setLines(prev => [
+      ...prev,
+      { id: crypto.randomUUID(), method: m, amount: rest > 0 ? rest.toFixed(2) : '' },
+    ]);
+  };
+
+  const resetPayment = () => { setLines([]); setReceivedAmount(''); };
+
+  const toggleOrder = (id: string) =>
+    setSelectedOrderIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
 
   const pay = useMutation({
     mutationFn: async () => {
-      if (!selectedTableId || !method || !tableOrders.length) throw new Error('Dados incompletos');
+      if (!selectedTableId) throw new Error('Selecione uma mesa');
+      if (!selectedOrders.length) throw new Error('Selecione ao menos uma comanda');
+      if (linesTotal <= 0) throw new Error('Informe ao menos uma forma de pagamento');
+      if (linesTotal - dueNow > 0.009) throw new Error('Valor informado maior que o saldo devedor');
 
-      let remainingChange = method === 'cash' ? change : 0;
-      for (const order of tableOrders) {
-        const orderTotal = (items || [])
-          .filter(i => i.order_id === order.id)
-          .reduce((s, i) => s + Number(i.unit_price) * i.quantity, 0);
-        const { error } = await supabase.from('payments').insert({
-          order_id: order.id,
-          restaurant_id: restaurantId!,
-          cash_register_id: activeRegister?.id || null,
-          method: method as any,
-          amount: orderTotal,
-          change_amount: remainingChange,
-          user_id: user!.id,
-        });
-        if (error) throw error;
-        remainingChange = 0;
-        await supabase.from('orders').update({ status: 'delivered' as any, total: orderTotal }).eq('id', order.id);
+      // saldo devedor por comanda (ordem de criação)
+      const balances = selectedOrders.map(o => ({ id: o.id, due: round2(orderTotal(o.id) - o.paid) })).filter(b => b.due > 0.009);
+      let changeLeft = change;
+
+      for (const line of lines) {
+        let amount = round2(parseFloat(line.amount) || 0);
+        if (amount <= 0) continue;
+        for (const b of balances) {
+          if (amount <= 0.009) break;
+          if (b.due <= 0.009) continue;
+          const apply = round2(Math.min(amount, b.due));
+          const { error } = await supabase.from('payments').insert({
+            order_id: b.id,
+            restaurant_id: restaurantId!,
+            cash_register_id: activeRegister?.id || null,
+            method: line.method as any,
+            amount: apply,
+            change_amount: line.method === 'cash' ? changeLeft : 0,
+            user_id: user!.id,
+          });
+          if (error) throw error;
+          if (line.method === 'cash') changeLeft = 0;
+          b.due = round2(b.due - apply);
+          amount = round2(amount - apply);
+        }
       }
 
-      const { error: tableError } = await supabase
-        .from('restaurant_tables')
-        .update({ status: 'free' as const })
-        .eq('id', selectedTableId);
-      if (tableError) throw tableError;
+      // fecha comandas totalmente pagas
+      const settled = balances.filter(b => b.due <= 0.009).map(b => b.id);
+      if (settled.length) {
+        for (const id of settled) {
+          await supabase.from('orders').update({ status: 'delivered' as any, total: orderTotal(id) }).eq('id', id);
+        }
+      }
+
+      // libera a mesa somente quando não sobrar saldo em nenhuma comanda
+      const stillOpen = tableOrders.some(o => {
+        const due = round2(orderTotal(o.id) - o.paid);
+        const settledHere = balances.find(b => b.id === o.id);
+        const left = settledHere ? settledHere.due : due;
+        return left > 0.009;
+      });
+
+      if (!stillOpen) {
+        const { error: tableError } = await supabase
+          .from('restaurant_tables')
+          .update({ status: 'free' as const })
+          .eq('id', selectedTableId);
+        if (tableError) throw tableError;
+      }
+
+      await logAudit({
+        restaurantId: restaurantId!,
+        role: currentRole?.role,
+        action: 'create',
+        entity: 'payment',
+        entityId: selectedOrders[0]?.id,
+        summary: `Pagamento de R$ ${linesTotal.toFixed(2)} • ${lines.map(l => `${methodLabel(l.method)} R$ ${(parseFloat(l.amount) || 0).toFixed(2)}`).join(' + ')} • ${selectedOrders.length} comanda(s)`,
+      });
+
+      return { fullyPaid: !stillOpen, partial: remaining > 0.009 };
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['cashier-open-orders'] });
       queryClient.invalidateQueries({ queryKey: ['cashier-tables'] });
       queryClient.invalidateQueries({ queryKey: ['cashier-today-payments'] });
-      toast.success('Pagamento registrado! Mesa liberada.');
-      setSelectedTableId(null);
-      setMethod('');
-      setReceivedAmount('');
+      toast.success(
+        res?.fullyPaid ? 'Pagamento registrado! Mesa liberada.' : 'Pagamento parcial registrado. Saldo permanece em aberto.'
+      );
+      resetPayment();
+      if (res?.fullyPaid) setSelectedTableId(null);
     },
-    onError: () => toast.error('Erro ao processar pagamento.'),
+    onError: (e: any) => toast.error(e.message || 'Erro ao processar pagamento.'),
   });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'F4') {
         e.preventDefault();
-        if (method && tableOrders.length && !pay.isPending) pay.mutate();
+        if (linesTotal > 0 && selectedOrders.length && !pay.isPending) pay.mutate();
       }
     };
     window.addEventListener('keydown', onKey);
@@ -198,26 +289,30 @@ export default function Payments() {
   const visibleTables = (tables || []).filter(t => String(t.number).includes(search.trim()));
 
   const handlePrintReceipt = (width: '58mm' | '80mm' = '80mm') => {
-    if (!tableOrders.length) return;
-    const first = tableOrders[0] as any;
+    if (!selectedOrders.length) return;
+    const first = selectedOrders[0] as any;
     printReceipt({
       restaurantName: restaurant?.name || 'Oxys Restaurante',
       width,
       order: {
         id: first.id,
         created_at: first.created_at,
-        customer_name: tableOrders.map((o: any, i) => o.customer_name || `Comanda ${i + 1}`).join(' / '),
+        customer_name: selectedOrders.map((o: any, i) => o.customer_name || `Comanda ${i + 1}`).join(' / '),
         table_number: selectedTable?.number ?? null,
-        total,
+        total: selectedTotal,
         created_by_name: first.created_by_name,
         created_by_role: first.created_by_role,
       },
-      items: (items || []).map(i => ({
-        name: (i as any).menu_items?.name || 'Item',
-        quantity: i.quantity,
-        unit_price: Number(i.unit_price),
-      })),
-      payments: method ? [{ method, amount: total }] : [],
+      items: (items || [])
+        .filter(i => selectedOrderIds.includes(i.order_id))
+        .map(i => ({
+          name: (i as any).menu_items?.name || 'Item',
+          quantity: i.quantity,
+          unit_price: Number(i.unit_price),
+        })),
+      payments: lines
+        .filter(l => (parseFloat(l.amount) || 0) > 0)
+        .map(l => ({ method: l.method, amount: parseFloat(l.amount) || 0 })),
       change,
     });
     logAudit({
@@ -226,7 +321,7 @@ export default function Payments() {
       action: 'print',
       entity: 'payment',
       entityId: first.id,
-      summary: `Recibo impresso • Mesa ${selectedTable?.number ?? '-'} • R$ ${total.toFixed(2)}`,
+      summary: `Recibo impresso • Mesa ${selectedTable?.number ?? '-'} • R$ ${selectedTotal.toFixed(2)}`,
     });
   };
 
@@ -239,7 +334,9 @@ export default function Payments() {
               {selectedTable ? `Mesa ${selectedTable.number}` : 'Selecione a mesa'}
             </div>
             <div className="text-xs text-muted-foreground">
-              {selectedTable ? `${selectedTable.capacity} pessoas • ${tableOrders.length} comanda(s)` : 'Nenhuma mesa selecionada'}
+              {selectedTable
+                ? `${selectedTable.capacity} pessoas • ${tableOrders.length} comanda(s) • ${selectedOrders.length} selecionada(s)`
+                : 'Nenhuma mesa selecionada'}
             </div>
           </div>
           <Wallet className="h-5 w-5 text-primary" />
@@ -251,16 +348,18 @@ export default function Payments() {
           <div className="flex h-full min-h-[140px] items-center justify-center p-6 text-center text-sm text-muted-foreground">
             Escolha uma mesa ao lado para ver o consumo.
           </div>
-        ) : !tableOrders.length ? (
+        ) : !pendingOrders.length ? (
           <div className="flex h-full min-h-[140px] items-center justify-center p-6 text-center text-sm text-muted-foreground">
-            Nenhuma comanda aberta nesta mesa.
+            Nenhuma comanda em aberto nesta mesa.
           </div>
         ) : (
           <div className="space-y-3">
             <AnimatePresence initial={false}>
-              {tableOrders.map((order, idx) => {
+              {pendingOrders.map((order, idx) => {
                 const orderItems = (items || []).filter(i => i.order_id === order.id);
-                const orderTotal = orderItems.reduce((s, i) => s + Number(i.unit_price) * i.quantity, 0);
+                const oTotal = orderTotal(order.id);
+                const due = round2(oTotal - order.paid);
+                const checked = selectedOrderIds.includes(order.id);
                 return (
                   <motion.div
                     key={order.id}
@@ -269,18 +368,29 @@ export default function Payments() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: 12 }}
                     transition={{ duration: 0.2 }}
-                    className="rounded-xl border border-border bg-muted/10 p-3"
+                    className={cn(
+                      'rounded-xl border p-3 transition-colors',
+                      checked ? 'border-primary/60 bg-primary/5' : 'border-border bg-muted/10'
+                    )}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-semibold">
-                        {order.customer_name || `Comanda ${idx + 1}`}
-                      </span>
+                      <label className="flex min-w-0 items-center gap-2">
+                        <Checkbox checked={checked} onCheckedChange={() => toggleOrder(order.id)} />
+                        <span className="truncate text-sm font-semibold">
+                          {order.customer_name || `Comanda ${idx + 1}`}
+                        </span>
+                      </label>
                       <span className="shrink-0 rounded-lg bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-                        R$ {orderTotal.toFixed(2)}
+                        R$ {due.toFixed(2)}
                       </span>
                     </div>
                     <div className="mb-2 text-[11px] text-muted-foreground">
                       Lançado por {authorLabel(order as any)}
+                      {order.paid > 0 && (
+                        <span className="ml-1 text-[hsl(var(--success))]">
+                          • já pago R$ {order.paid.toFixed(2)} de R$ {oTotal.toFixed(2)}
+                        </span>
+                      )}
                     </div>
                     {orderItems.length ? (
                       <ul className="space-y-1 text-sm">
@@ -306,41 +416,75 @@ export default function Payments() {
 
       <div className="pdv-card space-y-4 p-4">
         <div className="space-y-1 text-sm">
-          <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>R$ {total.toFixed(2)}</span></div>
-          <div className="flex justify-between text-muted-foreground"><span>Taxa</span><span>R$ 0,00</span></div>
+          <div className="flex justify-between text-muted-foreground"><span>Consumo selecionado</span><span>R$ {selectedTotal.toFixed(2)}</span></div>
+          <div className="flex justify-between text-muted-foreground"><span>Já pago</span><span>R$ {selectedPaid.toFixed(2)}</span></div>
         </div>
 
         <div className="flex items-end justify-between border-t border-border pt-3">
-          <span className="text-sm text-muted-foreground">Total</span>
-          <span className="text-3xl font-bold text-primary">R$ {total.toFixed(2)}</span>
+          <span className="text-sm text-muted-foreground">Saldo devedor</span>
+          <span className="text-3xl font-bold text-primary">R$ {dueNow.toFixed(2)}</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          {methods.map(m => (
-            <button
-              key={m.value}
-              onClick={() => setMethod(m.value)}
-              className={cn(
-                'pdv-ripple flex items-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-all duration-200',
-                method === m.value
-                  ? 'border-primary bg-primary/15 text-primary'
-                  : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
-              )}
-            >
-              <m.icon className="h-4 w-4" /> {m.label}
-            </button>
-          ))}
+        <div>
+          <Label className="text-xs">Adicionar forma de pagamento</Label>
+          <div className="mt-1.5 grid grid-cols-2 gap-2">
+            {methods.map(m => (
+              <button
+                key={m.value}
+                onClick={() => addLine(m.value)}
+                disabled={!selectedOrders.length}
+                className={cn(
+                  'pdv-ripple flex items-center gap-2 rounded-xl border border-border px-3 py-3 text-sm font-medium text-muted-foreground transition-all duration-200',
+                  'hover:border-primary/40 hover:text-foreground disabled:opacity-40'
+                )}
+              >
+                <m.icon className="h-4 w-4" /> {m.label}
+                <Plus className="ml-auto h-3.5 w-3.5" />
+              </button>
+            ))}
+          </div>
         </div>
 
-        {method === 'cash' && (
+        {!!lines.length && (
+          <div className="space-y-2">
+            {lines.map(l => (
+              <div key={l.id} className="flex items-center gap-2 rounded-xl border border-border p-2">
+                <span className="w-24 shrink-0 truncate text-xs font-medium">{methodLabel(l.method)}</span>
+                <Input
+                  type="number" min="0" step="0.01"
+                  className="h-9 rounded-lg"
+                  value={l.amount}
+                  onChange={e => setLines(prev => prev.map(x => (x.id === l.id ? { ...x, amount: e.target.value } : x)))}
+                  placeholder="0,00"
+                />
+                <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0 text-destructive"
+                  onClick={() => setLines(prev => prev.filter(x => x.id !== l.id))}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Total informado</span>
+              <span className="font-semibold">R$ {linesTotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Restante após este pagamento</span>
+              <span className={cn('font-semibold', remaining > 0.009 ? 'text-amber-500' : 'text-[hsl(var(--success))]')}>
+                R$ {Math.max(0, remaining).toFixed(2)}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {hasCash && (
           <div className="space-y-1.5">
-            <Label className="text-xs">Valor recebido (R$)</Label>
+            <Label className="text-xs">Valor recebido em dinheiro (R$)</Label>
             <Input
               type="number" min="0" step="0.01"
               className="rounded-xl"
               value={receivedAmount}
               onChange={e => setReceivedAmount(e.target.value)}
-              placeholder={total.toFixed(2)}
+              placeholder={cashLinesTotal.toFixed(2)}
             />
             {received > 0 && (
               <p className="text-sm font-semibold text-[hsl(var(--success))]">Troco: R$ {change.toFixed(2)}</p>
@@ -350,20 +494,24 @@ export default function Payments() {
 
         <Button
           className="pdv-ripple h-14 w-full gap-2 rounded-2xl text-base font-semibold"
-          disabled={!method || !tableOrders.length || pay.isPending || (method === 'cash' && received > 0 && received < total)}
+          disabled={
+            !selectedOrders.length || linesTotal <= 0 || pay.isPending ||
+            linesTotal - dueNow > 0.009 ||
+            (hasCash && received > 0 && received < cashLinesTotal)
+          }
           onClick={() => pay.mutate()}
         >
           {pay.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <ReceiptText className="h-5 w-5" />}
-          Finalizar pagamento
+          {remaining > 0.009 ? 'Registrar pagamento parcial' : 'Finalizar pagamento'}
           <span className="ml-1 rounded-md bg-primary-foreground/15 px-1.5 py-0.5 text-[11px]">F4</span>
         </Button>
 
         <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" className="h-12 gap-2 rounded-xl text-xs" disabled={!tableOrders.length}
+          <Button variant="outline" className="h-12 gap-2 rounded-xl text-xs" disabled={!selectedOrders.length}
             onClick={() => handlePrintReceipt('80mm')}>
             <Printer className="h-4 w-4" /> Recibo 80mm
           </Button>
-          <Button variant="outline" className="h-12 gap-2 rounded-xl text-xs" disabled={!tableOrders.length}
+          <Button variant="outline" className="h-12 gap-2 rounded-xl text-xs" disabled={!selectedOrders.length}
             onClick={() => handlePrintReceipt('58mm')}>
             <Printer className="h-4 w-4" /> Recibo 58mm
           </Button>
@@ -378,7 +526,7 @@ export default function Payments() {
         <div className="flex flex-wrap items-center gap-3">
           <div className="mr-auto">
             <h1 className="text-2xl font-bold tracking-tight">Pagamentos</h1>
-            <p className="text-xs text-muted-foreground">PDV • Recebimento e liberação de mesas</p>
+            <p className="text-xs text-muted-foreground">PDV • Recebimento parcial, por comanda e liberação de mesas</p>
           </div>
           <div className="relative min-w-[200px] flex-1 md:max-w-xs">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -414,7 +562,7 @@ export default function Payments() {
                 <motion.button
                   key={t.id}
                   whileTap={{ scale: 0.97 }}
-                  onClick={() => { setSelectedTableId(t.id); setMethod(''); setReceivedAmount(''); }}
+                  onClick={() => { setSelectedTableId(t.id); resetPayment(); }}
                   className={cn(
                     'pdv-card pdv-card-hover pdv-ripple border p-4 text-left transition-all duration-200',
                     isSelected
@@ -453,8 +601,6 @@ export default function Payments() {
           cashRegisterId={activeRegister?.id}
         />
       )}
-
-
     </div>
   );
 }
