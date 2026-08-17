@@ -532,6 +532,50 @@ export type Database = {
           },
         ]
       }
+      kitchen_sessions: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          opened_at: string
+          opened_by: string
+          orders_archived: number
+          restaurant_id: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          opened_by: string
+          orders_archived?: number
+          restaurant_id: string
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          opened_by?: string
+          orders_archived?: number
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kitchen_sessions_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       login_attempts: {
         Row: {
           attempts: number
@@ -852,6 +896,8 @@ export type Database = {
       }
       orders: {
         Row: {
+          archived_at: string | null
+          archived_by: string | null
           courier_id: string | null
           created_at: string
           created_by: string | null
@@ -863,6 +909,7 @@ export type Database = {
           delivery_fee: number
           delivery_status: string
           id: string
+          kitchen_session_id: string | null
           notes: string | null
           order_type: string
           restaurant_id: string
@@ -873,6 +920,8 @@ export type Database = {
           waiter_id: string | null
         }
         Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
           courier_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -884,6 +933,7 @@ export type Database = {
           delivery_fee?: number
           delivery_status?: string
           id?: string
+          kitchen_session_id?: string | null
           notes?: string | null
           order_type?: string
           restaurant_id: string
@@ -894,6 +944,8 @@ export type Database = {
           waiter_id?: string | null
         }
         Update: {
+          archived_at?: string | null
+          archived_by?: string | null
           courier_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -905,6 +957,7 @@ export type Database = {
           delivery_fee?: number
           delivery_status?: string
           id?: string
+          kitchen_session_id?: string | null
           notes?: string | null
           order_type?: string
           restaurant_id?: string
