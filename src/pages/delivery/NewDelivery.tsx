@@ -223,7 +223,10 @@ export default function NewDelivery() {
             <div className="space-y-2">
               <Label>Pagamento</Label>
               <div className="grid grid-cols-2 gap-2">
-                {[{ k: null, l: 'Pagar na entrega' }, ...Object.entries(paymentMethodLabel).map(([k, l]) => ({ k, l }))].map(opt => (
+                {([{ k: null, l: 'Pagar na entrega' }] as { k: string | null; l: string }[])
+                  .concat(Object.entries(paymentMethodLabel).map(([k, l]) => ({ k, l })))
+                  .map(opt => (
+
                   <button key={opt.k ?? 'later'} type="button" onClick={() => setPayMethod(opt.k as string | null)}
                     className={cn(
                       'rounded-xl border p-2 text-xs transition-colors',
