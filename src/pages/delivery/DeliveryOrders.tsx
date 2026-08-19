@@ -11,6 +11,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { authorLabel, deliveryStatusLabels } from '@/lib/orders';
 import { courierStatusLabels, courierDotClass } from '@/lib/delivery';
+import { paymentMethodLabel } from '@/lib/finance';
+
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
