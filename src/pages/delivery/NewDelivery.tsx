@@ -14,6 +14,8 @@ import MenuImage from '@/components/MenuImage';
 import { authorFields } from '@/lib/orders';
 import { cn } from '@/lib/utils';
 import { courierStatusLabels, courierDotClass } from '@/lib/delivery';
+import { paymentMethodLabel } from '@/lib/finance';
+
 
 interface CartItem { id: string; name: string; price: number; quantity: number; }
 
