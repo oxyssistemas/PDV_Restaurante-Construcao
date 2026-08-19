@@ -57,6 +57,39 @@ export default function DeliveryOrders() {
     },
   });
 
+  const { data: payments } = useQuery({
+    queryKey: ['delivery-payments', restaurantId],
+    enabled: !!restaurantId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('payments')
+        .select('order_id, amount')
+        .eq('restaurant_id', restaurantId!);
+      return data || [];
+    },
+  });
+  const paidOrderIds = new Set((payments || []).map(p => p.order_id));
+
+  const registerPayment = useMutation({
+    mutationFn: async ({ order, method }: { order: any; method: string }) => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error('Sessão expirada');
+      const { error } = await supabase.from('payments').insert({
+        order_id: order.id,
+        restaurant_id: restaurantId!,
+        method: method as any,
+        amount: Number(order.total) + Number(order.delivery_fee || 0),
+        user_id: auth.user.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['delivery-payments', restaurantId] });
+      toast.success('Pagamento registrado no financeiro!');
+    },
+    onError: (e: any) => toast.error(e.message || 'Erro ao registrar pagamento.'),
+  });
+
   const assignCourier = useMutation({
     mutationFn: async ({ id, courierId }: { id: string; courierId: string }) => {
       const { error } = await supabase.from('orders').update({ courier_id: courierId }).eq('id', id);
