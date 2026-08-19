@@ -218,6 +218,26 @@ export default function NewDelivery() {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <Label>Pagamento</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {[{ k: null, l: 'Pagar na entrega' }, ...Object.entries(paymentMethodLabel).map(([k, l]) => ({ k, l }))].map(opt => (
+                  <button key={opt.k ?? 'later'} type="button" onClick={() => setPayMethod(opt.k as string | null)}
+                    className={cn(
+                      'rounded-xl border p-2 text-xs transition-colors',
+                      payMethod === opt.k ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'
+                    )}>
+                    {opt.l}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {payMethod ? 'A venda será contabilizada no financeiro agora.' : 'Registre o pagamento na aba de pedidos após a entrega.'}
+              </p>
+            </div>
+
+
+
             <div className="space-y-2 border-t pt-3">
               {cart.length ? cart.map(c => (
                 <div key={c.id} className="flex items-center justify-between gap-2 text-sm">
