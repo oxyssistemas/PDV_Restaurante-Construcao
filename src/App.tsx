@@ -54,6 +54,8 @@ import NewDelivery from "./pages/delivery/NewDelivery";
 import CourierLayout from "./components/layouts/CourierLayout";
 import MyDeliveries from "./pages/courier/MyDeliveries";
 import CouriersPage from "./pages/admin/Couriers";
+import OrdersHistory from "./pages/shared/OrdersHistory";
+
 
 
 const queryClient = new QueryClient();
@@ -94,6 +96,8 @@ const App = () => (
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="couriers" element={<CouriersPage />} />
+              <Route path="history" element={<OrdersHistory />} />
+
               <Route path="settings" element={<SettingsPage />} />
             </Route>
 
@@ -136,6 +140,8 @@ const App = () => (
               <Route path="crm" element={<FinanceCrmPage />} />
               <Route path="reports" element={<FinanceReports />} />
               <Route path="inventory" element={<FinanceInventory />} />
+              <Route path="history" element={<OrdersHistory />} />
+
             </Route>
             <Route path="/delivery" element={
               <ProtectedRoute allowedRoles={['delivery', 'admin']}>
