@@ -11,6 +11,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { authorLabel, deliveryStatusLabels } from '@/lib/orders';
 import { courierStatusLabels, courierDotClass } from '@/lib/delivery';
+import { paymentMethodLabel } from '@/lib/finance';
+
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -55,6 +57,39 @@ export default function DeliveryOrders() {
         .order('name');
       return data || [];
     },
+  });
+
+  const { data: payments } = useQuery({
+    queryKey: ['delivery-payments', restaurantId],
+    enabled: !!restaurantId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('payments')
+        .select('order_id, amount')
+        .eq('restaurant_id', restaurantId!);
+      return data || [];
+    },
+  });
+  const paidOrderIds = new Set((payments || []).map(p => p.order_id));
+
+  const registerPayment = useMutation({
+    mutationFn: async ({ order, method }: { order: any; method: string }) => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error('Sessão expirada');
+      const { error } = await supabase.from('payments').insert({
+        order_id: order.id,
+        restaurant_id: restaurantId!,
+        method: method as any,
+        amount: Number(order.total) + Number(order.delivery_fee || 0),
+        user_id: auth.user.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['delivery-payments', restaurantId] });
+      toast.success('Pagamento registrado no financeiro!');
+    },
+    onError: (e: any) => toast.error(e.message || 'Erro ao registrar pagamento.'),
   });
 
   const assignCourier = useMutation({
@@ -194,6 +229,23 @@ export default function DeliveryOrders() {
                             ))}
                           </SelectContent>
                         </Select>
+                        {paidOrderIds.has(o.id) ? (
+                          <div className="mt-2 rounded-lg border border-[hsl(var(--success))]/40 bg-[hsl(var(--success))]/10 px-2 py-1 text-[11px] text-[hsl(var(--success))]">
+                            Pago · contabilizado no financeiro
+                          </div>
+                        ) : (
+                          <Select onValueChange={v => registerPayment.mutate({ order: o, method: v })}>
+                            <SelectTrigger className="mt-2 h-8 text-xs">
+                              <SelectValue placeholder="Registrar pagamento" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(paymentMethodLabel).map(([k, l]) => (
+                                <SelectItem key={k} value={k}>{l}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+
                         <div className="mt-2 flex gap-2">
                           {col.next && (
                             <Button size="sm" className="flex-1 gap-1" disabled={setStatus.isPending || blockRoute}

@@ -83,6 +83,24 @@ export default function KitchenQueue() {
     } catch {}
   }, []);
 
+  const { data: session, isLoading: loadingSession } = useQuery({
+    queryKey: ['kitchen-session', restaurantId],
+    enabled: !!restaurantId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('kitchen_sessions')
+        .select('*')
+        .eq('restaurant_id', restaurantId!)
+        .is('closed_at', null)
+        .order('opened_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+  const kitchenOpen = !!session;
+
   const { data: orderItems, isLoading, dataUpdatedAt } = useQuery({
     queryKey: ['kitchen-queue', restaurantId],
     enabled: !!restaurantId,
@@ -90,8 +108,9 @@ export default function KitchenQueue() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('order_items')
-        .select('*, menu_items(name, menu_categories(name)), orders!inner(id, table_id, restaurant_id, order_type, customer_name, created_by_name, created_by_role, restaurant_tables(number))')
+        .select('*, menu_items(name, menu_categories(name)), orders!inner(id, table_id, restaurant_id, order_type, customer_name, created_by_name, created_by_role, archived_at, restaurant_tables(number))')
         .eq('orders.restaurant_id', restaurantId!)
+        .is('orders.archived_at', null)
         .in('status', ['pending', 'preparing', 'ready'])
         .order('created_at', { ascending: true });
 
@@ -99,6 +118,7 @@ export default function KitchenQueue() {
       return data;
     },
   });
+
 
   useEffect(() => { if (dataUpdatedAt) setLastSync(new Date(dataUpdatedAt)); }, [dataUpdatedAt]);
 

@@ -14,6 +14,8 @@ import MenuImage from '@/components/MenuImage';
 import { authorFields } from '@/lib/orders';
 import { cn } from '@/lib/utils';
 import { courierStatusLabels, courierDotClass } from '@/lib/delivery';
+import { paymentMethodLabel } from '@/lib/finance';
+
 
 interface CartItem { id: string; name: string; price: number; quantity: number; }
 
@@ -30,6 +32,8 @@ export default function NewDelivery() {
   const [address, setAddress] = useState('');
   const [fee, setFee] = useState('0');
   const [courierId, setCourierId] = useState<string | null>(null);
+  const [payMethod, setPayMethod] = useState<string | null>(null);
+
 
   const { data: couriers } = useQuery({
     queryKey: ['couriers', restaurantId],
@@ -115,7 +119,20 @@ export default function NewDelivery() {
         }))
       );
       if (itemsError) throw itemsError;
+
+      // Pagamento já recebido: contabiliza no financeiro
+      if (payMethod && user) {
+        const { error: payError } = await supabase.from('payments').insert({
+          order_id: order.id,
+          restaurant_id: restaurantId!,
+          method: payMethod as any,
+          amount: subtotal + (parseFloat(fee) || 0),
+          user_id: user.id,
+        });
+        if (payError) throw payError;
+      }
     },
+
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['delivery-orders'] });
       toast.success('Pedido de delivery criado e enviado à cozinha!');
@@ -202,6 +219,28 @@ export default function NewDelivery() {
                 {!couriers?.length && <p className="text-xs text-muted-foreground">Nenhum entregador cadastrado.</p>}
               </div>
             </div>
+
+            <div className="space-y-2">
+              <Label>Pagamento</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {([{ k: null, l: 'Pagar na entrega' }] as { k: string | null; l: string }[])
+                  .concat(Object.entries(paymentMethodLabel).map(([k, l]) => ({ k, l })))
+                  .map(opt => (
+                  <button key={opt.k ?? 'later'} type="button" onClick={() => setPayMethod(opt.k as string | null)}
+                    className={cn(
+                      'rounded-xl border p-2 text-xs transition-colors',
+                      payMethod === opt.k ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'
+                    )}>
+                    {opt.l}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {payMethod ? 'A venda será contabilizada no financeiro agora.' : 'Registre o pagamento na aba de pedidos após a entrega.'}
+              </p>
+            </div>
+
+
 
             <div className="space-y-2 border-t pt-3">
               {cart.length ? cart.map(c => (
