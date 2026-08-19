@@ -226,7 +226,6 @@ export default function NewDelivery() {
                 {([{ k: null, l: 'Pagar na entrega' }] as { k: string | null; l: string }[])
                   .concat(Object.entries(paymentMethodLabel).map(([k, l]) => ({ k, l })))
                   .map(opt => (
-
                   <button key={opt.k ?? 'later'} type="button" onClick={() => setPayMethod(opt.k as string | null)}
                     className={cn(
                       'rounded-xl border p-2 text-xs transition-colors',
