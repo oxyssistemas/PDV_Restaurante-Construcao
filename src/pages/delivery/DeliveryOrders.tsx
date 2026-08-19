@@ -227,6 +227,23 @@ export default function DeliveryOrders() {
                             ))}
                           </SelectContent>
                         </Select>
+                        {paidOrderIds.has(o.id) ? (
+                          <div className="mt-2 rounded-lg border border-[hsl(var(--success))]/40 bg-[hsl(var(--success))]/10 px-2 py-1 text-[11px] text-[hsl(var(--success))]">
+                            Pago · contabilizado no financeiro
+                          </div>
+                        ) : (
+                          <Select onValueChange={v => registerPayment.mutate({ order: o, method: v })}>
+                            <SelectTrigger className="mt-2 h-8 text-xs">
+                              <SelectValue placeholder="Registrar pagamento" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(paymentMethodLabel).map(([k, l]) => (
+                                <SelectItem key={k} value={k}>{l}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+
                         <div className="mt-2 flex gap-2">
                           {col.next && (
                             <Button size="sm" className="flex-1 gap-1" disabled={setStatus.isPending || blockRoute}
