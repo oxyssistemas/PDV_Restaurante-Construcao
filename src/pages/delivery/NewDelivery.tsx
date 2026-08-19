@@ -30,6 +30,8 @@ export default function NewDelivery() {
   const [address, setAddress] = useState('');
   const [fee, setFee] = useState('0');
   const [courierId, setCourierId] = useState<string | null>(null);
+  const [payMethod, setPayMethod] = useState<string | null>(null);
+
 
   const { data: couriers } = useQuery({
     queryKey: ['couriers', restaurantId],
@@ -115,7 +117,20 @@ export default function NewDelivery() {
         }))
       );
       if (itemsError) throw itemsError;
+
+      // Pagamento já recebido: contabiliza no financeiro
+      if (payMethod && user) {
+        const { error: payError } = await supabase.from('payments').insert({
+          order_id: order.id,
+          restaurant_id: restaurantId!,
+          method: payMethod as any,
+          amount: subtotal + (parseFloat(fee) || 0),
+          user_id: user.id,
+        });
+        if (payError) throw payError;
+      }
     },
+
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['delivery-orders'] });
       toast.success('Pedido de delivery criado e enviado à cozinha!');
