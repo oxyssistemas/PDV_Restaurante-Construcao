@@ -400,12 +400,25 @@ export default function KitchenQueue() {
             />
           </div>
 
+          {kitchenOpen ? (
+            <Button variant="outline" className="h-10 gap-2 rounded-xl border-destructive/40 text-destructive"
+              disabled={closeKitchen.isPending} onClick={handleCloseKitchen}>
+              <Power className="h-4 w-4" /> Fechar cozinha
+            </Button>
+          ) : (
+            <Button className="h-10 gap-2 rounded-xl" disabled={openKitchen.isPending || loadingSession}
+              onClick={() => openKitchen.mutate()}>
+              <Power className="h-4 w-4" /> Abrir cozinha
+            </Button>
+          )}
+
           <div className="text-right">
             <p className="font-mono text-xl font-bold leading-none">{format(clock, 'HH:mm:ss')}</p>
             <p className="text-[11px] text-muted-foreground">
               {format(clock, "EEE, dd 'de' MMM", { locale: ptBR })} · sync {format(lastSync, 'HH:mm')}
             </p>
           </div>
+
         </header>
 
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
