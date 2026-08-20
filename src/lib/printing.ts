@@ -2,6 +2,58 @@
 
 export type ThermalWidth = '58mm' | '80mm';
 
+/** Tipos de impressão que podem ser mapeados para impressoras diferentes. */
+export type PrintPurpose = 'order' | 'kitchen' | 'receipt';
+
+export const printPurposeLabels: Record<PrintPurpose, string> = {
+  order: 'Pedido detalhado (comanda)',
+  kitchen: 'Via da cozinha',
+  receipt: 'Recibo de pagamento',
+};
+
+export const printPurposes: PrintPurpose[] = ['order', 'kitchen', 'receipt'];
+
+/** Modelos suportados; cada um ajusta a largura padrão sugerida. */
+export const printerModels: { value: string; label: string; width: ThermalWidth }[] = [
+  { value: 'generic', label: 'Genérica ESC/POS 80mm', width: '80mm' },
+  { value: 'generic_58', label: 'Genérica ESC/POS 58mm', width: '58mm' },
+  { value: 'epson_tm_t20', label: 'Epson TM-T20 / T20X', width: '80mm' },
+  { value: 'epson_tm_t88', label: 'Epson TM-T88', width: '80mm' },
+  { value: 'elgin_i9', label: 'Elgin i9', width: '80mm' },
+  { value: 'elgin_i7', label: 'Elgin i7', width: '80mm' },
+  { value: 'bematech_mp4200', label: 'Bematech MP-4200 TH', width: '80mm' },
+  { value: 'daruma_dr800', label: 'Daruma DR800', width: '80mm' },
+  { value: 'tanca_tp650', label: 'Tanca TP-650', width: '80mm' },
+  { value: 'sweda_si300', label: 'Sweda SI-300', width: '80mm' },
+  { value: 'mp4200_58', label: 'Mini impressora 58mm (Bluetooth)', width: '58mm' },
+];
+
+export const printerModelLabel = (v?: string | null) =>
+  printerModels.find(m => m.value === v)?.label ?? 'Genérica ESC/POS 80mm';
+
+export interface PrinterConfig {
+  purpose: PrintPurpose;
+  enabled: boolean;
+  model: string;
+  device_name?: string | null;
+  width: ThermalWidth;
+  copies: number;
+  header_note?: string | null;
+  footer_note?: string | null;
+}
+
+export const defaultPrinterConfig = (purpose: PrintPurpose): PrinterConfig => ({
+  purpose,
+  enabled: true,
+  model: 'generic',
+  device_name: null,
+  width: '80mm',
+  copies: 1,
+  header_note: null,
+  footer_note: null,
+});
+
+
 export interface PrintItem {
   name: string;
   quantity: number;
