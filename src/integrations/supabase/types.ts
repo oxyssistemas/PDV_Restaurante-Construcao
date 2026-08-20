@@ -912,6 +912,7 @@ export type Database = {
           kitchen_session_id: string | null
           notes: string | null
           order_type: string
+          reservation_id: string | null
           restaurant_id: string
           status: Database["public"]["Enums"]["order_status"]
           table_id: string | null
@@ -936,6 +937,7 @@ export type Database = {
           kitchen_session_id?: string | null
           notes?: string | null
           order_type?: string
+          reservation_id?: string | null
           restaurant_id: string
           status?: Database["public"]["Enums"]["order_status"]
           table_id?: string | null
@@ -960,6 +962,7 @@ export type Database = {
           kitchen_session_id?: string | null
           notes?: string | null
           order_type?: string
+          reservation_id?: string | null
           restaurant_id?: string
           status?: Database["public"]["Enums"]["order_status"]
           table_id?: string | null
@@ -973,6 +976,13 @@ export type Database = {
             columns: ["courier_id"]
             isOneToOne: false
             referencedRelation: "couriers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
             referencedColumns: ["id"]
           },
           {
@@ -1042,6 +1052,59 @@ export type Database = {
           },
           {
             foreignKeyName: "payments_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      printer_settings: {
+        Row: {
+          copies: number
+          created_at: string
+          device_name: string | null
+          enabled: boolean
+          footer_note: string | null
+          header_note: string | null
+          id: string
+          model: string
+          purpose: string
+          restaurant_id: string
+          updated_at: string
+          width: string
+        }
+        Insert: {
+          copies?: number
+          created_at?: string
+          device_name?: string | null
+          enabled?: boolean
+          footer_note?: string | null
+          header_note?: string | null
+          id?: string
+          model?: string
+          purpose: string
+          restaurant_id: string
+          updated_at?: string
+          width?: string
+        }
+        Update: {
+          copies?: number
+          created_at?: string
+          device_name?: string | null
+          enabled?: boolean
+          footer_note?: string | null
+          header_note?: string | null
+          id?: string
+          model?: string
+          purpose?: string
+          restaurant_id?: string
+          updated_at?: string
+          width?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "printer_settings_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"

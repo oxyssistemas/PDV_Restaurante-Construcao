@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.enforce_table_reservation() FROM anon, authenticated, PUBLIC;

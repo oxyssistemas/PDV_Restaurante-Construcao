@@ -2,6 +2,58 @@
 
 export type ThermalWidth = '58mm' | '80mm';
 
+/** Tipos de impressão que podem ser mapeados para impressoras diferentes. */
+export type PrintPurpose = 'order' | 'kitchen' | 'receipt';
+
+export const printPurposeLabels: Record<PrintPurpose, string> = {
+  order: 'Pedido detalhado (comanda)',
+  kitchen: 'Via da cozinha',
+  receipt: 'Recibo de pagamento',
+};
+
+export const printPurposes: PrintPurpose[] = ['order', 'kitchen', 'receipt'];
+
+/** Modelos suportados; cada um ajusta a largura padrão sugerida. */
+export const printerModels: { value: string; label: string; width: ThermalWidth }[] = [
+  { value: 'generic', label: 'Genérica ESC/POS 80mm', width: '80mm' },
+  { value: 'generic_58', label: 'Genérica ESC/POS 58mm', width: '58mm' },
+  { value: 'epson_tm_t20', label: 'Epson TM-T20 / T20X', width: '80mm' },
+  { value: 'epson_tm_t88', label: 'Epson TM-T88', width: '80mm' },
+  { value: 'elgin_i9', label: 'Elgin i9', width: '80mm' },
+  { value: 'elgin_i7', label: 'Elgin i7', width: '80mm' },
+  { value: 'bematech_mp4200', label: 'Bematech MP-4200 TH', width: '80mm' },
+  { value: 'daruma_dr800', label: 'Daruma DR800', width: '80mm' },
+  { value: 'tanca_tp650', label: 'Tanca TP-650', width: '80mm' },
+  { value: 'sweda_si300', label: 'Sweda SI-300', width: '80mm' },
+  { value: 'mp4200_58', label: 'Mini impressora 58mm (Bluetooth)', width: '58mm' },
+];
+
+export const printerModelLabel = (v?: string | null) =>
+  printerModels.find(m => m.value === v)?.label ?? 'Genérica ESC/POS 80mm';
+
+export interface PrinterConfig {
+  purpose: PrintPurpose;
+  enabled: boolean;
+  model: string;
+  device_name?: string | null;
+  width: ThermalWidth;
+  copies: number;
+  header_note?: string | null;
+  footer_note?: string | null;
+}
+
+export const defaultPrinterConfig = (purpose: PrintPurpose): PrinterConfig => ({
+  purpose,
+  enabled: true,
+  model: 'generic',
+  device_name: null,
+  width: '80mm',
+  copies: 1,
+  header_note: null,
+  footer_note: null,
+});
+
+
 export interface PrintItem {
   name: string;
   quantity: number;
@@ -71,6 +123,7 @@ function shell(width: ThermalWidth, body: string) {
   .obs { padding-left: 8px; font-style: italic; }
   .total { font-size: ${width === '58mm' ? '13px' : '15px'}; font-weight: 700; }
   .small { font-size: ${width === '58mm' ? '9px' : '10px'}; }
+  .cut { page-break-before: always; }
 </style></head><body>${body}</body></html>`;
 }
 
@@ -124,6 +177,18 @@ function itemsBlock(items: PrintItem[], showPrices: boolean) {
   return `<div class="sep"></div>${rows.join('')}`;
 }
 
+/** Emite o HTML respeitando a configuração da impressora (largura, vias, notas). */
+function emit(body: string, config?: PrinterConfig | null, widthOverride?: ThermalWidth) {
+  if (config && config.enabled === false) return;
+  const width = widthOverride || config?.width || '80mm';
+  const copies = Math.min(Math.max(config?.copies ?? 1, 1), 5);
+  const pre = config?.header_note ? `<div class="center small">${esc(config.header_note)}</div><div class="sep"></div>` : '';
+  const post = config?.footer_note ? `<div class="sep"></div><div class="center small">${esc(config.footer_note)}</div>` : '';
+  const one = pre + body + post;
+  const all = Array.from({ length: copies }, (_, i) => (i === 0 ? one : `<div class="cut"></div>${one}`)).join('');
+  printHtml(shell(width, all));
+}
+
 /** Pedido detalhado (comanda / via da cozinha). */
 export function printOrderTicket(opts: {
   restaurantName: string;
@@ -132,8 +197,9 @@ export function printOrderTicket(opts: {
   width?: ThermalWidth;
   title?: string;
   showPrices?: boolean;
+  config?: PrinterConfig | null;
 }) {
-  const { restaurantName, order, items, width = '80mm', title = 'Pedido detalhado', showPrices = true } = opts;
+  const { restaurantName, order, items, title = 'Pedido detalhado', showPrices = true } = opts;
   const subtotal = items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
   const fee = Number(order.delivery_fee || 0);
   const body = [
@@ -148,7 +214,7 @@ export function printOrderTicket(opts: {
     `<div class="center small">${esc(dt())}</div>`,
     '<div class="small">&nbsp;</div><div class="small">&nbsp;</div>',
   ].join('');
-  printHtml(shell(width, body));
+  emit(body, opts.config, opts.width);
 }
 
 /** Recibo de pagamento (nao possui valor fiscal). */
@@ -160,8 +226,9 @@ export function printReceipt(opts: {
   change?: number;
   width?: ThermalWidth;
   footerNote?: string;
+  config?: PrinterConfig | null;
 }) {
-  const { restaurantName, order, items, payments, change = 0, width = '80mm' } = opts;
+  const { restaurantName, order, items, payments, change = 0 } = opts;
   const subtotal = items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
   const fee = Number(order.delivery_fee || 0);
   const total = order.total ?? subtotal + fee;
@@ -185,5 +252,5 @@ export function printReceipt(opts: {
     `<div class="center small">${esc(dt())}</div>`,
     '<div class="small">&nbsp;</div><div class="small">&nbsp;</div>',
   ].join('');
-  printHtml(shell(width, body));
+  emit(body, opts.config, opts.width);
 }
