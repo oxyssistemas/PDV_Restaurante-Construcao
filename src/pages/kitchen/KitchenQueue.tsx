@@ -262,6 +262,75 @@ export default function KitchenQueue() {
     win.print();
   }, []);
 
+  const openKitchen = useMutation({
+    mutationFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error('Sessão expirada');
+      const { error } = await supabase.from('kitchen_sessions').insert({
+        restaurant_id: restaurantId!,
+        opened_by: auth.user.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kitchen-session', restaurantId] });
+      queryClient.invalidateQueries({ queryKey: ['kitchen-queue', restaurantId] });
+      toast.success('Cozinha aberta!');
+    },
+    onError: (e: any) => toast.error(e.message || 'Erro ao abrir a cozinha.'),
+  });
+
+  const closeKitchen = useMutation({
+    mutationFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user || !session) throw new Error('Sessão expirada');
+
+      const { data: archived, error } = await supabase
+        .from('orders')
+        .update({
+          archived_at: new Date().toISOString(),
+          archived_by: auth.user.id,
+          kitchen_session_id: session.id,
+        })
+        .eq('restaurant_id', restaurantId!)
+        .is('archived_at', null)
+        .select('id');
+      if (error) throw error;
+
+      const { error: closeError } = await supabase
+        .from('kitchen_sessions')
+        .update({
+          closed_at: new Date().toISOString(),
+          closed_by: auth.user.id,
+          orders_archived: archived?.length ?? 0,
+        })
+        .eq('id', session.id);
+      if (closeError) throw closeError;
+      return archived?.length ?? 0;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['kitchen-session', restaurantId] });
+      queryClient.invalidateQueries({ queryKey: ['kitchen-queue', restaurantId] });
+      setSelectedKey(null);
+      toast.success(`Cozinha fechada — ${count} pedidos arquivados no histórico.`);
+    },
+    onError: (e: any) => toast.error(e.message || 'Erro ao fechar a cozinha.'),
+  });
+
+  const handleCloseKitchen = useCallback(() => {
+    const pending = tickets.filter((t) => t.column !== 'ready').length;
+    if (pending > 0) {
+      const ok = window.confirm(
+        `Existem ${pending} pedido(s) em aberto na cozinha. Fechar mesmo assim? Todos os pedidos serão arquivados no histórico.`
+      );
+      if (!ok) return;
+    } else if (!window.confirm('Fechar a cozinha e arquivar os pedidos do expediente?')) {
+      return;
+    }
+    closeKitchen.mutate();
+  }, [tickets, closeKitchen]);
+
+
   return (
     <div className="flex h-screen w-full">
       {/* Sidebar */}
