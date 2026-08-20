@@ -440,9 +440,21 @@ export default function KitchenQueue() {
 
         {/* Kanban */}
         <div className="min-h-0 flex-1 overflow-x-auto">
-          {isLoading ? (
+          {isLoading || loadingSession ? (
             <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+          ) : !kitchenOpen ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+              <Power className="h-12 w-12 text-muted-foreground" />
+              <p className="text-lg font-bold">Cozinha fechada</p>
+              <p className="max-w-sm text-sm text-muted-foreground">
+                Abra a cozinha para começar a receber pedidos. Os pedidos do expediente anterior ficam no histórico do financeiro e da gerência.
+              </p>
+              <Button className="mt-2 gap-2 rounded-xl" onClick={() => openKitchen.mutate()} disabled={openKitchen.isPending}>
+                <Power className="h-4 w-4" /> Abrir cozinha
+              </Button>
+            </div>
           ) : (
+
             <div className="flex h-full min-w-[900px] gap-3 p-3">
               {columns.map((col) => (
                 <section
