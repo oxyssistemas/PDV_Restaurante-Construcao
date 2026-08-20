@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Loader2, Clock, Flame, CheckCircle2, ChefHat, Printer, LogOut, Search, Bike,
-  UtensilsCrossed, X, Timer, Wifi, RefreshCw, ArrowRightLeft, Ban, User, AlertTriangle,
+  UtensilsCrossed, X, Timer, Wifi, RefreshCw, ArrowRightLeft, Ban, User, AlertTriangle, Power,
 } from 'lucide-react';
 import { useEffect, useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
