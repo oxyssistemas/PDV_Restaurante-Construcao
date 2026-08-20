@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Loader2, Clock, Flame, CheckCircle2, ChefHat, Printer, LogOut, Search, Bike,
-  UtensilsCrossed, X, Timer, Wifi, RefreshCw, ArrowRightLeft, Ban, User, AlertTriangle,
+  UtensilsCrossed, X, Timer, Wifi, RefreshCw, ArrowRightLeft, Ban, User, AlertTriangle, Power,
 } from 'lucide-react';
 import { useEffect, useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -262,6 +262,75 @@ export default function KitchenQueue() {
     win.print();
   }, []);
 
+  const openKitchen = useMutation({
+    mutationFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error('Sessão expirada');
+      const { error } = await supabase.from('kitchen_sessions').insert({
+        restaurant_id: restaurantId!,
+        opened_by: auth.user.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kitchen-session', restaurantId] });
+      queryClient.invalidateQueries({ queryKey: ['kitchen-queue', restaurantId] });
+      toast.success('Cozinha aberta!');
+    },
+    onError: (e: any) => toast.error(e.message || 'Erro ao abrir a cozinha.'),
+  });
+
+  const closeKitchen = useMutation({
+    mutationFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user || !session) throw new Error('Sessão expirada');
+
+      const { data: archived, error } = await supabase
+        .from('orders')
+        .update({
+          archived_at: new Date().toISOString(),
+          archived_by: auth.user.id,
+          kitchen_session_id: session.id,
+        })
+        .eq('restaurant_id', restaurantId!)
+        .is('archived_at', null)
+        .select('id');
+      if (error) throw error;
+
+      const { error: closeError } = await supabase
+        .from('kitchen_sessions')
+        .update({
+          closed_at: new Date().toISOString(),
+          closed_by: auth.user.id,
+          orders_archived: archived?.length ?? 0,
+        })
+        .eq('id', session.id);
+      if (closeError) throw closeError;
+      return archived?.length ?? 0;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['kitchen-session', restaurantId] });
+      queryClient.invalidateQueries({ queryKey: ['kitchen-queue', restaurantId] });
+      setSelectedKey(null);
+      toast.success(`Cozinha fechada — ${count} pedidos arquivados no histórico.`);
+    },
+    onError: (e: any) => toast.error(e.message || 'Erro ao fechar a cozinha.'),
+  });
+
+  const handleCloseKitchen = useCallback(() => {
+    const pending = tickets.filter((t) => t.column !== 'ready').length;
+    if (pending > 0) {
+      const ok = window.confirm(
+        `Existem ${pending} pedido(s) em aberto na cozinha. Fechar mesmo assim? Todos os pedidos serão arquivados no histórico.`
+      );
+      if (!ok) return;
+    } else if (!window.confirm('Fechar a cozinha e arquivar os pedidos do expediente?')) {
+      return;
+    }
+    closeKitchen.mutate();
+  }, [tickets, closeKitchen]);
+
+
   return (
     <div className="flex h-screen w-full">
       {/* Sidebar */}
@@ -331,12 +400,25 @@ export default function KitchenQueue() {
             />
           </div>
 
+          {kitchenOpen ? (
+            <Button variant="outline" className="h-10 gap-2 rounded-xl border-destructive/40 text-destructive"
+              disabled={closeKitchen.isPending} onClick={handleCloseKitchen}>
+              <Power className="h-4 w-4" /> Fechar cozinha
+            </Button>
+          ) : (
+            <Button className="h-10 gap-2 rounded-xl" disabled={openKitchen.isPending || loadingSession}
+              onClick={() => openKitchen.mutate()}>
+              <Power className="h-4 w-4" /> Abrir cozinha
+            </Button>
+          )}
+
           <div className="text-right">
             <p className="font-mono text-xl font-bold leading-none">{format(clock, 'HH:mm:ss')}</p>
             <p className="text-[11px] text-muted-foreground">
               {format(clock, "EEE, dd 'de' MMM", { locale: ptBR })} · sync {format(lastSync, 'HH:mm')}
             </p>
           </div>
+
         </header>
 
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
@@ -358,9 +440,21 @@ export default function KitchenQueue() {
 
         {/* Kanban */}
         <div className="min-h-0 flex-1 overflow-x-auto">
-          {isLoading ? (
+          {isLoading || loadingSession ? (
             <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+          ) : !kitchenOpen ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+              <Power className="h-12 w-12 text-muted-foreground" />
+              <p className="text-lg font-bold">Cozinha fechada</p>
+              <p className="max-w-sm text-sm text-muted-foreground">
+                Abra a cozinha para começar a receber pedidos. Os pedidos do expediente anterior ficam no histórico do financeiro e da gerência.
+              </p>
+              <Button className="mt-2 gap-2 rounded-xl" onClick={() => openKitchen.mutate()} disabled={openKitchen.isPending}>
+                <Power className="h-4 w-4" /> Abrir cozinha
+              </Button>
+            </div>
           ) : (
+
             <div className="flex h-full min-w-[900px] gap-3 p-3">
               {columns.map((col) => (
                 <section
