@@ -21,6 +21,7 @@ import MenuImage from '@/components/MenuImage';
 import { cn } from '@/lib/utils';
 import { authorLabel } from '@/lib/orders';
 import { printOrderTicket } from '@/lib/printing';
+import { usePrinterSettings } from '@/hooks/usePrinterSettings';
 import { logAudit } from '@/lib/audit';
 import { brl, elapsedSince } from '@/lib/waiter';
 
@@ -266,6 +267,7 @@ export default function OrderDetail() {
         created_by_role: (order as any).created_by_role,
       },
       items: list,
+      config: getConfig(kind === 'kitchen' ? 'kitchen' : 'order'),
     });
     logAudit({
       restaurantId: restaurantId!,
