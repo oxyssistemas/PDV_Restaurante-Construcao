@@ -1,4 +1,4 @@
-export type TableUiStatus = 'free' | 'occupied' | 'sent' | 'ready' | 'calling';
+export type TableUiStatus = 'free' | 'reserved' | 'occupied' | 'sent' | 'ready' | 'calling';
 
 export const tableStatusMeta: Record<TableUiStatus, { label: string; dot: string; card: string; chip: string }> = {
   free: {
@@ -6,6 +6,12 @@ export const tableStatusMeta: Record<TableUiStatus, { label: string; dot: string
     dot: 'bg-emerald-500',
     card: 'border-emerald-500/40 hover:border-emerald-500',
     chip: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+  },
+  reserved: {
+    label: 'Reservada',
+    dot: 'bg-amber-400',
+    card: 'border-amber-400/40 hover:border-amber-400',
+    chip: 'bg-amber-400/15 text-amber-400 border-amber-400/30',
   },
   occupied: {
     label: 'Ocupada',
@@ -36,6 +42,7 @@ export const tableStatusMeta: Record<TableUiStatus, { label: string; dot: string
 export const waiterFilters: { value: 'all' | TableUiStatus; label: string }[] = [
   { value: 'all', label: 'Todas' },
   { value: 'free', label: 'Livres' },
+  { value: 'reserved', label: 'Reservadas' },
   { value: 'occupied', label: 'Ocupadas' },
   { value: 'sent', label: 'Aguardando pedido' },
   { value: 'ready', label: 'Pedido pronto' },
