@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { authorLabel } from '@/lib/orders';
 import { printReceipt } from '@/lib/printing';
+import { usePrinterSettings } from '@/hooks/usePrinterSettings';
 import { logAudit } from '@/lib/audit';
 import DeliverySaleDialog from '@/components/delivery/DeliverySaleDialog';
 
@@ -314,6 +315,7 @@ export default function Payments() {
         .filter(l => (parseFloat(l.amount) || 0) > 0)
         .map(l => ({ method: l.method, amount: parseFloat(l.amount) || 0 })),
       change,
+      config: getConfig('receipt'),
     });
     logAudit({
       restaurantId: restaurantId!,

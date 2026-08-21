@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import PrinterSettingsCard from '@/components/admin/PrinterSettingsCard';
 
 export default function SettingsPage() {
   const { currentRole } = useAuth();
@@ -64,7 +65,8 @@ export default function SettingsPage() {
   return (
     <div>
       <h1 className="text-3xl font-bold tracking-tight mb-6">Configurações</h1>
-      <Card className="max-w-lg">
+      <div className="grid max-w-3xl gap-6">
+      <Card>
         <CardHeader><CardTitle>Dados do Restaurante</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={(e) => { e.preventDefault(); update.mutate(); }} className="space-y-4">
@@ -87,6 +89,11 @@ export default function SettingsPage() {
           </form>
         </CardContent>
       </Card>
+
+      {restaurantId && (
+        <PrinterSettingsCard restaurantId={restaurantId} restaurantName={restaurant?.name || 'Oxys Restaurante'} />
+      )}
+      </div>
     </div>
   );
 }
