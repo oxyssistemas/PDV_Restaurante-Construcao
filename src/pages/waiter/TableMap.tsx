@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   Loader2, Search, Plus, Users, Clock, Receipt, UtensilsCrossed, User2,
-  Pencil, Link2, Unlink, Check, X, ChevronRight,
+  Pencil, Link2, Unlink, Check, X, ChevronRight, CalendarClock,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import { authorFields } from '@/lib/orders';
 import { brl, tableStatusMeta, timeLabel, waiterFilters, TableUiStatus } from '@/lib/waiter';
+import { activeReservationFor, hhmm, sameHolder, todayISO, upcomingReservationFor } from '@/lib/reservations';
 
 export default function TableMap() {
   const { currentRole, user } = useAuth();
@@ -72,6 +73,20 @@ export default function TableMap() {
     },
   });
 
+  const { data: reservations } = useQuery({
+    queryKey: ['table-reservations', restaurantId],
+    enabled: !!restaurantId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('reservations')
+        .select('id, table_id, customer_name, reservation_date, start_time, end_time, status')
+        .eq('restaurant_id', restaurantId!)
+        .eq('reservation_date', todayISO())
+        .eq('status', 'confirmed');
+      return data || [];
+    },
+  });
+
   const { data: alerts } = useQuery({
     queryKey: ['waiter-table-alerts', restaurantId],
     enabled: !!restaurantId,
@@ -96,6 +111,8 @@ export default function TableMap() {
         () => queryClient.invalidateQueries({ queryKey: ['table-orders', restaurantId] }))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' },
         () => queryClient.invalidateQueries({ queryKey: ['table-order-items'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations', filter: `restaurant_id=eq.${restaurantId}` },
+        () => queryClient.invalidateQueries({ queryKey: ['table-reservations', restaurantId] }))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `restaurant_id=eq.${restaurantId}` },
         () => queryClient.invalidateQueries({ queryKey: ['waiter-table-alerts', restaurantId] }))
       .subscribe();
@@ -121,9 +138,13 @@ export default function TableMap() {
       else if (tableItems.some(i => i.status === 'pending' || i.status === 'preparing')) status = 'sent';
       else if (tableOrders.length || table.status !== 'free') status = 'occupied';
 
-      return { table, tableOrders, totals, itemCount, openedAt, status, group, groupTables, capacity };
+      const reservation = activeReservationFor(table.id, reservations as any);
+      const nextReservation = upcomingReservationFor(table.id, reservations as any);
+      if (status === 'free' && reservation) status = 'reserved';
+
+      return { table, tableOrders, totals, itemCount, openedAt, status, group, groupTables, capacity, reservation, nextReservation };
     });
-  }, [tables, orders, items, alerts]);
+  }, [tables, orders, items, alerts, reservations]);
 
   const visible = cards.filter(c => {
     if (filter !== 'all' && c.status !== filter) return false;
@@ -139,8 +160,15 @@ export default function TableMap() {
       if (table?.status === 'free') {
         await supabase.from('restaurant_tables').update({ status: 'occupied' as const }).eq('id', tableId);
       }
+      const reservation = activeReservationFor(tableId, reservations as any);
+      if (reservation && !sameHolder(customer, reservation.customer_name)) {
+        throw new Error(
+          `Mesa reservada para ${reservation.customer_name} (${hhmm(reservation.start_time)} - ${hhmm(reservation.end_time)}). Somente o titular da reserva pode ocupar esta mesa.`
+        );
+      }
       const { data, error } = await supabase.from('orders').insert({
         table_id: tableId,
+        reservation_id: reservation?.id ?? null,
         restaurant_id: restaurantId!,
         waiter_id: user!.id,
         status: 'pending' as const,
@@ -157,7 +185,7 @@ export default function TableMap() {
       queryClient.invalidateQueries({ queryKey: ['table-orders'] });
       navigate(`/waiter/orders/${order.id}`);
     },
-    onError: () => toast.error('Não foi possível abrir a comanda.'),
+    onError: (e: any) => toast.error(e.message || 'Não foi possível abrir a comanda.'),
   });
 
   const renameOrder = useMutation({
@@ -209,6 +237,12 @@ export default function TableMap() {
     if (mergeMode) return toggleSelect(c.table.id);
     if (c.tableOrders.length === 1) return navigate(`/waiter/orders/${c.tableOrders[0].id}`);
     if (c.tableOrders.length > 1) return navigate(`/waiter/orders?table=${c.table.id}`);
+    if (c.reservation) {
+      setNewTableId(c.table.id);
+      setNewCustomer(c.reservation.customer_name);
+      setNewOpen(true);
+      return;
+    }
     openOrder.mutate({ tableId: c.table.id });
   };
 
@@ -316,6 +350,17 @@ export default function TableMap() {
                 </div>
               )}
 
+              {(c.reservation || c.nextReservation) && (
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-400">
+                  <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">
+                    {c.reservation
+                      ? `Reservada para ${c.reservation.customer_name} até ${hhmm(c.reservation.end_time)}`
+                      : `Reserva às ${hhmm(c.nextReservation!.start_time)} • ${c.nextReservation!.customer_name}`}
+                  </span>
+                </div>
+              )}
+
               <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Users className="h-4 w-4" /> {c.capacity} pessoas
@@ -370,7 +415,9 @@ export default function TableMap() {
                     disabled={openOrder.isPending}
                     onClick={e => {
                       e.stopPropagation();
-                      setNewTableId(c.table.id); setNewCustomer(''); setNewOpen(true);
+                      setNewTableId(c.table.id);
+                      setNewCustomer(c.reservation?.customer_name || '');
+                      setNewOpen(true);
                     }}
                   >
                     <Plus className="h-4 w-4" />
@@ -412,6 +459,16 @@ export default function TableMap() {
                 </SelectContent>
               </Select>
             </div>
+            {(() => {
+              const res = activeReservationFor(newTableId, reservations as any);
+              if (!res) return null;
+              return (
+                <div className="rounded-xl border border-amber-400/40 bg-amber-400/10 p-3 text-xs text-amber-400">
+                  Mesa reservada para <strong>{res.customer_name}</strong> ({hhmm(res.start_time)} - {hhmm(res.end_time)}).
+                  Informe o nome do titular para liberar a abertura da comanda.
+                </div>
+              );
+            })()}
             <div className="space-y-1.5">
               <Label className="text-xs">Nome da comanda (opcional)</Label>
               <Input className="h-12 rounded-xl" placeholder="Ex.: João / Conta 1" value={newCustomer} onChange={e => setNewCustomer(e.target.value)} />
