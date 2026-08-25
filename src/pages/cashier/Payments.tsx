@@ -34,6 +34,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export default function Payments() {
   const { user, currentRole } = useAuth();
   const restaurantId = currentRole?.restaurant_id;
+  const { getConfig } = usePrinterSettings(restaurantId);
   const queryClient = useQueryClient();
 
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
