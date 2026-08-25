@@ -336,6 +336,8 @@ export type Database = {
       }
       fiscal_invoices: {
         Row: {
+          access_key: string | null
+          attempts: number
           created_at: string
           created_by: string | null
           customer_address: string | null
@@ -344,6 +346,8 @@ export type Database = {
           customer_id: string | null
           customer_name: string | null
           discount: number
+          environment: Database["public"]["Enums"]["fiscal_environment"] | null
+          error_message: string | null
           id: string
           issued_at: string | null
           items: Json
@@ -351,8 +355,10 @@ export type Database = {
           number: string | null
           order_id: string | null
           pdf_url: string | null
+          protocol: string | null
           provider: string | null
           provider_ref: string | null
+          qrcode_url: string | null
           restaurant_id: string
           series: string | null
           status: Database["public"]["Enums"]["fiscal_invoice_status"]
@@ -363,6 +369,8 @@ export type Database = {
           xml_url: string | null
         }
         Insert: {
+          access_key?: string | null
+          attempts?: number
           created_at?: string
           created_by?: string | null
           customer_address?: string | null
@@ -371,6 +379,8 @@ export type Database = {
           customer_id?: string | null
           customer_name?: string | null
           discount?: number
+          environment?: Database["public"]["Enums"]["fiscal_environment"] | null
+          error_message?: string | null
           id?: string
           issued_at?: string | null
           items?: Json
@@ -378,8 +388,10 @@ export type Database = {
           number?: string | null
           order_id?: string | null
           pdf_url?: string | null
+          protocol?: string | null
           provider?: string | null
           provider_ref?: string | null
+          qrcode_url?: string | null
           restaurant_id: string
           series?: string | null
           status?: Database["public"]["Enums"]["fiscal_invoice_status"]
@@ -390,6 +402,8 @@ export type Database = {
           xml_url?: string | null
         }
         Update: {
+          access_key?: string | null
+          attempts?: number
           created_at?: string
           created_by?: string | null
           customer_address?: string | null
@@ -398,6 +412,8 @@ export type Database = {
           customer_id?: string | null
           customer_name?: string | null
           discount?: number
+          environment?: Database["public"]["Enums"]["fiscal_environment"] | null
+          error_message?: string | null
           id?: string
           issued_at?: string | null
           items?: Json
@@ -405,8 +421,10 @@ export type Database = {
           number?: string | null
           order_id?: string | null
           pdf_url?: string | null
+          protocol?: string | null
           provider?: string | null
           provider_ref?: string | null
+          qrcode_url?: string | null
           restaurant_id?: string
           series?: string | null
           status?: Database["public"]["Enums"]["fiscal_invoice_status"]
@@ -435,6 +453,128 @@ export type Database = {
             foreignKeyName: "fiscal_invoices_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fiscal_profiles: {
+        Row: {
+          active: boolean
+          auto_emit_on_payment: boolean
+          certificate_expires_at: string | null
+          certificate_path: string | null
+          certificate_uploaded_at: string | null
+          city: string | null
+          city_code: string | null
+          cnpj: string | null
+          complement: string | null
+          created_at: string
+          csc_id: string | null
+          csc_token: string | null
+          default_cfop: string | null
+          default_csosn: string | null
+          default_ncm: string | null
+          default_origin: string
+          default_unit: string
+          district: string | null
+          environment: Database["public"]["Enums"]["fiscal_environment"]
+          id: string
+          legal_name: string | null
+          municipal_registration: string | null
+          nfce_next_number: number
+          nfce_series: string
+          number: string | null
+          phone: string | null
+          provider: string
+          restaurant_id: string
+          state: string | null
+          state_registration: string | null
+          street: string | null
+          tax_regime: Database["public"]["Enums"]["tax_regime"]
+          trade_name: string | null
+          updated_at: string
+          zip_code: string | null
+        }
+        Insert: {
+          active?: boolean
+          auto_emit_on_payment?: boolean
+          certificate_expires_at?: string | null
+          certificate_path?: string | null
+          certificate_uploaded_at?: string | null
+          city?: string | null
+          city_code?: string | null
+          cnpj?: string | null
+          complement?: string | null
+          created_at?: string
+          csc_id?: string | null
+          csc_token?: string | null
+          default_cfop?: string | null
+          default_csosn?: string | null
+          default_ncm?: string | null
+          default_origin?: string
+          default_unit?: string
+          district?: string | null
+          environment?: Database["public"]["Enums"]["fiscal_environment"]
+          id?: string
+          legal_name?: string | null
+          municipal_registration?: string | null
+          nfce_next_number?: number
+          nfce_series?: string
+          number?: string | null
+          phone?: string | null
+          provider?: string
+          restaurant_id: string
+          state?: string | null
+          state_registration?: string | null
+          street?: string | null
+          tax_regime?: Database["public"]["Enums"]["tax_regime"]
+          trade_name?: string | null
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Update: {
+          active?: boolean
+          auto_emit_on_payment?: boolean
+          certificate_expires_at?: string | null
+          certificate_path?: string | null
+          certificate_uploaded_at?: string | null
+          city?: string | null
+          city_code?: string | null
+          cnpj?: string | null
+          complement?: string | null
+          created_at?: string
+          csc_id?: string | null
+          csc_token?: string | null
+          default_cfop?: string | null
+          default_csosn?: string | null
+          default_ncm?: string | null
+          default_origin?: string
+          default_unit?: string
+          district?: string | null
+          environment?: Database["public"]["Enums"]["fiscal_environment"]
+          id?: string
+          legal_name?: string | null
+          municipal_registration?: string | null
+          nfce_next_number?: number
+          nfce_series?: string
+          number?: string | null
+          phone?: string | null
+          provider?: string
+          restaurant_id?: string
+          state?: string | null
+          state_registration?: string | null
+          street?: string | null
+          tax_regime?: Database["public"]["Enums"]["tax_regime"]
+          trade_name?: string | null
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiscal_profiles_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
             referencedRelation: "restaurants"
             referencedColumns: ["id"]
           },
@@ -749,12 +889,17 @@ export type Database = {
         Row: {
           available: boolean
           category_id: string | null
+          cfop: string | null
+          commercial_unit: string | null
           created_at: string
+          csosn: string | null
           description: string | null
           id: string
           image_url: string | null
           is_combo: boolean
           name: string
+          ncm: string | null
+          origin: string | null
           price: number
           restaurant_id: string
           updated_at: string
@@ -762,12 +907,17 @@ export type Database = {
         Insert: {
           available?: boolean
           category_id?: string | null
+          cfop?: string | null
+          commercial_unit?: string | null
           created_at?: string
+          csosn?: string | null
           description?: string | null
           id?: string
           image_url?: string | null
           is_combo?: boolean
           name: string
+          ncm?: string | null
+          origin?: string | null
           price: number
           restaurant_id: string
           updated_at?: string
@@ -775,12 +925,17 @@ export type Database = {
         Update: {
           available?: boolean
           category_id?: string | null
+          cfop?: string | null
+          commercial_unit?: string | null
           created_at?: string
+          csosn?: string | null
           description?: string | null
           id?: string
           image_url?: string | null
           is_combo?: boolean
           name?: string
+          ncm?: string | null
+          origin?: string | null
           price?: number
           restaurant_id?: string
           updated_at?: string
@@ -1379,6 +1534,7 @@ export type Database = {
         | "delivery"
         | "courier"
       cash_movement_type: "sangria" | "suprimento"
+      fiscal_environment: "homologation" | "production"
       fiscal_invoice_status:
         | "draft"
         | "pending"
@@ -1403,6 +1559,7 @@ export type Database = {
       reservation_status: "confirmed" | "cancelled" | "completed" | "no_show"
       restaurant_status: "active" | "blocked"
       table_status: "free" | "occupied" | "reserved"
+      tax_regime: "simples_nacional" | "simples_excesso" | "regime_normal"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1541,6 +1698,7 @@ export const Constants = {
         "courier",
       ],
       cash_movement_type: ["sangria", "suprimento"],
+      fiscal_environment: ["homologation", "production"],
       fiscal_invoice_status: [
         "draft",
         "pending",
@@ -1562,6 +1720,7 @@ export const Constants = {
       reservation_status: ["confirmed", "cancelled", "completed", "no_show"],
       restaurant_status: ["active", "blocked"],
       table_status: ["free", "occupied", "reserved"],
+      tax_regime: ["simples_nacional", "simples_excesso", "regime_normal"],
     },
   },
 } as const
