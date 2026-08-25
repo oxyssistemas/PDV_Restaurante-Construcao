@@ -47,6 +47,7 @@ export default function OrderDetail() {
   const { orderId } = useParams();
   const { currentRole, user } = useAuth();
   const restaurantId = currentRole?.restaurant_id;
+  const { getConfig } = usePrinterSettings(restaurantId);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
