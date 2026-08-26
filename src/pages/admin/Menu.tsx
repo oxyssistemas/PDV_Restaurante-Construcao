@@ -282,6 +282,11 @@ function ItemDialog({
   const [categoryId, setCategoryId] = useState(editItem?.category_id || '');
   const [imagePath, setImagePath] = useState<string | null>(editItem?.image_url || null);
   const [isCombo, setIsCombo] = useState<boolean>(!!editItem?.is_combo);
+  const [ncm, setNcm] = useState(editItem?.ncm || '');
+  const [cfop, setCfop] = useState(editItem?.cfop || '');
+  const [csosn, setCsosn] = useState(editItem?.csosn || '');
+  const [origin, setOrigin] = useState(editItem?.origin || '');
+  const [commercialUnit, setCommercialUnit] = useState(editItem?.commercial_unit || '');
   const [ingredients, setIngredients] = useState<IngRow[]>([]);
   const [components, setComponents] = useState<CompRow[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -333,6 +338,11 @@ function ItemDialog({
       image_url: imagePath,
       is_combo: isCombo,
       restaurant_id: restaurantId,
+      ncm: ncm.replace(/\D/g, '') || null,
+      cfop: cfop.replace(/\D/g, '') || null,
+      csosn: csosn || null,
+      origin: origin || null,
+      commercial_unit: commercialUnit || null,
     };
 
     const { data: saved, error } = editItem
@@ -374,11 +384,13 @@ function ItemDialog({
 
     queryClient.invalidateQueries({ queryKey: ['menu-items'] });
     queryClient.invalidateQueries({ queryKey: ['item-composition'] });
+    queryClient.invalidateQueries({ queryKey: ['fiscal-items-missing-ncm'] });
     toast({ title: editItem ? 'Item atualizado' : 'Item criado' });
     setOpen(false);
     if (!editItem) {
       setName(''); setDescription(''); setPrice(''); setCategoryId(''); setImagePath(null);
       setIsCombo(false); setIngredients([]); setComponents([]);
+      setNcm(''); setCfop(''); setCsosn(''); setOrigin(''); setCommercialUnit('');
     }
     setLoading(false);
   };

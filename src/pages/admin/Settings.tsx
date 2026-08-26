@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import PrinterSettingsCard from '@/components/admin/PrinterSettingsCard';
+import FiscalSettingsCard from '@/components/admin/FiscalSettingsCard';
 
 export default function SettingsPage() {
   const { currentRole } = useAuth();
@@ -89,6 +90,10 @@ export default function SettingsPage() {
           </form>
         </CardContent>
       </Card>
+
+      {restaurantId && (
+        <FiscalSettingsCard restaurantId={restaurantId} role={currentRole?.role} />
+      )}
 
       {restaurantId && (
         <PrinterSettingsCard restaurantId={restaurantId} restaurantName={restaurant?.name || 'Oxys Restaurante'} />
