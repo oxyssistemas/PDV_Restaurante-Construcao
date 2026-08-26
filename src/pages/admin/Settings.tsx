@@ -91,6 +91,10 @@ export default function SettingsPage() {
       </Card>
 
       {restaurantId && (
+        <FiscalSettingsCard restaurantId={restaurantId} role={currentRole?.role} />
+      )}
+
+      {restaurantId && (
         <PrinterSettingsCard restaurantId={restaurantId} restaurantName={restaurant?.name || 'Oxys Restaurante'} />
       )}
       </div>
