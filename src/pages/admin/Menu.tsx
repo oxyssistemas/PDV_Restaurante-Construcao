@@ -384,11 +384,13 @@ function ItemDialog({
 
     queryClient.invalidateQueries({ queryKey: ['menu-items'] });
     queryClient.invalidateQueries({ queryKey: ['item-composition'] });
+    queryClient.invalidateQueries({ queryKey: ['fiscal-items-missing-ncm'] });
     toast({ title: editItem ? 'Item atualizado' : 'Item criado' });
     setOpen(false);
     if (!editItem) {
       setName(''); setDescription(''); setPrice(''); setCategoryId(''); setImagePath(null);
       setIsCombo(false); setIngredients([]); setComponents([]);
+      setNcm(''); setCfop(''); setCsosn(''); setOrigin(''); setCommercialUnit('');
     }
     setLoading(false);
   };
