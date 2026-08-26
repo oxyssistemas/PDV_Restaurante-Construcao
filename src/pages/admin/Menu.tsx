@@ -282,6 +282,11 @@ function ItemDialog({
   const [categoryId, setCategoryId] = useState(editItem?.category_id || '');
   const [imagePath, setImagePath] = useState<string | null>(editItem?.image_url || null);
   const [isCombo, setIsCombo] = useState<boolean>(!!editItem?.is_combo);
+  const [ncm, setNcm] = useState(editItem?.ncm || '');
+  const [cfop, setCfop] = useState(editItem?.cfop || '');
+  const [csosn, setCsosn] = useState(editItem?.csosn || '');
+  const [origin, setOrigin] = useState(editItem?.origin || '');
+  const [commercialUnit, setCommercialUnit] = useState(editItem?.commercial_unit || '');
   const [ingredients, setIngredients] = useState<IngRow[]>([]);
   const [components, setComponents] = useState<CompRow[]>([]);
   const [uploading, setUploading] = useState(false);
