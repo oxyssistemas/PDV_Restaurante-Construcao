@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import PrinterSettingsCard from '@/components/admin/PrinterSettingsCard';
+import FiscalSettingsCard from '@/components/admin/FiscalSettingsCard';
 
 export default function SettingsPage() {
   const { currentRole } = useAuth();
