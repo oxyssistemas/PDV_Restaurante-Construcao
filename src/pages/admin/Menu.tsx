@@ -338,6 +338,11 @@ function ItemDialog({
       image_url: imagePath,
       is_combo: isCombo,
       restaurant_id: restaurantId,
+      ncm: ncm.replace(/\D/g, '') || null,
+      cfop: cfop.replace(/\D/g, '') || null,
+      csosn: csosn || null,
+      origin: origin || null,
+      commercial_unit: commercialUnit || null,
     };
 
     const { data: saved, error } = editItem
