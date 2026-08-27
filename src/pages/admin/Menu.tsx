@@ -308,6 +308,20 @@ function ItemDialog({
     },
   });
 
+  const { data: fiscalProfile } = useQuery({
+    queryKey: ['fiscal-profile', restaurantId],
+    enabled: open && !!restaurantId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('fiscal_profiles')
+        .select('default_ncm, default_cfop, default_csosn, default_origin, default_unit, tax_regime')
+        .eq('restaurant_id', restaurantId).maybeSingle();
+      return data;
+    },
+  });
+
+
+
   const handleUpload = async (file: File) => {
     setUploading(true);
     const ext = file.name.split('.').pop() || 'jpg';
