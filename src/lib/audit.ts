@@ -30,6 +30,7 @@ export const entityLabels: Record<string, string> = {
   order: 'Pedido',
   menu_item: 'Item do cardápio',
   inventory: 'Estoque',
+  fiscal_profile: 'Configuração fiscal',
 };
 
 /** Registra uma alteração no log de auditoria. Nunca lança erro para não travar a ação principal. */
