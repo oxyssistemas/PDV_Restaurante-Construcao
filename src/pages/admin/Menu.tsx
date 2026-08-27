@@ -572,6 +572,79 @@ function ItemDialog({
             </div>
           )}
 
+          <div className="space-y-3 rounded-lg border p-3">
+            <div className="flex items-center gap-2">
+              <ReceiptText className="h-4 w-4 text-primary" />
+              <Label className="text-sm font-medium">Dados fiscais (NFC-e)</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Opcional. Deixe em branco para herdar o padrão do restaurante definido em Configurações → Fiscal.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-xs">NCM</Label>
+                <Input
+                  value={ncm} onChange={e => setNcm(e.target.value)}
+                  placeholder={fiscalProfile?.default_ncm ? `Padrão: ${fiscalProfile.default_ncm}` : 'Ex.: 21069090'}
+                />
+                <div className="flex flex-wrap gap-1">
+                  {ncmSuggestions.slice(0, 4).map(n => (
+                    <button key={n.value} type="button"
+                      className="rounded border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent"
+                      onClick={() => setNcm(n.value)}>{n.value}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">CFOP</Label>
+                <Input
+                  value={cfop} onChange={e => setCfop(e.target.value)}
+                  placeholder={fiscalProfile?.default_cfop ? `Padrão: ${fiscalProfile.default_cfop}` : '5102'}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">
+                  {isSimples(fiscalProfile?.tax_regime as TaxRegime) ? 'CSOSN' : 'CST'}
+                </Label>
+                <Select value={csosn || 'default'} onValueChange={v => setCsosn(v === 'default' ? '' : v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">
+                      Usar padrão{fiscalProfile?.default_csosn ? ` (${fiscalProfile.default_csosn})` : ''}
+                    </SelectItem>
+                    {(isSimples(fiscalProfile?.tax_regime as TaxRegime) ? csosnOptions : cstOptions).map(o => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Origem</Label>
+                <Select value={origin || 'default'} onValueChange={v => setOrigin(v === 'default' ? '' : v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">
+                      Usar padrão{fiscalProfile?.default_origin ? ` (${fiscalProfile.default_origin})` : ''}
+                    </SelectItem>
+                    {originOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Unidade comercial</Label>
+                <Select value={commercialUnit || 'default'} onValueChange={v => setCommercialUnit(v === 'default' ? '' : v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">
+                      Usar padrão{fiscalProfile?.default_unit ? ` (${fiscalProfile.default_unit})` : ''}
+                    </SelectItem>
+                    {unitOptions.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
           <DialogFooter>
             <Button type="submit" disabled={loading || uploading} className="gap-2">
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
