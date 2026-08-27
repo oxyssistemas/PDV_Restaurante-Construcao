@@ -15,9 +15,12 @@ import {
 } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Loader2, Pencil, Trash2, Upload, Boxes } from 'lucide-react';
+import { Plus, Loader2, Pencil, Trash2, Upload, Boxes, ReceiptText } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import MenuImage, { useMenuImageUrl } from '@/components/MenuImage';
+import {
+  csosnOptions, cstOptions, isSimples, ncmSuggestions, originOptions, unitOptions, type TaxRegime,
+} from '@/lib/fiscal';
 
 export default function MenuPage() {
   const { currentRole } = useAuth();
