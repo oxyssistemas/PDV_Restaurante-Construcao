@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
-  UtensilsCrossed, LayoutDashboard, Store, LogOut, Menu, X,
+  UtensilsCrossed, LayoutDashboard, Store, LogOut, Menu, X, Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -10,6 +10,7 @@ import { useState } from 'react';
 const navItems = [
   { to: '/super-admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { to: '/super-admin/restaurants', icon: Store, label: 'Restaurantes', end: false },
+  { to: '/super-admin/plans', icon: Layers, label: 'Planos', end: false },
 ];
 
 export default function SuperAdminLayout() {
