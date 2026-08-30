@@ -12,6 +12,8 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+import RoleGate from "./components/RoleGate";
+import PermissionsPage from "./pages/admin/Permissions";
 import DocumentTitle from "./components/DocumentTitle";
 import SuperAdminLayout from "./components/layouts/SuperAdminLayout";
 import SuperAdminDashboard from "./pages/super-admin/Dashboard";
