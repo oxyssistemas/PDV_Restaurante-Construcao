@@ -3,11 +3,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
   UtensilsCrossed, LayoutDashboard, BookOpen, Grid3X3, Users, Package, Settings, LogOut, Menu, Bike,
-  Building2, History, Briefcase, PieChart, Gift, Palette, Sparkles, Megaphone,
+  Building2, History, Briefcase, PieChart, Gift, Palette, Sparkles, Megaphone, ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import NotificationsBell from '@/components/NotificationsBell';
+import { ModuleKey } from '@/lib/modules';
+import { useModuleAccess } from '@/hooks/useModuleAccess';
 
 const navItems: { to: string; icon: typeof Users; label: string; end: boolean; module?: ModuleKey }[] = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
