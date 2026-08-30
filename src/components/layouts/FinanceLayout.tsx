@@ -7,22 +7,29 @@ import {
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import NotificationsBell from '@/components/NotificationsBell';
+import { ModuleKey } from '@/lib/modules';
+import { useModuleAccess } from '@/hooks/useModuleAccess';
 
 
-const navItems = [
-  { to: '/finance', icon: LineChart, label: 'Dashboard', end: true },
-  { to: '/finance/crm', icon: Building2, label: 'CRM Financeiro', end: false },
-  { to: '/finance/dre', icon: PieChart, label: 'DRE', end: false },
-  { to: '/finance/hr', icon: Briefcase, label: 'RH', end: false },
-  { to: '/finance/loyalty', icon: Gift, label: 'Fidelidade', end: false },
-  { to: '/finance/reports', icon: FileBarChart, label: 'Relatórios', end: false },
-  { to: '/finance/inventory', icon: Package, label: 'Estoque', end: false },
-  { to: '/finance/history', icon: History, label: 'Histórico', end: false },
+const navItems: { to: string; icon: typeof LineChart; label: string; end: boolean; module?: ModuleKey; financeOnly?: boolean }[] = [
+  { to: '/finance', icon: LineChart, label: 'Dashboard', end: true, financeOnly: true },
+  { to: '/finance/crm', icon: Building2, label: 'CRM Financeiro', end: false, financeOnly: true },
+  { to: '/finance/dre', icon: PieChart, label: 'DRE', end: false, module: 'dre' },
+  { to: '/finance/hr', icon: Briefcase, label: 'RH', end: false, module: 'hr' },
+  { to: '/finance/loyalty', icon: Gift, label: 'Fidelidade', end: false, module: 'loyalty' },
+  { to: '/finance/reports', icon: FileBarChart, label: 'Relatórios', end: false, financeOnly: true },
+  { to: '/finance/inventory', icon: Package, label: 'Estoque', end: false, financeOnly: true },
+  { to: '/finance/history', icon: History, label: 'Histórico', end: false, financeOnly: true },
 ];
 
 
 export default function FinanceLayout() {
-  const { signOut, user } = useAuth();
+  const { signOut, user, roles, isSuperAdmin } = useAuth();
+  const { canView } = useModuleAccess();
+  const isFinance = isSuperAdmin || roles.some(r => r.role === 'finance');
+  const visibleItems = navItems.filter(i =>
+    (i.financeOnly ? isFinance : true) && (!i.module || canView(i.module))
+  );
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
