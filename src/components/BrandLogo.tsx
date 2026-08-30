@@ -28,15 +28,13 @@ export default function BrandLogo({ fallbackIcon: Icon, fallbackName, dark = tru
   return (
     <div className={cn('flex items-center gap-3 overflow-hidden', className)}>
       {logoUrl ? (
-        <img src={logoUrl} alt={name} className="h-9 max-w-[140px] object-contain" />
+        <img src={logoUrl} alt={name} className="h-9 w-9 shrink-0 rounded-lg object-contain" />
       ) : (
-        <>
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <Icon className="h-5 w-5" />
-          </div>
-          <span className="truncate text-lg font-bold tracking-tight">{name}</span>
-        </>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+          <Icon className="h-5 w-5" />
+        </div>
       )}
+      <span className="truncate text-lg font-bold tracking-tight">{name}</span>
     </div>
   );
 }
