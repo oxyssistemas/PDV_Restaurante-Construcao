@@ -80,6 +80,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <BrandingProvider>
           <DocumentTitle />
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -94,6 +95,7 @@ const App = () => (
             }>
               <Route index element={<SuperAdminDashboard />} />
               <Route path="restaurants" element={<Restaurants />} />
+              <Route path="plans" element={<PlansPage />} />
             </Route>
 
             {/* Admin do Restaurante */}
@@ -110,8 +112,24 @@ const App = () => (
               <Route path="users" element={<UsersPage />} />
               <Route path="couriers" element={<CouriersPage />} />
               <Route path="history" element={<OrdersHistory />} />
+              <Route path="hr" element={<HrPage />} />
+              <Route path="dre" element={<DrePage />} />
+              <Route path="loyalty" element={<LoyaltyPage />} />
+              <Route path="branding" element={<BrandingPage />} />
+              <Route path="assistant" element={<AssistantPage />} />
 
               <Route path="settings" element={<SettingsPage />} />
+            </Route>
+
+            {/* Marketing */}
+            <Route path="/marketing" element={
+              <ProtectedRoute allowedRoles={['marketing', 'admin']}>
+                <MarketingLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<MarketingOverview />} />
+              <Route path="connections" element={<MarketingConnections />} />
+              <Route path="campaigns" element={<MarketingCampaigns />} />
             </Route>
 
 
