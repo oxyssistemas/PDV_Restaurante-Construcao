@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { edgeErrorMessage } from '@/lib/functionError';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -212,7 +213,7 @@ function CreateAdminForm({ restaurantId, restaurantName, onSuccess }: {
     });
 
     if (error) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro', description: await edgeErrorMessage(error, 'Erro ao criar admin.'), variant: 'destructive' });
     } else if (data?.error) {
       toast({ title: 'Erro', description: data.error, variant: 'destructive' });
     } else {
