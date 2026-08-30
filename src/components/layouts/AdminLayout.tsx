@@ -2,7 +2,8 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
-  UtensilsCrossed, LayoutDashboard, BookOpen, Grid3X3, Users, Package, Settings, LogOut, Menu, Bike, Building2, History,
+  UtensilsCrossed, LayoutDashboard, BookOpen, Grid3X3, Users, Package, Settings, LogOut, Menu, Bike,
+  Building2, History, Briefcase, PieChart, Gift, Palette, Sparkles, Megaphone,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -10,14 +11,20 @@ import NotificationsBell from '@/components/NotificationsBell';
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
+  { to: '/admin/assistant', icon: Sparkles, label: 'Assistente IA', end: false },
   { to: '/admin/crm', icon: Building2, label: 'CRM', end: false },
   { to: '/admin/menu', icon: BookOpen, label: 'Cardápio', end: false },
   { to: '/admin/tables', icon: Grid3X3, label: 'Mesas', end: false },
   { to: '/admin/inventory', icon: Package, label: 'Estoque', end: false },
+  { to: '/admin/hr', icon: Briefcase, label: 'RH', end: false },
+  { to: '/admin/dre', icon: PieChart, label: 'DRE', end: false },
+  { to: '/admin/loyalty', icon: Gift, label: 'Fidelidade', end: false },
+  { to: '/marketing', icon: Megaphone, label: 'Marketing', end: false },
   { to: '/admin/history', icon: History, label: 'Histórico', end: false },
   { to: '/delivery', icon: Bike, label: 'Delivery', end: false },
   { to: '/admin/couriers', icon: Bike, label: 'Entregadores', end: false },
   { to: '/admin/users', icon: Users, label: 'Usuários', end: false },
+  { to: '/admin/branding', icon: Palette, label: 'Identidade visual', end: false },
   { to: '/admin/settings', icon: Settings, label: 'Configurações', end: false },
 ];
 

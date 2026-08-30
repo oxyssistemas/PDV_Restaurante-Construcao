@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { BrandingProvider } from "@/contexts/BrandingContext";
 
 import Login from "./pages/Login";
 import Setup from "./pages/Setup";
@@ -56,6 +57,18 @@ import MyDeliveries from "./pages/courier/MyDeliveries";
 import CouriersPage from "./pages/admin/Couriers";
 import OrdersHistory from "./pages/shared/OrdersHistory";
 
+import HrPage from "./pages/shared/HrPage";
+import DrePage from "./pages/shared/DrePage";
+import LoyaltyPage from "./pages/shared/LoyaltyPage";
+import BrandingPage from "./pages/shared/BrandingPage";
+import AssistantPage from "./pages/shared/AssistantPage";
+import PlansPage from "./pages/super-admin/Plans";
+import MarketingLayout from "./components/layouts/MarketingLayout";
+import MarketingOverview from "./pages/marketing/Overview";
+import MarketingConnections from "./pages/marketing/Connections";
+import MarketingCampaigns from "./pages/marketing/Campaigns";
+
+
 
 
 const queryClient = new QueryClient();
@@ -67,6 +80,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <BrandingProvider>
           <DocumentTitle />
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -81,6 +95,7 @@ const App = () => (
             }>
               <Route index element={<SuperAdminDashboard />} />
               <Route path="restaurants" element={<Restaurants />} />
+              <Route path="plans" element={<PlansPage />} />
             </Route>
 
             {/* Admin do Restaurante */}
@@ -97,8 +112,24 @@ const App = () => (
               <Route path="users" element={<UsersPage />} />
               <Route path="couriers" element={<CouriersPage />} />
               <Route path="history" element={<OrdersHistory />} />
+              <Route path="hr" element={<HrPage />} />
+              <Route path="dre" element={<DrePage />} />
+              <Route path="loyalty" element={<LoyaltyPage />} />
+              <Route path="branding" element={<BrandingPage />} />
+              <Route path="assistant" element={<AssistantPage />} />
 
               <Route path="settings" element={<SettingsPage />} />
+            </Route>
+
+            {/* Marketing */}
+            <Route path="/marketing" element={
+              <ProtectedRoute allowedRoles={['marketing', 'admin']}>
+                <MarketingLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<MarketingOverview />} />
+              <Route path="connections" element={<MarketingConnections />} />
+              <Route path="campaigns" element={<MarketingCampaigns />} />
             </Route>
 
 
@@ -141,6 +172,9 @@ const App = () => (
               <Route path="reports" element={<FinanceReports />} />
               <Route path="inventory" element={<FinanceInventory />} />
               <Route path="history" element={<OrdersHistory />} />
+              <Route path="hr" element={<HrPage />} />
+              <Route path="dre" element={<DrePage />} />
+              <Route path="loyalty" element={<LoyaltyPage />} />
 
             </Route>
             <Route path="/delivery" element={
@@ -162,6 +196,7 @@ const App = () => (
 
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </BrandingProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
