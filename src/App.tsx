@@ -57,6 +57,18 @@ import MyDeliveries from "./pages/courier/MyDeliveries";
 import CouriersPage from "./pages/admin/Couriers";
 import OrdersHistory from "./pages/shared/OrdersHistory";
 
+import HrPage from "./pages/shared/HrPage";
+import DrePage from "./pages/shared/DrePage";
+import LoyaltyPage from "./pages/shared/LoyaltyPage";
+import BrandingPage from "./pages/shared/BrandingPage";
+import AssistantPage from "./pages/shared/AssistantPage";
+import PlansPage from "./pages/super-admin/Plans";
+import MarketingLayout from "./components/layouts/MarketingLayout";
+import MarketingOverview from "./pages/marketing/Overview";
+import MarketingConnections from "./pages/marketing/Connections";
+import MarketingCampaigns from "./pages/marketing/Campaigns";
+
+
 
 
 const queryClient = new QueryClient();
