@@ -28,6 +28,9 @@ export default function Index() {
       case 'finance': return <Navigate to="/finance" replace />;
       case 'delivery': return <Navigate to="/delivery" replace />;
       case 'courier': return <Navigate to="/courier" replace />;
+      case 'hr': return <Navigate to="/finance/hr" replace />;
+      case 'marketing': return <Navigate to="/marketing" replace />;
+
 
     }
   }
