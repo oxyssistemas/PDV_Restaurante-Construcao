@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Palette, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { logAudit } from '@/lib/audit';
-import FeatureGate from '@/components/FeatureGate';
+import ModuleGate from '@/components/ModuleGate';
 
 const defaults = {
   brand_name: '', logo_light_url: '', logo_dark_url: '', favicon_url: '', login_background_url: '',
@@ -110,7 +110,7 @@ export default function BrandingPage() {
   );
 
   return (
-    <FeatureGate feature="branding">
+    <ModuleGate module="branding" requireEdit>
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -203,6 +203,6 @@ export default function BrandingPage() {
           {save.isPending && <Loader2 className="h-4 w-4 animate-spin" />} Salvar interface
         </Button>
       </div>
-    </FeatureGate>
+    </ModuleGate>
   );
 }

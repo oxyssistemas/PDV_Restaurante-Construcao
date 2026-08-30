@@ -11,7 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import FeatureGate from '@/components/FeatureGate';
+import ModuleGate from '@/components/ModuleGate';
 
 const channelLabels: Record<string, string> = {
   instagram: 'Instagram',
@@ -85,7 +85,7 @@ export default function MarketingCampaigns() {
   if (!restaurantId) return <p className="text-muted-foreground">Nenhum restaurante vinculado a este usuário.</p>;
 
   return (
-    <FeatureGate feature="marketing">
+    <ModuleGate module="marketing">
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -145,6 +145,6 @@ export default function MarketingCampaigns() {
           </DialogContent>
         </Dialog>
       </div>
-    </FeatureGate>
+    </ModuleGate>
   );
 }

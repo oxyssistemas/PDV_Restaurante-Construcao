@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Sparkles, Send, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import FeatureGate from '@/components/FeatureGate';
+import ModuleGate from '@/components/ModuleGate';
 
 interface Msg { role: 'user' | 'assistant'; content: string }
 
@@ -101,7 +101,7 @@ export default function AssistantPage() {
   if (!restaurantId) return <p className="text-muted-foreground">Nenhum restaurante vinculado a este usuário.</p>;
 
   return (
-    <FeatureGate feature="ai">
+    <ModuleGate module="ai">
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -176,6 +176,6 @@ export default function AssistantPage() {
           </Card>
         </div>
       </div>
-    </FeatureGate>
+    </ModuleGate>
   );
 }

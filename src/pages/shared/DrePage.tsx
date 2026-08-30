@@ -11,7 +11,7 @@ import { Loader2, Download, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { brl, downloadCsv } from '@/lib/finance';
 import { negativePayrollTypes } from '@/lib/hr';
-import FeatureGate from '@/components/FeatureGate';
+import ModuleGate from '@/components/ModuleGate';
 
 const groupLabels: Record<string, string> = {
   revenue: 'Receita',
@@ -37,7 +37,7 @@ export default function DrePage() {
   }
 
   return (
-    <FeatureGate feature="dre">
+    <ModuleGate module="dre">
       <div className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -53,7 +53,7 @@ export default function DrePage() {
         <DreReport restaurantId={restaurantId} from={from} to={to} />
         <DreCategories restaurantId={restaurantId} />
       </div>
-    </FeatureGate>
+    </ModuleGate>
   );
 }
 

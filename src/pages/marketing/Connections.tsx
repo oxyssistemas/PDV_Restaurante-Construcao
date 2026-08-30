@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Instagram, Facebook, MessageCircle, MapPin, Loader2, Link2, Unlink } from 'lucide-react';
 import { toast } from 'sonner';
-import FeatureGate from '@/components/FeatureGate';
+import ModuleGate from '@/components/ModuleGate';
 
 const providers = [
   { key: 'instagram', label: 'Instagram', icon: Instagram, hint: '@perfil do restaurante' },
@@ -81,7 +81,7 @@ export default function MarketingConnections() {
   if (!restaurantId) return <p className="text-muted-foreground">Nenhum restaurante vinculado a este usuário.</p>;
 
   return (
-    <FeatureGate feature="marketing">
+    <ModuleGate module="marketing">
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Conexões</h1>
@@ -134,6 +134,6 @@ export default function MarketingConnections() {
           </DialogContent>
         </Dialog>
       </div>
-    </FeatureGate>
+    </ModuleGate>
   );
 }

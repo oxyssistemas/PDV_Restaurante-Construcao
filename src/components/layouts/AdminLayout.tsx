@@ -3,35 +3,42 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
   UtensilsCrossed, LayoutDashboard, BookOpen, Grid3X3, Users, Package, Settings, LogOut, Menu, Bike,
-  Building2, History, Briefcase, PieChart, Gift, Palette, Sparkles, Megaphone,
+  Building2, History, Briefcase, PieChart, Gift, Palette, Sparkles, Megaphone, ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import NotificationsBell from '@/components/NotificationsBell';
+import { ModuleKey } from '@/lib/modules';
+import { useModuleAccess } from '@/hooks/useModuleAccess';
 
-const navItems = [
+const navItems: { to: string; icon: typeof Users; label: string; end: boolean; module?: ModuleKey }[] = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/admin/assistant', icon: Sparkles, label: 'Assistente IA', end: false },
+  { to: '/admin/assistant', icon: Sparkles, label: 'Assistente IA', end: false, module: 'ai' },
   { to: '/admin/crm', icon: Building2, label: 'CRM', end: false },
   { to: '/admin/menu', icon: BookOpen, label: 'Cardápio', end: false },
   { to: '/admin/tables', icon: Grid3X3, label: 'Mesas', end: false },
   { to: '/admin/inventory', icon: Package, label: 'Estoque', end: false },
-  { to: '/admin/hr', icon: Briefcase, label: 'RH', end: false },
-  { to: '/admin/dre', icon: PieChart, label: 'DRE', end: false },
-  { to: '/admin/loyalty', icon: Gift, label: 'Fidelidade', end: false },
-  { to: '/marketing', icon: Megaphone, label: 'Marketing', end: false },
+  { to: '/admin/hr', icon: Briefcase, label: 'RH', end: false, module: 'hr' },
+  { to: '/admin/dre', icon: PieChart, label: 'DRE', end: false, module: 'dre' },
+  { to: '/admin/loyalty', icon: Gift, label: 'Fidelidade', end: false, module: 'loyalty' },
+  { to: '/marketing', icon: Megaphone, label: 'Marketing', end: false, module: 'marketing' },
   { to: '/admin/history', icon: History, label: 'Histórico', end: false },
   { to: '/delivery', icon: Bike, label: 'Delivery', end: false },
   { to: '/admin/couriers', icon: Bike, label: 'Entregadores', end: false },
   { to: '/admin/users', icon: Users, label: 'Usuários', end: false },
-  { to: '/admin/branding', icon: Palette, label: 'Identidade visual', end: false },
+  { to: '/admin/permissions', icon: ShieldCheck, label: 'Permissões', end: false },
+  { to: '/admin/branding', icon: Palette, label: 'Identidade visual', end: false, module: 'branding' },
   { to: '/admin/settings', icon: Settings, label: 'Configurações', end: false },
 ];
 
 
 
+
+
 export default function AdminLayout() {
   const { signOut, user } = useAuth();
+  const { canView } = useModuleAccess();
+  const visibleItems = navItems.filter(i => !i.module || canView(i.module));
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -50,7 +57,7 @@ export default function AdminLayout() {
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-4">
-        {navItems.map(item => (
+        {visibleItems.map(item => (
           <NavLink
             key={item.to}
             to={item.to}

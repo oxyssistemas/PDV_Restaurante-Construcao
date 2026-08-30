@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Share2, Megaphone, Users } from 'lucide-react';
-import FeatureGate from '@/components/FeatureGate';
+import ModuleGate from '@/components/ModuleGate';
 
 export default function MarketingOverview() {
   const { currentRole } = useAuth();
@@ -29,7 +29,7 @@ export default function MarketingOverview() {
   if (!restaurantId) return <p className="text-muted-foreground">Nenhum restaurante vinculado a este usuário.</p>;
 
   return (
-    <FeatureGate feature="marketing">
+    <ModuleGate module="marketing">
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Marketing</h1>
@@ -55,6 +55,6 @@ export default function MarketingOverview() {
           </CardContent>
         </Card>
       </div>
-    </FeatureGate>
+    </ModuleGate>
   );
 }

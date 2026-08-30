@@ -23,7 +23,7 @@ import {
   contractLabels, monthKey, monthLabel, negativePayrollTypes, payrollStatusLabels,
   payrollTypeLabels, sectorLabels, shiftHours,
 } from '@/lib/hr';
-import FeatureGate from '@/components/FeatureGate';
+import ModuleGate from '@/components/ModuleGate';
 
 interface EmployeeForm {
   id?: string; name: string; document: string; role_title: string; sector: string;
@@ -47,7 +47,7 @@ export default function HrPage() {
   }
 
   return (
-    <FeatureGate feature="hr">
+    <ModuleGate module="hr">
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Recursos Humanos</h1>
@@ -70,7 +70,7 @@ export default function HrPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </FeatureGate>
+    </ModuleGate>
   );
 }
 

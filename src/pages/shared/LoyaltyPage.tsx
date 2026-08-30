@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Loader2, Plus, Trash2, Gift, Settings2, Users, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { brl } from '@/lib/finance';
-import FeatureGate from '@/components/FeatureGate';
+import ModuleGate from '@/components/ModuleGate';
 
 const modeLabels: Record<string, string> = {
   points: 'Pontos',
@@ -44,7 +44,7 @@ export default function LoyaltyPage() {
   }
 
   return (
-    <FeatureGate feature="loyalty">
+    <ModuleGate module="loyalty">
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Programa de Fidelidade</h1>
@@ -61,7 +61,7 @@ export default function LoyaltyPage() {
           <TabsContent value="accounts" className="mt-4"><AccountsTab restaurantId={restaurantId} /></TabsContent>
         </Tabs>
       </div>
-    </FeatureGate>
+    </ModuleGate>
   );
 }
 
