@@ -47,7 +47,7 @@ export default function FinanceLayout() {
         <span className="font-bold text-lg tracking-tight">Financeiro</span>
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
-        {navItems.map(item => (
+        {visibleItems.map(item => (
           <NavLink
             key={item.to}
             to={item.to}
