@@ -1639,6 +1639,47 @@ export type Database = {
           },
         ]
       }
+      module_permissions: {
+        Row: {
+          can_edit: boolean
+          can_view: boolean
+          created_at: string
+          id: string
+          module: string
+          restaurant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          id?: string
+          module: string
+          restaurant_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          id?: string
+          module?: string
+          restaurant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_permissions_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
@@ -2289,6 +2330,15 @@ export type Database = {
     Functions: {
       clear_login_attempts: { Args: { _email: string }; Returns: undefined }
       get_user_restaurant_id: { Args: { _user_id: string }; Returns: string }
+      has_module_access: {
+        Args: {
+          _edit?: boolean
+          _module: string
+          _restaurant_id: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2301,7 +2351,15 @@ export type Database = {
         Returns: boolean
       }
       login_lock_seconds: { Args: { _email: string }; Returns: number }
+      module_guard: {
+        Args: { _edit?: boolean; _module: string; _restaurant_id: string }
+        Returns: boolean
+      }
       register_login_failure: { Args: { _email: string }; Returns: number }
+      restaurant_has_feature: {
+        Args: { _feature: string; _restaurant_id: string }
+        Returns: boolean
+      }
       user_belongs_to_restaurant: {
         Args: { _restaurant_id: string; _user_id: string }
         Returns: boolean
