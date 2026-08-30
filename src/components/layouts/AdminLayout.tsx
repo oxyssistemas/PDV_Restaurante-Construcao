@@ -6,6 +6,7 @@ import {
   Building2, History, Briefcase, PieChart, Gift, Palette, Sparkles, Megaphone, ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import BrandLogo from '@/components/BrandLogo';
 import { useState } from 'react';
 import NotificationsBell from '@/components/NotificationsBell';
 import { ModuleKey } from '@/lib/modules';
@@ -50,10 +51,7 @@ export default function AdminLayout() {
   const sidebar = (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center gap-3 px-6 border-b border-sidebar-border">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-          <UtensilsCrossed className="h-5 w-5" />
-        </div>
-        <span className="font-bold text-lg tracking-tight">Administração</span>
+        <BrandLogo fallbackIcon={UtensilsCrossed} fallbackName="Administração" />
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-4">

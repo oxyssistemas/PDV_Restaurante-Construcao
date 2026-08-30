@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Megaphone, Share2, LogOut, Menu, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import BrandLogo from '@/components/BrandLogo';
 import { useState } from 'react';
 import NotificationsBell from '@/components/NotificationsBell';
 
@@ -22,10 +23,7 @@ export default function MarketingLayout() {
   const sidebar = (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-          <Megaphone className="h-5 w-5" />
-        </div>
-        <span className="text-lg font-bold tracking-tight">Marketing</span>
+        <BrandLogo fallbackIcon={Megaphone} fallbackName="Marketing" />
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navItems.map(item => (
