@@ -37,6 +37,8 @@ const navItems: { to: string; icon: typeof Users; label: string; end: boolean; m
 
 export default function AdminLayout() {
   const { signOut, user } = useAuth();
+  const { canView } = useModuleAccess();
+  const visibleItems = navItems.filter(i => !i.module || canView(i.module));
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
