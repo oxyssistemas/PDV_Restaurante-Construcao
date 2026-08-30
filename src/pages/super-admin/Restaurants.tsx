@@ -213,7 +213,7 @@ function CreateAdminForm({ restaurantId, restaurantName, onSuccess }: {
     });
 
     if (error) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro', description: await edgeErrorMessage(error, 'Erro ao criar admin.'), variant: 'destructive' });
     } else if (data?.error) {
       toast({ title: 'Erro', description: data.error, variant: 'destructive' });
     } else {
