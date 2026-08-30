@@ -47,6 +47,20 @@ Deno.serve(async (req) => {
     const allowed = (roles || []).some(r => ['admin', 'finance', 'hr', 'marketing'].includes(r.role));
     if (!allowed) return json({ error: 'Sem permissão para este restaurante' }, 403);
 
+    // O plano do restaurante precisa incluir a IA e o usuário precisa de permissão no módulo.
+    const { data: planOk } = await admin.rpc('restaurant_has_feature', {
+      _restaurant_id: restaurantId, _feature: 'ai',
+    });
+    if (planOk === false) {
+      return json({ error: 'O plano deste restaurante não inclui o Assistente de IA.' }, 403);
+    }
+    const { data: moduleOk } = await admin.rpc('has_module_access', {
+      _user_id: user.id, _restaurant_id: restaurantId, _module: 'ai', _edit: false,
+    });
+    if (moduleOk === false) {
+      return json({ error: 'Você não tem permissão para usar o Assistente de IA.' }, 403);
+    }
+
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const [restaurant, payments, orders, lowStock, payables, employees, program] = await Promise.all([
       admin.from('restaurants').select('name, plan_code').eq('id', restaurantId).maybeSingle(),
