@@ -238,7 +238,7 @@ function CreateUserForm({ restaurantId, onSuccess }: { restaurantId: string; onS
     });
 
     if (error) {
-      toast.error(error.message);
+      toast.error(await edgeErrorMessage(error, 'Erro ao criar usuário.'));
     } else if (data?.error) {
       toast.error(data.error);
     } else {
