@@ -13,6 +13,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import BrandLogo from '@/components/BrandLogo';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -61,11 +62,7 @@ export default function CashierLayout() {
   const sidebar = (
     <div className="flex h-full flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-5">
-        <img src={logo.url} alt="Oxys Sistemas" className="h-9 w-9 rounded-xl object-contain" />
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold tracking-tight">Oxys Sistemas</div>
-          <div className="truncate text-[11px] text-sidebar-foreground/50">Frente de Caixa</div>
-        </div>
+        <BrandLogo fallbackIcon={Wallet} fallbackName="Oxys Sistemas" subtitle="Frente de Caixa" nameClassName="text-sm font-semibold" />
         <Button
           variant="ghost"
           size="icon"

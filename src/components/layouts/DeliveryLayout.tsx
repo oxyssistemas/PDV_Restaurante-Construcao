@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Bike, LogOut, Menu, ListOrdered, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import BrandLogo from '@/components/BrandLogo';
 import { useState } from 'react';
 
 const navItems = [
@@ -23,10 +24,7 @@ export default function DeliveryLayout() {
   const sidebar = (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center gap-3 px-6 border-b border-sidebar-border">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-          <Bike className="h-5 w-5" />
-        </div>
-        <span className="font-bold text-lg tracking-tight">Delivery</span>
+        <BrandLogo fallbackIcon={Bike} fallbackName="Delivery" />
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navItems.map(item => (

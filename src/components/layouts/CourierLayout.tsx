@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Bike, LogOut, ListOrdered } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import BrandLogo from '@/components/BrandLogo';
 
 const navItems = [
   { to: '/courier', icon: ListOrdered, label: 'Minhas entregas', end: true },
@@ -20,13 +21,15 @@ export default function CourierLayout() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-border bg-card px-4">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <Bike className="h-5 w-5" />
-        </div>
-        <div className="mr-auto min-w-0">
-          <div className="font-bold leading-tight tracking-tight">Entregador</div>
-          <div className="truncate text-[11px] text-muted-foreground">{user?.email}</div>
-        </div>
+        <BrandLogo
+          fallbackIcon={Bike}
+          fallbackName="Entregador"
+          dark={false}
+          subtitle={user?.email ?? undefined}
+          className="mr-auto"
+          nameClassName="text-base"
+          iconWrapperClassName="bg-primary text-primary-foreground"
+        />
         <Button variant="ghost" size="icon" onClick={handleSignOut} aria-label="Sair">
           <LogOut className="h-5 w-5" />
         </Button>

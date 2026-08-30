@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Grid3X3, ClipboardList, BookOpen, CalendarDays, LogOut, Menu, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import BrandLogo from '@/components/BrandLogo';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -62,10 +63,7 @@ export default function WaiterLayout() {
   const sidebar = (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center gap-3 px-6 border-b border-sidebar-border">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-          <ClipboardList className="h-5 w-5" />
-        </div>
-        <span className="font-bold text-lg tracking-tight">Garçom</span>
+        <BrandLogo fallbackIcon={ClipboardList} fallbackName="Garçom" />
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-4">
