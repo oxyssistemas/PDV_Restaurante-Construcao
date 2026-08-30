@@ -163,15 +163,15 @@ const App = () => (
               <Route path="movements" element={<CashMovementsPage />} />
             </Route>
             <Route path="/finance" element={
-              <ProtectedRoute allowedRoles={['finance']}>
+              <ProtectedRoute allowedRoles={['finance', 'hr']}>
                 <FinanceLayout />
               </ProtectedRoute>
             }>
-              <Route index element={<FinanceDashboard />} />
-              <Route path="crm" element={<FinanceCrmPage />} />
-              <Route path="reports" element={<FinanceReports />} />
-              <Route path="inventory" element={<FinanceInventory />} />
-              <Route path="history" element={<OrdersHistory />} />
+              <Route index element={<RoleGate roles={['finance']}><FinanceDashboard /></RoleGate>} />
+              <Route path="crm" element={<RoleGate roles={['finance']}><FinanceCrmPage /></RoleGate>} />
+              <Route path="reports" element={<RoleGate roles={['finance']}><FinanceReports /></RoleGate>} />
+              <Route path="inventory" element={<RoleGate roles={['finance']}><FinanceInventory /></RoleGate>} />
+              <Route path="history" element={<RoleGate roles={['finance']}><OrdersHistory /></RoleGate>} />
               <Route path="hr" element={<HrPage />} />
               <Route path="dre" element={<DrePage />} />
               <Route path="loyalty" element={<LoyaltyPage />} />
