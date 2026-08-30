@@ -172,6 +172,9 @@ const App = () => (
               <Route path="reports" element={<FinanceReports />} />
               <Route path="inventory" element={<FinanceInventory />} />
               <Route path="history" element={<OrdersHistory />} />
+              <Route path="hr" element={<HrPage />} />
+              <Route path="dre" element={<DrePage />} />
+              <Route path="loyalty" element={<LoyaltyPage />} />
 
             </Route>
             <Route path="/delivery" element={
@@ -193,6 +196,7 @@ const App = () => (
 
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </BrandingProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
