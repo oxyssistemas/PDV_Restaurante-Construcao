@@ -8,10 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Palette, RotateCcw } from 'lucide-react';
+import { Loader2, Palette, RotateCcw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { logAudit } from '@/lib/audit';
 import ModuleGate from '@/components/ModuleGate';
+import MenuImage from '@/components/MenuImage';
 
 const defaults = {
   brand_name: '', logo_light_url: '', logo_dark_url: '', favicon_url: '', login_background_url: '',
@@ -28,6 +29,7 @@ const themeOptions = { dark: 'Escuro', light: 'Claro', system: 'Seguir sistema' 
 
 export default function BrandingPage() {
   const { currentRole } = useAuth();
+  const [uploading, setUploading] = useState<string | null>(null);
   const restaurantId = currentRole?.restaurant_id ?? null;
   const role = currentRole?.role;
   const qc = useQueryClient();
