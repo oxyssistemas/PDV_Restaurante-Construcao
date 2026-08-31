@@ -8,10 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Palette, RotateCcw } from 'lucide-react';
+import { Loader2, Palette, RotateCcw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { logAudit } from '@/lib/audit';
 import ModuleGate from '@/components/ModuleGate';
+import MenuImage from '@/components/MenuImage';
 
 const defaults = {
   brand_name: '', logo_light_url: '', logo_dark_url: '', favicon_url: '', login_background_url: '',
@@ -28,6 +29,7 @@ const themeOptions = { dark: 'Escuro', light: 'Claro', system: 'Seguir sistema' 
 
 export default function BrandingPage() {
   const { currentRole } = useAuth();
+  const [uploading, setUploading] = useState<string | null>(null);
   const restaurantId = currentRole?.restaurant_id ?? null;
   const role = currentRole?.role;
   const qc = useQueryClient();
@@ -77,12 +79,16 @@ export default function BrandingPage() {
   });
 
   const uploadImage = async (field: keyof typeof defaults, file: File) => {
-    const path = `${restaurantId}/${field}-${Date.now()}.${file.name.split('.').pop()}`;
+    if (!file.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem'); return; }
+    if (file.size > 3 * 1024 * 1024) { toast.error('A imagem deve ter no máximo 3 MB'); return; }
+    setUploading(field);
+    const path = `${restaurantId}/branding/${field}-${Date.now()}.${file.name.split('.').pop()}`;
     const { error } = await supabase.storage.from('menu-images').upload(path, file, { upsert: true });
+    setUploading(null);
     if (error) { toast.error(error.message); return; }
-    const { data } = supabase.storage.from('menu-images').getPublicUrl(path);
-    setForm(f => ({ ...f, [field]: data.publicUrl }));
-    toast.success('Imagem enviada — salve para aplicar');
+    // Guardamos o caminho no storage; a URL assinada é gerada na exibição.
+    setForm(f => ({ ...f, [field]: path }));
+    toast.success('Imagem enviada — clique em salvar para aplicar');
   };
 
   if (!restaurantId) return <p className="text-muted-foreground">Nenhum restaurante vinculado a este usuário.</p>;
@@ -98,14 +104,34 @@ export default function BrandingPage() {
     </div>
   );
 
-  const imageField = (key: keyof typeof defaults, label: string) => (
+  const imageField = (key: keyof typeof defaults, label: string, hint?: string) => (
     <div className="space-y-2" key={key}>
       <Label>{label}</Label>
+      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
       <div className="flex flex-wrap items-center gap-2">
-        <Input value={form[key] as string} placeholder="URL da imagem" onChange={e => setForm({ ...form, [key]: e.target.value })} />
-        <Input type="file" accept="image/*" className="max-w-[220px]" onChange={e => e.target.files?.[0] && uploadImage(key, e.target.files[0])} />
+        <Input
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/svg+xml"
+          className="max-w-[260px]"
+          disabled={uploading === key}
+          onChange={e => e.target.files?.[0] && uploadImage(key, e.target.files[0])}
+        />
+        {uploading === key ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : null}
+        {form[key] ? (
+          <Button type="button" variant="ghost" size="sm" className="gap-1 text-destructive"
+            onClick={() => setForm(f => ({ ...f, [key]: '' }))}>
+            <Trash2 className="h-4 w-4" /> Remover
+          </Button>
+        ) : null}
       </div>
-      {form[key] ? <img src={form[key] as string} alt={label} className="h-12 rounded border object-contain" /> : null}
+      {form[key] ? (
+        <div className="flex items-center gap-3 rounded-lg border bg-muted/30 p-2">
+          <MenuImage path={form[key] as string} alt={label} className="h-12 w-12 !object-contain" />
+          <span className="truncate text-xs text-muted-foreground">Prévia</span>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">Nenhuma imagem enviada.</p>
+      )}
     </div>
   );
 
@@ -128,9 +154,9 @@ export default function BrandingPage() {
                 <Label>Nome exibido</Label>
                 <Input value={form.brand_name} onChange={e => setForm({ ...form, brand_name: e.target.value })} placeholder="Oxys Restaurante" />
               </div>
-              {imageField('logo_light_url', 'Logo (fundo claro)')}
-              {imageField('logo_dark_url', 'Logo (fundo escuro)')}
-              {imageField('favicon_url', 'Favicon')}
+              {imageField('logo_dark_url', 'Logo principal (menu escuro)', 'Substitui o ícone no canto superior esquerdo de todos os portais. Ideal: PNG quadrado com fundo transparente.')}
+              {imageField('logo_light_url', 'Logo alternativa (fundo claro)', 'Usada em telas de fundo claro. Se vazia, usamos a logo principal.')}
+              {imageField('favicon_url', 'Favicon', 'Ícone exibido na aba do navegador.')}
               {imageField('login_background_url', 'Fundo da tela de login')}
             </CardContent>
           </Card>
