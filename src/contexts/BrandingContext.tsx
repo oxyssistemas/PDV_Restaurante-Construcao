@@ -94,9 +94,16 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
       if (branding.theme_mode === 'light') root.classList.remove('dark');
       if (branding.theme_mode === 'dark') root.classList.add('dark');
       if (branding.favicon_url) {
-        let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-        if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
-        link.href = branding.favicon_url;
+        const apply = (href: string) => {
+          let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+          if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+          link.href = href;
+        };
+        if (branding.favicon_url.startsWith('http')) apply(branding.favicon_url);
+        else {
+          supabase.storage.from('menu-images').createSignedUrl(branding.favicon_url, 60 * 60)
+            .then(({ data }) => { if (data?.signedUrl) apply(data.signedUrl); });
+        }
       }
     }
     return () => { applied.forEach(n => root.style.removeProperty(n)); };
