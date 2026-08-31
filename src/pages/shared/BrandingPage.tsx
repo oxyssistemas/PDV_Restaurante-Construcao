@@ -154,9 +154,9 @@ export default function BrandingPage() {
                 <Label>Nome exibido</Label>
                 <Input value={form.brand_name} onChange={e => setForm({ ...form, brand_name: e.target.value })} placeholder="Oxys Restaurante" />
               </div>
-              {imageField('logo_light_url', 'Logo (fundo claro)')}
-              {imageField('logo_dark_url', 'Logo (fundo escuro)')}
-              {imageField('favicon_url', 'Favicon')}
+              {imageField('logo_dark_url', 'Logo principal (menu escuro)', 'Substitui o ícone no canto superior esquerdo de todos os portais. Ideal: PNG quadrado com fundo transparente.')}
+              {imageField('logo_light_url', 'Logo alternativa (fundo claro)', 'Usada em telas de fundo claro. Se vazia, usamos a logo principal.')}
+              {imageField('favicon_url', 'Favicon', 'Ícone exibido na aba do navegador.')}
               {imageField('login_background_url', 'Fundo da tela de login')}
             </CardContent>
           </Card>
