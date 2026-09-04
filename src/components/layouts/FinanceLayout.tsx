@@ -80,7 +80,7 @@ export default function FinanceLayout() {
       <aside className={cn('fixed inset-y-0 left-0 z-50 w-64 transform transition-transform lg:relative lg:translate-x-0', sidebarOpen ? 'translate-x-0' : '-translate-x-full')}>
         {sidebar}
       </aside>
-      <main className="flex-1 overflow-auto">
+      <main className="flex min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain">
         <div className="flex h-14 items-center gap-4 border-b px-4">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}><Menu className="h-5 w-5" /></Button>
           <span className="font-semibold lg:hidden">Financeiro</span>

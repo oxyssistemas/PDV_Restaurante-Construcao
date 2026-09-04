@@ -85,7 +85,7 @@ export default function SuperAdminLayout() {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain">
         <div className="flex h-14 items-center gap-4 border-b px-4 lg:hidden">
           <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
             <Menu className="h-5 w-5" />
