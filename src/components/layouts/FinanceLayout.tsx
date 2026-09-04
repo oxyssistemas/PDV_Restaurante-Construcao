@@ -40,11 +40,11 @@ export default function FinanceLayout() {
   };
 
   const sidebar = (
-    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex h-16 items-center gap-3 px-6 border-b border-sidebar-border">
+    <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
+      <div className="flex h-16 shrink-0 items-center gap-3 px-6 border-b border-sidebar-border">
         <BrandLogo fallbackIcon={LineChart} fallbackName="Financeiro" />
       </div>
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-4">
         {visibleItems.map(item => (
           <NavLink
             key={item.to}
@@ -65,7 +65,7 @@ export default function FinanceLayout() {
           </NavLink>
         ))}
       </nav>
-      <div className="border-t border-sidebar-border p-4">
+      <div className="shrink-0 border-t border-sidebar-border p-4">
         <div className="text-xs text-sidebar-foreground/50 mb-2 truncate">{user?.email}</div>
         <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-sidebar-foreground/70" onClick={handleSignOut}>
           <LogOut className="h-4 w-4" /> Sair
