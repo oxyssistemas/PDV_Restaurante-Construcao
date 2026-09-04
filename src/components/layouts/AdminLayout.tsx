@@ -49,12 +49,12 @@ export default function AdminLayout() {
   };
 
   const sidebar = (
-    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex h-16 items-center gap-3 px-6 border-b border-sidebar-border">
+    <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
+      <div className="flex h-16 shrink-0 items-center gap-3 px-6 border-b border-sidebar-border">
         <BrandLogo fallbackIcon={UtensilsCrossed} fallbackName="Administração" />
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-4">
         {visibleItems.map(item => (
           <NavLink
             key={item.to}
@@ -76,7 +76,7 @@ export default function AdminLayout() {
         ))}
       </nav>
 
-      <div className="border-t border-sidebar-border p-4">
+      <div className="shrink-0 border-t border-sidebar-border p-4">
         <div className="text-xs text-sidebar-foreground/50 mb-2 truncate">{user?.email}</div>
         <Button
           variant="ghost"
@@ -102,8 +102,8 @@ export default function AdminLayout() {
       )}>
         {sidebar}
       </aside>
-      <main className="flex-1 overflow-auto">
-        <div className="flex h-14 items-center gap-4 border-b px-4">
+      <main className="flex min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+        <div className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-4 border-b bg-background px-4">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
             <Menu className="h-5 w-5" />
           </Button>
