@@ -63,7 +63,7 @@ export default function DeliveryLayout() {
         {sidebar}
       </aside>
       <main className="flex min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain">
-        <div className="flex h-14 items-center gap-4 border-b px-4 lg:hidden">
+        <div className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-4 border-b bg-background px-4 lg:hidden">
           <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}><Menu className="h-5 w-5" /></Button>
           <span className="font-semibold">Delivery</span>
         </div>
