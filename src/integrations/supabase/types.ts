@@ -915,6 +915,166 @@ export type Database = {
           },
         ]
       }
+      ifood_events: {
+        Row: {
+          code: string | null
+          created_at: string
+          event_id: string
+          id: string
+          ifood_order_id: string | null
+          payload: Json
+          restaurant_id: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          event_id: string
+          id?: string
+          ifood_order_id?: string | null
+          payload?: Json
+          restaurant_id: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          event_id?: string
+          id?: string
+          ifood_order_id?: string | null
+          payload?: Json
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ifood_events_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ifood_integrations: {
+        Row: {
+          auto_accept: boolean
+          created_at: string
+          enabled: boolean
+          id: string
+          last_error: string | null
+          last_sync_at: string | null
+          merchant_id: string | null
+          restaurant_id: string
+          store_open: boolean
+          sync_catalog: boolean
+          sync_store_status: boolean
+          updated_at: string
+        }
+        Insert: {
+          auto_accept?: boolean
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_error?: string | null
+          last_sync_at?: string | null
+          merchant_id?: string | null
+          restaurant_id: string
+          store_open?: boolean
+          sync_catalog?: boolean
+          sync_store_status?: boolean
+          updated_at?: string
+        }
+        Update: {
+          auto_accept?: boolean
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_error?: string | null
+          last_sync_at?: string | null
+          merchant_id?: string | null
+          restaurant_id?: string
+          store_open?: boolean
+          sync_catalog?: boolean
+          sync_store_status?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ifood_integrations_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ifood_orders: {
+        Row: {
+          created_at: string
+          customer_address: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          decision: string
+          display_id: string | null
+          id: string
+          ifood_order_id: string
+          ifood_status: string | null
+          last_error: string | null
+          order_id: string | null
+          payload: Json
+          restaurant_id: string
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_address?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          decision?: string
+          display_id?: string | null
+          id?: string
+          ifood_order_id: string
+          ifood_status?: string | null
+          last_error?: string | null
+          order_id?: string | null
+          payload?: Json
+          restaurant_id: string
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_address?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          decision?: string
+          display_id?: string | null
+          id?: string
+          ifood_order_id?: string
+          ifood_status?: string | null
+          last_error?: string | null
+          order_id?: string | null
+          payload?: Json
+          restaurant_id?: string
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ifood_orders_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ifood_orders_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           cost_per_unit: number | null
@@ -1577,6 +1737,7 @@ export type Database = {
           csosn: string | null
           description: string | null
           id: string
+          ifood_product_id: string | null
           image_url: string | null
           is_combo: boolean
           name: string
@@ -1595,6 +1756,7 @@ export type Database = {
           csosn?: string | null
           description?: string | null
           id?: string
+          ifood_product_id?: string | null
           image_url?: string | null
           is_combo?: boolean
           name: string
@@ -1613,6 +1775,7 @@ export type Database = {
           csosn?: string | null
           description?: string | null
           id?: string
+          ifood_product_id?: string | null
           image_url?: string | null
           is_combo?: boolean
           name?: string
@@ -1792,6 +1955,7 @@ export type Database = {
           order_type: string
           reservation_id: string | null
           restaurant_id: string
+          source: string
           status: Database["public"]["Enums"]["order_status"]
           table_id: string | null
           total: number
@@ -1817,6 +1981,7 @@ export type Database = {
           order_type?: string
           reservation_id?: string | null
           restaurant_id: string
+          source?: string
           status?: Database["public"]["Enums"]["order_status"]
           table_id?: string | null
           total?: number
@@ -1842,6 +2007,7 @@ export type Database = {
           order_type?: string
           reservation_id?: string | null
           restaurant_id?: string
+          source?: string
           status?: Database["public"]["Enums"]["order_status"]
           table_id?: string | null
           total?: number
