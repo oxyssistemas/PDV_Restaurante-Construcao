@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { pushIfoodStatus } from '@/lib/ifood';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -126,6 +127,7 @@ export default function DeliveryOrders() {
       if (status === 'cancelled') payload.status = 'cancelled';
       const { error } = await supabase.from('orders').update(payload).eq('id', id);
       if (error) throw error;
+      await pushIfoodStatus(restaurantId, id, status);
 
       if (courierId) {
         if (status === 'out_for_delivery') {
