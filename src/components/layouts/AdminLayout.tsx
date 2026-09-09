@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import {
   UtensilsCrossed, LayoutDashboard, BookOpen, Grid3X3, Users, Package, Settings, LogOut, Menu, Bike,
   Building2, History, Briefcase, PieChart, Gift, Palette, Sparkles, Megaphone, ShieldCheck,
-} from 'lucide-react';
+, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
 import { useState } from 'react';
@@ -26,6 +26,7 @@ const navItems: { to: string; icon: typeof Users; label: string; end: boolean; m
   { to: '/admin/history', icon: History, label: 'Histórico', end: false },
   { to: '/delivery', icon: Bike, label: 'Delivery', end: false },
   { to: '/admin/couriers', icon: Bike, label: 'Entregadores', end: false },
+  { to: '/admin/ifood', icon: ShoppingBag, label: 'iFood', end: false },
   { to: '/admin/users', icon: Users, label: 'Usuários', end: false },
   { to: '/admin/permissions', icon: ShieldCheck, label: 'Permissões', end: false },
   { to: '/admin/branding', icon: Palette, label: 'Identidade visual', end: false, module: 'branding' },

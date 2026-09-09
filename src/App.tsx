@@ -66,6 +66,7 @@ import BrandingPage from "./pages/shared/BrandingPage";
 import AssistantPage from "./pages/shared/AssistantPage";
 import PlansPage from "./pages/super-admin/Plans";
 import MarketingLayout from "./components/layouts/MarketingLayout";
+import IfoodPage from "./pages/shared/IfoodPage";
 import MarketingOverview from "./pages/marketing/Overview";
 import MarketingConnections from "./pages/marketing/Connections";
 import MarketingCampaigns from "./pages/marketing/Campaigns";
@@ -121,6 +122,7 @@ const App = () => (
               <Route path="branding" element={<BrandingPage />} />
               <Route path="assistant" element={<AssistantPage />} />
 
+              <Route path="ifood" element={<IfoodPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
 
