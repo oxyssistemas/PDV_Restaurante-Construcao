@@ -1,11 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
-import { getFunctionError } from '@/lib/functionError';
+import { edgeErrorMessage } from '@/lib/functionError';
 
 export type IfoodAction = 'accept' | 'reject' | 'ready' | 'dispatch' | 'conclude' | 'cancel';
 
 async function call(fn: string, body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke(fn, { body });
-  if (error) throw new Error(await getFunctionError(error));
+  if (error) throw new Error(await edgeErrorMessage(error));
   if ((data as any)?.error) throw new Error((data as any).error);
   return data as any;
 }
