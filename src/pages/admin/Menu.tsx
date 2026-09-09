@@ -577,6 +577,15 @@ function ItemDialog({
             </div>
           )}
 
+          <div className="space-y-2 rounded-lg border p-3">
+            <Label className="text-sm font-medium">Código do produto no iFood</Label>
+            <Input
+              value={ifoodProductId}
+              onChange={e => setIfoodProductId(e.target.value)}
+              placeholder="Opcional — necessário para sincronizar preço e disponibilidade"
+            />
+          </div>
+
           <div className="space-y-3 rounded-lg border p-3">
             <div className="flex items-center gap-2">
               <ReceiptText className="h-4 w-4 text-primary" />
