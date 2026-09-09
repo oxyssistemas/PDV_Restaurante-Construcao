@@ -290,6 +290,7 @@ function ItemDialog({
   const [csosn, setCsosn] = useState(editItem?.csosn || '');
   const [origin, setOrigin] = useState(editItem?.origin || '');
   const [commercialUnit, setCommercialUnit] = useState(editItem?.commercial_unit || '');
+  const [ifoodProductId, setIfoodProductId] = useState(editItem?.ifood_product_id || '');
   const [ingredients, setIngredients] = useState<IngRow[]>([]);
   const [components, setComponents] = useState<CompRow[]>([]);
   const [uploading, setUploading] = useState(false);
