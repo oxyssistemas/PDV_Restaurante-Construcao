@@ -66,7 +66,7 @@ export default function MyDeliveries() {
       if (status === 'delivered') payload.status = 'delivered';
       const { error } = await supabase.from('orders').update(payload).eq('id', id);
       if (error) throw error;
-      await pushIfoodStatus(restaurantId, id, status);
+      await pushIfoodStatus(courier?.restaurant_id, id, status);
 
       if (courier) {
         const stillOnRoute = (orders || []).some(
