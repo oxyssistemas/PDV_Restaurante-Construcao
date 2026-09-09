@@ -189,6 +189,7 @@ const App = () => (
             }>
               <Route index element={<DeliveryOrders />} />
               <Route path="new" element={<NewDelivery />} />
+              <Route path="ifood" element={<IfoodPage />} />
             </Route>
             <Route path="/courier" element={
               <ProtectedRoute allowedRoles={['courier']}>
