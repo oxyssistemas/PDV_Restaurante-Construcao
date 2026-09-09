@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { pushIfoodStatus } from '@/lib/ifood';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Loader2, Bike, Phone, Navigation, CheckCircle2, MapPin } from 'lucide-react';
@@ -65,6 +66,7 @@ export default function MyDeliveries() {
       if (status === 'delivered') payload.status = 'delivered';
       const { error } = await supabase.from('orders').update(payload).eq('id', id);
       if (error) throw error;
+      await pushIfoodStatus(courier?.restaurant_id, id, status);
 
       if (courier) {
         const stillOnRoute = (orders || []).some(

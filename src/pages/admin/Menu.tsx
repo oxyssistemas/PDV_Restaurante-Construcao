@@ -290,6 +290,7 @@ function ItemDialog({
   const [csosn, setCsosn] = useState(editItem?.csosn || '');
   const [origin, setOrigin] = useState(editItem?.origin || '');
   const [commercialUnit, setCommercialUnit] = useState(editItem?.commercial_unit || '');
+  const [ifoodProductId, setIfoodProductId] = useState(editItem?.ifood_product_id || '');
   const [ingredients, setIngredients] = useState<IngRow[]>([]);
   const [components, setComponents] = useState<CompRow[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -360,6 +361,7 @@ function ItemDialog({
       csosn: csosn || null,
       origin: origin || null,
       commercial_unit: commercialUnit || null,
+      ifood_product_id: ifoodProductId.trim() || null,
     };
 
     const { data: saved, error } = editItem
@@ -574,6 +576,15 @@ function ItemDialog({
               </Button>
             </div>
           )}
+
+          <div className="space-y-2 rounded-lg border p-3">
+            <Label className="text-sm font-medium">Código do produto no iFood</Label>
+            <Input
+              value={ifoodProductId}
+              onChange={e => setIfoodProductId(e.target.value)}
+              placeholder="Opcional — necessário para sincronizar preço e disponibilidade"
+            />
+          </div>
 
           <div className="space-y-3 rounded-lg border p-3">
             <div className="flex items-center gap-2">

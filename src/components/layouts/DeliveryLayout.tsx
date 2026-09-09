@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { Bike, LogOut, Menu, ListOrdered, PlusCircle } from 'lucide-react';
+import { Bike, LogOut, Menu, ListOrdered, PlusCircle, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
 import { useState } from 'react';
@@ -9,6 +9,7 @@ import { useState } from 'react';
 const navItems = [
   { to: '/delivery', icon: ListOrdered, label: 'Pedidos', end: true },
   { to: '/delivery/new', icon: PlusCircle, label: 'Novo Pedido', end: false },
+  { to: '/delivery/ifood', icon: ShoppingBag, label: 'iFood', end: false },
 ];
 
 export default function DeliveryLayout() {
