@@ -361,6 +361,7 @@ function ItemDialog({
       csosn: csosn || null,
       origin: origin || null,
       commercial_unit: commercialUnit || null,
+      ifood_product_id: ifoodProductId.trim() || null,
     };
 
     const { data: saved, error } = editItem
