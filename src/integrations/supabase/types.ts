@@ -2501,6 +2501,10 @@ export type Database = {
     }
     Functions: {
       clear_login_attempts: { Args: { _email: string }; Returns: undefined }
+      create_qr_order: {
+        Args: { _customer_name: string; _items: Json; _qr_token: string }
+        Returns: string
+      }
       get_user_restaurant_id: { Args: { _user_id: string }; Returns: string }
       has_module_access: {
         Args: {
