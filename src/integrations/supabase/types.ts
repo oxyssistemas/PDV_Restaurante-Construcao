@@ -2325,6 +2325,8 @@ export type Database = {
           id: string
           merge_group_id: string | null
           number: number
+          qr_enabled: boolean
+          qr_token: string
           restaurant_id: string
           status: Database["public"]["Enums"]["table_status"]
           updated_at: string
@@ -2335,6 +2337,8 @@ export type Database = {
           id?: string
           merge_group_id?: string | null
           number: number
+          qr_enabled?: boolean
+          qr_token?: string
           restaurant_id: string
           status?: Database["public"]["Enums"]["table_status"]
           updated_at?: string
@@ -2345,6 +2349,8 @@ export type Database = {
           id?: string
           merge_group_id?: string | null
           number?: number
+          qr_enabled?: boolean
+          qr_token?: string
           restaurant_id?: string
           status?: Database["public"]["Enums"]["table_status"]
           updated_at?: string
@@ -2495,6 +2501,10 @@ export type Database = {
     }
     Functions: {
       clear_login_attempts: { Args: { _email: string }; Returns: undefined }
+      create_qr_order: {
+        Args: { _customer_name: string; _items: Json; _qr_token: string }
+        Returns: string
+      }
       get_user_restaurant_id: { Args: { _user_id: string }; Returns: string }
       has_module_access: {
         Args: {
