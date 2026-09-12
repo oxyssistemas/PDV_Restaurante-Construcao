@@ -2325,6 +2325,8 @@ export type Database = {
           id: string
           merge_group_id: string | null
           number: number
+          qr_enabled: boolean
+          qr_token: string
           restaurant_id: string
           status: Database["public"]["Enums"]["table_status"]
           updated_at: string
@@ -2335,6 +2337,8 @@ export type Database = {
           id?: string
           merge_group_id?: string | null
           number: number
+          qr_enabled?: boolean
+          qr_token?: string
           restaurant_id: string
           status?: Database["public"]["Enums"]["table_status"]
           updated_at?: string
@@ -2345,6 +2349,8 @@ export type Database = {
           id?: string
           merge_group_id?: string | null
           number?: number
+          qr_enabled?: boolean
+          qr_token?: string
           restaurant_id?: string
           status?: Database["public"]["Enums"]["table_status"]
           updated_at?: string
