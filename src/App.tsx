@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import Setup from "./pages/Setup";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import TableMenu from "./pages/public/TableMenu";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import RoleGate from "./components/RoleGate";
@@ -89,6 +90,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/setup" element={<Setup />} />
             <Route path="/" element={<Index />} />
+            <Route path="/mesa/:token" element={<TableMenu />} />
 
             {/* Super Admin */}
             <Route path="/super-admin" element={

@@ -10,8 +10,11 @@ import { Badge } from '@/components/ui/badge';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from '@/components/ui/dialog';
-import { Plus, Loader2, Trash2, Users } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Plus, Loader2, Trash2, Users, QrCode } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import TableQrDialog from '@/components/TableQrDialog';
+import { useBranding } from '@/contexts/BrandingContext';
 
 const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' }> = {
   free: { label: 'Livre', variant: 'secondary' },
@@ -23,7 +26,9 @@ export default function TablesPage() {
   const { currentRole } = useAuth();
   const restaurantId = currentRole?.restaurant_id;
   const queryClient = useQueryClient();
+  const { branding } = useBranding();
   const [createOpen, setCreateOpen] = useState(false);
+  const [qrTable, setQrTable] = useState<{ number: number; qr_token: string } | null>(null);
 
   const { data: tables, isLoading } = useQuery({
     queryKey: ['admin-tables', restaurantId],
@@ -48,6 +53,15 @@ export default function TablesPage() {
       queryClient.invalidateQueries({ queryKey: ['admin-tables'] });
       toast({ title: 'Mesa removida' });
     },
+  });
+
+  const toggleQr = useMutation({
+    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
+      const { error } = await supabase.from('restaurant_tables').update({ qr_enabled: enabled }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-tables'] }),
+    onError: (e: Error) => toast({ title: 'Erro', description: e.message, variant: 'destructive' }),
   });
 
   return (
@@ -83,6 +97,20 @@ export default function TablesPage() {
                   <div className="flex items-center gap-1 text-sm text-muted-foreground">
                     <Users className="h-3.5 w-3.5" /> {table.capacity} lugares
                   </div>
+                  <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={table.qr_enabled}
+                        onCheckedChange={v => toggleQr.mutate({ id: table.id, enabled: v })}
+                        aria-label="Pedidos pelo QR Code"
+                      />
+                      <span className="text-xs text-muted-foreground">Pedido por QR</span>
+                    </div>
+                    <Button variant="outline" size="sm" className="gap-1.5"
+                      onClick={() => setQrTable({ number: table.number, qr_token: table.qr_token })}>
+                      <QrCode className="h-4 w-4" /> QR Code
+                    </Button>
+                  </div>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -100,6 +128,18 @@ export default function TablesPage() {
           )}
         </div>
       )}
+
+      <Dialog open={!!qrTable} onOpenChange={open => !open && setQrTable(null)}>
+        <DialogContent>
+          {qrTable && (
+            <TableQrDialog
+              tableNumber={qrTable.number}
+              qrToken={qrTable.qr_token}
+              brandName={branding?.brand_name ?? undefined}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
