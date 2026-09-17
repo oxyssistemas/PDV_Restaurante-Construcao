@@ -10,8 +10,11 @@ import { Badge } from '@/components/ui/badge';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from '@/components/ui/dialog';
-import { Plus, Loader2, Trash2, Users } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Plus, Loader2, Trash2, Users, QrCode } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import TableQrDialog from '@/components/TableQrDialog';
+import { useBranding } from '@/contexts/BrandingContext';
 
 const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' }> = {
   free: { label: 'Livre', variant: 'secondary' },
