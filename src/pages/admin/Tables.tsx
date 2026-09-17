@@ -26,7 +26,9 @@ export default function TablesPage() {
   const { currentRole } = useAuth();
   const restaurantId = currentRole?.restaurant_id;
   const queryClient = useQueryClient();
+  const { branding } = useBranding();
   const [createOpen, setCreateOpen] = useState(false);
+  const [qrTable, setQrTable] = useState<{ number: number; qr_token: string } | null>(null);
 
   const { data: tables, isLoading } = useQuery({
     queryKey: ['admin-tables', restaurantId],
@@ -51,6 +53,15 @@ export default function TablesPage() {
       queryClient.invalidateQueries({ queryKey: ['admin-tables'] });
       toast({ title: 'Mesa removida' });
     },
+  });
+
+  const toggleQr = useMutation({
+    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
+      const { error } = await supabase.from('restaurant_tables').update({ qr_enabled: enabled }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-tables'] }),
+    onError: (e: Error) => toast({ title: 'Erro', description: e.message, variant: 'destructive' }),
   });
 
   return (
