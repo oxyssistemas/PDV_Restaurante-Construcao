@@ -1128,7 +1128,7 @@ export type Database = {
           reason: string | null
           restaurant_id: string
           type: Database["public"]["Enums"]["inventory_movement_type"]
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -1138,7 +1138,7 @@ export type Database = {
           reason?: string | null
           restaurant_id: string
           type: Database["public"]["Enums"]["inventory_movement_type"]
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -1148,7 +1148,7 @@ export type Database = {
           reason?: string | null
           restaurant_id?: string
           type?: Database["public"]["Enums"]["inventory_movement_type"]
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
