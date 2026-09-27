@@ -80,6 +80,125 @@ export type Database = {
           },
         ]
       }
+      ad_campaigns: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          creative: Json
+          daily_budget: number
+          end_date: string | null
+          error_message: string | null
+          external_ids: Json
+          id: string
+          last_synced_at: string | null
+          name: string
+          objective: string
+          platform: string
+          restaurant_id: string
+          start_date: string | null
+          status: string
+          targeting: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          creative?: Json
+          daily_budget?: number
+          end_date?: string | null
+          error_message?: string | null
+          external_ids?: Json
+          id?: string
+          last_synced_at?: string | null
+          name: string
+          objective: string
+          platform: string
+          restaurant_id: string
+          start_date?: string | null
+          status?: string
+          targeting?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          creative?: Json
+          daily_budget?: number
+          end_date?: string | null
+          error_message?: string | null
+          external_ids?: Json
+          id?: string
+          last_synced_at?: string | null
+          name?: string
+          objective?: string
+          platform?: string
+          restaurant_id?: string
+          start_date?: string | null
+          status?: string
+          targeting?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_campaigns_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ad_metrics_daily: {
+        Row: {
+          campaign_id: string
+          clicks: number
+          conversations: number
+          created_at: string
+          id: string
+          impressions: number
+          metric_date: string
+          restaurant_id: string
+          spend: number
+        }
+        Insert: {
+          campaign_id: string
+          clicks?: number
+          conversations?: number
+          created_at?: string
+          id?: string
+          impressions?: number
+          metric_date: string
+          restaurant_id: string
+          spend?: number
+        }
+        Update: {
+          campaign_id?: string
+          clicks?: number
+          conversations?: number
+          created_at?: string
+          id?: string
+          impressions?: number
+          metric_date?: string
+          restaurant_id?: string
+          spend?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_metrics_daily_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "ad_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_metrics_daily_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_conversations: {
         Row: {
           created_at: string
@@ -458,6 +577,7 @@ export type Database = {
           document: string | null
           email: string | null
           id: string
+          marketing_opt_in: boolean
           name: string
           notes: string | null
           phone: string | null
@@ -472,6 +592,7 @@ export type Database = {
           document?: string | null
           email?: string | null
           id?: string
+          marketing_opt_in?: boolean
           name: string
           notes?: string | null
           phone?: string | null
@@ -486,6 +607,7 @@ export type Database = {
           document?: string | null
           email?: string | null
           id?: string
+          marketing_opt_in?: boolean
           name?: string
           notes?: string | null
           phone?: string | null
@@ -1494,6 +1616,56 @@ export type Database = {
           },
         ]
       }
+      marketing_accounts: {
+        Row: {
+          created_at: string
+          external_id: string
+          id: string
+          kind: string
+          metadata: Json
+          name: string | null
+          parent_id: string | null
+          provider: string
+          restaurant_id: string
+          selected: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          external_id: string
+          id?: string
+          kind: string
+          metadata?: Json
+          name?: string | null
+          parent_id?: string | null
+          provider: string
+          restaurant_id: string
+          selected?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          external_id?: string
+          id?: string
+          kind?: string
+          metadata?: Json
+          name?: string | null
+          parent_id?: string | null
+          provider?: string
+          restaurant_id?: string
+          selected?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_accounts_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marketing_campaigns: {
         Row: {
           channels: string[]
@@ -1581,6 +1753,162 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "marketing_connections_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_credentials: {
+        Row: {
+          access_token: string
+          connected_by: string | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          provider: string
+          refresh_token: string | null
+          restaurant_id: string
+          scopes: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          connected_by?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          provider: string
+          refresh_token?: string | null
+          restaurant_id: string
+          scopes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          connected_by?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          provider?: string
+          refresh_token?: string | null
+          restaurant_id?: string
+          scopes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_credentials_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_metrics_daily: {
+        Row: {
+          calls: number | null
+          channel: string
+          created_at: string
+          directions: number | null
+          followers: number | null
+          id: string
+          metric_date: string
+          reach: number | null
+          restaurant_id: string
+          updated_at: string
+          views: number | null
+        }
+        Insert: {
+          calls?: number | null
+          channel: string
+          created_at?: string
+          directions?: number | null
+          followers?: number | null
+          id?: string
+          metric_date: string
+          reach?: number | null
+          restaurant_id: string
+          updated_at?: string
+          views?: number | null
+        }
+        Update: {
+          calls?: number | null
+          channel?: string
+          created_at?: string
+          directions?: number | null
+          followers?: number | null
+          id?: string
+          metric_date?: string
+          reach?: number | null
+          restaurant_id?: string
+          updated_at?: string
+          views?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_metrics_daily_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_posts: {
+        Row: {
+          caption: string
+          channels: string[]
+          created_at: string
+          created_by: string | null
+          error_message: string | null
+          external_ids: Json
+          id: string
+          image_path: string | null
+          metrics: Json
+          published_at: string | null
+          restaurant_id: string
+          scheduled_for: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          caption?: string
+          channels?: string[]
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          external_ids?: Json
+          id?: string
+          image_path?: string | null
+          metrics?: Json
+          published_at?: string | null
+          restaurant_id: string
+          scheduled_for?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          caption?: string
+          channels?: string[]
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          external_ids?: Json
+          id?: string
+          image_path?: string | null
+          metrics?: Json
+          published_at?: string | null
+          restaurant_id?: string
+          scheduled_for?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_posts_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
@@ -2488,6 +2816,167 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "user_roles_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_conversations: {
+        Row: {
+          contact_name: string | null
+          created_at: string
+          customer_id: string | null
+          id: string
+          last_inbound_at: string | null
+          last_message: string | null
+          last_message_at: string | null
+          phone: string
+          restaurant_id: string
+          unread_count: number
+          updated_at: string
+        }
+        Insert: {
+          contact_name?: string | null
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          last_inbound_at?: string | null
+          last_message?: string | null
+          last_message_at?: string | null
+          phone: string
+          restaurant_id: string
+          unread_count?: number
+          updated_at?: string
+        }
+        Update: {
+          contact_name?: string | null
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          last_inbound_at?: string | null
+          last_message?: string | null
+          last_message_at?: string | null
+          phone?: string
+          restaurant_id?: string
+          unread_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_conversations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_messages: {
+        Row: {
+          body: string | null
+          conversation_id: string
+          created_at: string
+          direction: string
+          error_message: string | null
+          external_id: string | null
+          id: string
+          message_type: string
+          restaurant_id: string
+          sent_by: string | null
+          status: string
+        }
+        Insert: {
+          body?: string | null
+          conversation_id: string
+          created_at?: string
+          direction: string
+          error_message?: string | null
+          external_id?: string | null
+          id?: string
+          message_type?: string
+          restaurant_id: string
+          sent_by?: string | null
+          status?: string
+        }
+        Update: {
+          body?: string | null
+          conversation_id?: string
+          created_at?: string
+          direction?: string
+          error_message?: string | null
+          external_id?: string | null
+          id?: string
+          message_type?: string
+          restaurant_id?: string
+          sent_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_templates: {
+        Row: {
+          body: string
+          category: string
+          created_at: string
+          id: string
+          language: string
+          name: string
+          restaurant_id: string
+          status: string
+          updated_at: string
+          variables: number
+        }
+        Insert: {
+          body: string
+          category?: string
+          created_at?: string
+          id?: string
+          language?: string
+          name: string
+          restaurant_id: string
+          status?: string
+          updated_at?: string
+          variables?: number
+        }
+        Update: {
+          body?: string
+          category?: string
+          created_at?: string
+          id?: string
+          language?: string
+          name?: string
+          restaurant_id?: string
+          status?: string
+          updated_at?: string
+          variables?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_templates_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
