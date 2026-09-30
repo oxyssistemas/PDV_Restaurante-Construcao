@@ -1,138 +1,199 @@
-import { useState } from 'react';
+import { useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Instagram, Facebook, MessageCircle, MapPin, Loader2, Link2, Unlink } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Loader2, Link2, RefreshCw, Unlink } from 'lucide-react';
 import { toast } from 'sonner';
 import ModuleGate from '@/components/ModuleGate';
+import NetworkIcon from '@/components/marketing/NetworkIcon';
+import { marketingApi, marketingConfig, startConnect, type Network, type Provider } from '@/lib/marketing';
 
-const providers = [
-  { key: 'instagram', label: 'Instagram', icon: Instagram, hint: '@perfil do restaurante' },
-  { key: 'facebook', label: 'Facebook', icon: Facebook, hint: 'Página do restaurante' },
-  { key: 'whatsapp', label: 'WhatsApp Business', icon: MessageCircle, hint: 'Número comercial' },
-  { key: 'google_business', label: 'Google Meu Negócio', icon: MapPin, hint: 'Perfil no Google Maps' },
+type Account = { id: string; provider: string; kind: string; name: string | null; selected: boolean };
+
+const PROVIDERS: { key: Provider; title: string; description: string; networks: { network: Network; kind: string; empty: string }[] }[] = [
+  {
+    key: 'meta',
+    title: 'Meta',
+    description: 'Facebook e Instagram em um único login. O Instagram precisa ser uma conta Profissional ligada a uma Página.',
+    networks: [
+      { network: 'facebook', kind: 'facebook_page', empty: 'Nenhuma Página do Facebook encontrada nesta conta.' },
+      { network: 'instagram', kind: 'instagram', empty: 'Nenhum Instagram Profissional ligado às suas Páginas.' },
+    ],
+  },
+  {
+    key: 'tiktok',
+    title: 'TikTok',
+    description: 'Publica vídeos e fotos no perfil conectado.',
+    networks: [{ network: 'tiktok', kind: 'tiktok', empty: 'Conta não encontrada.' }],
+  },
 ];
 
 export default function MarketingConnections() {
   const { currentRole } = useAuth();
   const restaurantId = currentRole?.restaurant_id ?? null;
   const qc = useQueryClient();
-  const [editing, setEditing] = useState<string | null>(null);
-  const [form, setForm] = useState({ account_name: '', account_url: '' });
+  const [params, setParams] = useSearchParams();
 
-  const { data: connections, isLoading } = useQuery({
-    queryKey: ['marketing-connections', restaurantId],
+  // Retorno do login da rede social
+  useEffect(() => {
+    const connected = params.get('connected');
+    const error = params.get('connect_error');
+    if (!connected && !error) return;
+    if (connected) toast.success(`Conta ${connected === 'tiktok' ? 'do TikTok' : 'da Meta'} conectada`);
+    if (error) toast.error(error);
+    setParams({}, { replace: true });
+  }, [params, setParams]);
+
+  const { data: config } = useQuery({ queryKey: ['marketing-config'], queryFn: marketingConfig, staleTime: 5 * 60_000 });
+
+  const { data: status, isLoading: loadingStatus } = useQuery({
+    queryKey: ['marketing-status', restaurantId],
+    enabled: !!restaurantId,
+    queryFn: () => marketingApi(restaurantId!, 'status') as Promise<{ credentials: { provider: string; expired: boolean }[] }>,
+  });
+
+  const { data: accounts, isLoading: loadingAccounts } = useQuery({
+    queryKey: ['marketing-accounts', restaurantId],
     enabled: !!restaurantId,
     queryFn: async () => {
-      const { data, error } = await supabase.from('marketing_connections').select('*')
-        .eq('restaurant_id', restaurantId!);
+      const { data, error } = await supabase.from('marketing_accounts')
+        .select('id, provider, kind, name, selected')
+        .eq('restaurant_id', restaurantId!)
+        .in('kind', ['facebook_page', 'instagram', 'tiktok'])
+        .order('name');
       if (error) throw error;
-      return data || [];
+      return (data || []) as Account[];
     },
   });
 
-  const save = useMutation({
-    mutationFn: async (provider: string) => {
-      const existing = (connections || []).find(c => c.provider === provider);
-      const payload = {
-        restaurant_id: restaurantId!,
-        provider,
-        status: 'connected',
-        account_name: form.account_name.trim() || null,
-        account_url: form.account_url.trim() || null,
-        connected_at: new Date().toISOString(),
-      };
-      if (existing) {
-        const { error } = await supabase.from('marketing_connections').update(payload).eq('id', existing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('marketing_connections').insert(payload);
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['marketing-connections'] });
-      qc.invalidateQueries({ queryKey: ['marketing-overview'] });
-      setEditing(null);
-      toast.success('Canal conectado');
-    },
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['marketing-status'] });
+    qc.invalidateQueries({ queryKey: ['marketing-accounts'] });
+    qc.invalidateQueries({ queryKey: ['marketing-overview'] });
+  };
+
+  const connect = useMutation({
+    mutationFn: (provider: Provider) => startConnect(restaurantId!, provider),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const select = useMutation({
+    mutationFn: (accountId: string) => marketingApi(restaurantId!, 'select_account', { accountId }),
+    onSuccess: () => { refresh(); toast.success('Conta selecionada'); },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const disconnect = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('marketing_connections')
-        .update({ status: 'disconnected', connected_at: null }).eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['marketing-connections'] });
-      qc.invalidateQueries({ queryKey: ['marketing-overview'] });
-      toast.success('Canal desconectado');
-    },
+    mutationFn: (provider: Provider) => marketingApi(restaurantId!, 'disconnect', { provider }),
+    onSuccess: () => { refresh(); toast.success('Conta desconectada'); },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   if (!restaurantId) return <p className="text-muted-foreground">Nenhum restaurante vinculado a este usuário.</p>;
+
+  const loading = loadingStatus || loadingAccounts;
 
   return (
     <ModuleGate module="marketing">
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Conexões</h1>
-          <p className="text-muted-foreground">Registre os canais oficiais do restaurante. A publicação automática chega em breve.</p>
+          <p className="text-muted-foreground">Conecte as redes sociais do restaurante para publicar direto por aqui.</p>
         </div>
 
-        {isLoading ? (
+        {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {providers.map(p => {
-              const conn = (connections || []).find(c => c.provider === p.key);
-              const connected = conn?.status === 'connected';
+          <div className="grid gap-4 lg:grid-cols-2">
+            {PROVIDERS.map(p => {
+              const cred = status?.credentials.find(c => c.provider === p.key);
+              const available = config?.configured?.[p.key] ?? false;
+              const expired = !!cred?.expired;
               return (
                 <Card key={p.key}>
-                  <CardContent className="flex flex-wrap items-center gap-3 p-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted"><p.icon className="h-5 w-5" /></div>
-                    <div className="min-w-[140px] flex-1">
-                      <p className="font-semibold">{p.label}</p>
-                      <p className="text-sm text-muted-foreground">{conn?.account_name || p.hint}</p>
+                  <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
+                    <div className="space-y-1">
+                      <CardTitle className="flex items-center gap-2">
+                        {p.networks.map(n => <NetworkIcon key={n.network} network={n.network} className="h-5 w-5" />)}
+                        {p.title}
+                      </CardTitle>
+                      <CardDescription>{p.description}</CardDescription>
                     </div>
-                    <Badge variant={connected ? 'secondary' : 'outline'}>{connected ? 'Conectado' : 'Não conectado'}</Badge>
-                    {connected ? (
-                      <Button size="sm" variant="outline" className="gap-2" onClick={() => disconnect.mutate(conn!.id)}>
-                        <Unlink className="h-4 w-4" /> Desconectar
-                      </Button>
+                    {!available && !cred ? (
+                      <Badge variant="outline">Aguardando liberação</Badge>
+                    ) : cred ? (
+                      <Badge variant={expired ? 'destructive' : 'secondary'}>{expired ? 'Acesso expirado' : 'Conectado'}</Badge>
                     ) : (
-                      <Button size="sm" className="gap-2" onClick={() => { setForm({ account_name: conn?.account_name || '', account_url: conn?.account_url || '' }); setEditing(p.key); }}>
-                        <Link2 className="h-4 w-4" /> Conectar
-                      </Button>
+                      <Badge variant="outline">Não conectado</Badge>
                     )}
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {cred && p.networks.map(n => {
+                      const list = (accounts || []).filter(a => a.kind === n.kind);
+                      const current = list.find(a => a.selected);
+                      return (
+                        <div key={n.network} className="space-y-1.5">
+                          <p className="flex items-center gap-2 text-sm font-medium"><NetworkIcon network={n.network} /> {n.network === 'facebook' ? 'Página do Facebook' : n.network === 'instagram' ? 'Instagram' : 'Perfil'}</p>
+                          {list.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">{n.empty}</p>
+                          ) : list.length === 1 ? (
+                            <p className="text-sm text-muted-foreground">{list[0].name}</p>
+                          ) : (
+                            <Select value={current?.id} onValueChange={id => select.mutate(id)} disabled={select.isPending}>
+                              <SelectTrigger><SelectValue placeholder="Escolha a conta" /></SelectTrigger>
+                              <SelectContent>
+                                {list.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {!available && !cred && (
+                      <p className="text-sm text-muted-foreground">A integração com {p.title} ainda não foi ativada pelo Oxys.</p>
+                    )}
+
+                    <div className="flex flex-wrap gap-2">
+                      {(available || cred) && (
+                        <Button size="sm" className="gap-2" variant={cred && !expired ? 'outline' : 'default'}
+                          disabled={!available || connect.isPending} onClick={() => connect.mutate(p.key)}>
+                          {connect.isPending && connect.variables === p.key
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : cred ? <RefreshCw className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
+                          {cred ? 'Reconectar' : 'Conectar'}
+                        </Button>
+                      )}
+                      {cred && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="ghost" className="gap-2"><Unlink className="h-4 w-4" /> Desconectar</Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Desconectar {p.title}?</AlertDialogTitle>
+                              <AlertDialogDescription>Publicações agendadas para estas redes vão falhar até você conectar de novo.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => disconnect.mutate(p.key)}>Desconectar</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               );
             })}
           </div>
         )}
-
-        <Dialog open={!!editing} onOpenChange={o => !o && setEditing(null)}>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Conectar {providers.find(p => p.key === editing)?.label}</DialogTitle></DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2"><Label>Nome da conta / perfil</Label><Input value={form.account_name} onChange={e => setForm({ ...form, account_name: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Link do perfil</Label><Input value={form.account_url} onChange={e => setForm({ ...form, account_url: e.target.value })} placeholder="https://" /></div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
-              <Button onClick={() => editing && save.mutate(editing)} disabled={save.isPending}>Conectar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
     </ModuleGate>
   );

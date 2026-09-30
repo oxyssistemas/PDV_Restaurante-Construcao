@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { Megaphone, Share2, LogOut, Menu, LayoutDashboard } from 'lucide-react';
+import { Megaphone, Share2, LogOut, Menu, LayoutDashboard, Send, ListChecks } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
 import { useState } from 'react';
@@ -9,6 +9,8 @@ import NotificationsBell from '@/components/NotificationsBell';
 
 const navItems = [
   { to: '/marketing', icon: LayoutDashboard, label: 'Visão geral', end: true },
+  { to: '/marketing/publish', icon: Send, label: 'Publicar', end: false },
+  { to: '/marketing/posts', icon: ListChecks, label: 'Publicações', end: false },
   { to: '/marketing/connections', icon: Share2, label: 'Conexões', end: false },
   { to: '/marketing/campaigns', icon: Megaphone, label: 'Campanhas', end: false },
 ];

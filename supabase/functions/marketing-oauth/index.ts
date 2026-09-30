@@ -2,6 +2,7 @@ import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import {
   adminClient, authorize, configured, GOOGLE_ADS_API, GOOGLE_ADS_DEV_TOKEN, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
   GRAPH, HttpError, json, META_APP_ID, META_APP_SECRET, OAUTH_REDIRECT, signState, verifyState,
+  TIKTOK_API, TIKTOK_CLIENT_KEY, tiktokToken,
 } from '../_shared/marketing.ts';
 
 const META_SCOPES = [
@@ -10,6 +11,7 @@ const META_SCOPES = [
   'whatsapp_business_management', 'whatsapp_business_messaging', 'business_management', 'ads_management', 'ads_read',
 ].join(',');
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/business.manage https://www.googleapis.com/auth/adwords';
+const TIKTOK_SCOPES = 'user.info.basic,video.publish';
 
 const allowedReturn = (u: string) => {
   try {
@@ -75,7 +77,14 @@ Deno.serve(async (req) => {
       const admin = adminClient();
       let access_token: string, refresh_token: string | null = null, expires_at: string | null = null, accounts: Acc[];
 
-      if (st.provider === 'meta') {
+      if (st.provider === 'tiktok') {
+        const t = await tiktokToken({ code, grant_type: 'authorization_code', redirect_uri: OAUTH_REDIRECT });
+        access_token = t.access_token; refresh_token = t.refresh_token ?? null;
+        expires_at = new Date(Date.now() + t.expires_in * 1000).toISOString();
+        const u = await (await fetch(`${TIKTOK_API}/user/info/?fields=open_id,display_name,avatar_url`, { headers: { Authorization: `Bearer ${access_token}` } })).json().catch(() => ({}));
+        const user = u?.data?.user ?? {};
+        accounts = [{ kind: 'tiktok', external_id: user.open_id ?? t.open_id, name: user.display_name ?? 'Conta do TikTok', metadata: { avatar_url: user.avatar_url ?? null } }];
+      } else if (st.provider === 'meta') {
         const t1 = await (await fetch(`${GRAPH}/oauth/access_token?${new URLSearchParams({ client_id: META_APP_ID, client_secret: META_APP_SECRET, redirect_uri: OAUTH_REDIRECT, code })}`)).json();
         if (!t1.access_token) throw new HttpError(400, 'A Meta recusou a conexão');
         const t2 = await (await fetch(`${GRAPH}/oauth/access_token?${new URLSearchParams({ grant_type: 'fb_exchange_token', client_id: META_APP_ID, client_secret: META_APP_SECRET, fb_exchange_token: t1.access_token })}`)).json();
@@ -131,13 +140,15 @@ Deno.serve(async (req) => {
     if (body.action === 'config') return json({ configured, redirectUri: OAUTH_REDIRECT });
     const { user } = await authorize(req, body.restaurantId, true);
     if (body.action !== 'start') throw new HttpError(400, 'Ação inválida');
-    const provider = body.provider;
-    if (provider !== 'meta' && provider !== 'google') throw new HttpError(400, 'Provedor inválido');
+    const provider = body.provider as 'meta' | 'google' | 'tiktok';
+    if (provider !== 'meta' && provider !== 'google' && provider !== 'tiktok') throw new HttpError(400, 'Provedor inválido');
     if (!configured[provider]) throw new HttpError(409, 'Esta integração ainda está aguardando liberação do Oxys');
     const returnTo = String(body.returnTo ?? '');
     if (!allowedReturn(returnTo)) throw new HttpError(400, 'Endereço de retorno inválido');
     const state = await signState({ restaurantId: body.restaurantId, userId: user.id, provider, returnTo });
-    const authUrl = provider === 'meta'
+    const authUrl = provider === 'tiktok'
+      ? `https://www.tiktok.com/v2/auth/authorize/?${new URLSearchParams({ client_key: TIKTOK_CLIENT_KEY, redirect_uri: OAUTH_REDIRECT, state, scope: TIKTOK_SCOPES, response_type: 'code' })}`
+      : provider === 'meta'
       ? `https://www.facebook.com/v21.0/dialog/oauth?${new URLSearchParams({ client_id: META_APP_ID, redirect_uri: OAUTH_REDIRECT, state, scope: META_SCOPES, response_type: 'code' })}`
       : `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({ client_id: GOOGLE_CLIENT_ID, redirect_uri: OAUTH_REDIRECT, state, scope: GOOGLE_SCOPES, response_type: 'code', access_type: 'offline', prompt: 'consent' })}`;
     return json({ url: authUrl });

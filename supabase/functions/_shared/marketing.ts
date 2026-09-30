@@ -9,16 +9,25 @@ export const META_APP_SECRET = Deno.env.get('META_APP_SECRET') ?? '';
 export const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID') ?? '';
 export const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET') ?? '';
 export const GOOGLE_ADS_DEV_TOKEN = Deno.env.get('GOOGLE_ADS_DEVELOPER_TOKEN') ?? '';
-const STATE_SECRET = Deno.env.get('MARKETING_STATE_SECRET') ?? '';
+export const TIKTOK_CLIENT_KEY = Deno.env.get('TIKTOK_CLIENT_KEY') ?? '';
+export const TIKTOK_CLIENT_SECRET = Deno.env.get('TIKTOK_CLIENT_SECRET') ?? '';
+// Sem segredo próprio, assina o state do OAuth com a service role (também secreta).
+const STATE_SECRET = Deno.env.get('MARKETING_STATE_SECRET') || SERVICE_ROLE;
+// Endereço público que repassa para o storage (vercel.json → /media). O TikTok só aceita
+// fotos vindas de um domínio verificado no painel dele.
+export const MEDIA_PROXY_BASE = (Deno.env.get('MEDIA_PROXY_BASE') ?? 'https://www.oxysrestaurante.app/media').replace(/\/$/, '');
+export const MEDIA_BUCKET = 'marketing-media';
 
 export const GRAPH = 'https://graph.facebook.com/v21.0';
 export const GOOGLE_ADS_API = 'https://googleads.googleapis.com/v18';
+export const TIKTOK_API = 'https://open.tiktokapis.com/v2';
 export const OAUTH_REDIRECT = `${SUPABASE_URL}/functions/v1/marketing-oauth`;
 
 export const configured = {
   meta: !!(META_APP_ID && META_APP_SECRET),
   google: !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET),
   googleAds: !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_ADS_DEV_TOKEN),
+  tiktok: !!(TIKTOK_CLIENT_KEY && TIKTOK_CLIENT_SECRET),
 };
 
 export const json = (body: unknown, status = 200) =>
@@ -62,7 +71,7 @@ export async function verifyState(state: string) {
   if (!body || !sig || (await hmac(body)) !== sig) throw new HttpError(400, 'Estado inválido');
   const data = JSON.parse(atob(body.replace(/-/g, '+').replace(/_/g, '/')));
   if (data.exp < Date.now()) throw new HttpError(400, 'Link expirado, tente conectar novamente');
-  return data as { restaurantId: string; userId: string; provider: 'meta' | 'google'; returnTo: string };
+  return data as { restaurantId: string; userId: string; provider: 'meta' | 'google' | 'tiktok'; returnTo: string };
 }
 export async function verifyMetaSignature(raw: string, header: string | null) {
   if (!header?.startsWith('sha256=') || !META_APP_SECRET) return false;
@@ -73,9 +82,20 @@ export async function verifyMetaSignature(raw: string, header: string | null) {
 }
 
 // ---------- tokens ----------
-export async function getCredential(admin: SupabaseClient, restaurantId: string, provider: 'meta' | 'google') {
+const PROVIDER_LABEL = { meta: 'da Meta', google: 'do Google', tiktok: 'do TikTok' } as const;
+
+export async function getCredential(admin: SupabaseClient, restaurantId: string, provider: 'meta' | 'google' | 'tiktok') {
   const { data } = await admin.from('marketing_credentials').select('*').eq('restaurant_id', restaurantId).eq('provider', provider).maybeSingle();
-  if (!data) throw new HttpError(409, provider === 'meta' ? 'Conecte a conta da Meta primeiro' : 'Conecte a conta do Google primeiro');
+  if (!data) throw new HttpError(409, `Conecte a conta ${PROVIDER_LABEL[provider]} primeiro`);
+  if (provider === 'tiktok' && (!data.expires_at || new Date(data.expires_at).getTime() < Date.now() + 60_000)) {
+    if (!data.refresh_token) throw new HttpError(409, 'O acesso ao TikTok expirou, reconecte a conta');
+    const t = await tiktokToken({ grant_type: 'refresh_token', refresh_token: data.refresh_token });
+    await admin.from('marketing_credentials').update({
+      access_token: t.access_token, refresh_token: t.refresh_token ?? data.refresh_token,
+      expires_at: new Date(Date.now() + t.expires_in * 1000).toISOString(),
+    }).eq('id', data.id);
+    return t.access_token as string;
+  }
   if (provider === 'google' && data.refresh_token && (!data.expires_at || new Date(data.expires_at).getTime() < Date.now() + 60_000)) {
     const r = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -125,6 +145,46 @@ export async function google(url: string, token: string, opts: { method?: string
   const headers: Record<string, string> = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
   if (opts.ads) headers['developer-token'] = GOOGLE_ADS_DEV_TOKEN;
   return parse(await fetch(url, { method: opts.method ?? 'GET', headers, body: opts.body ? JSON.stringify(opts.body) : undefined }), 'Google');
+}
+
+/** Troca de código/refresh por token no TikTok. */
+export async function tiktokToken(params: Record<string, string>) {
+  const r = await fetch(`${TIKTOK_API}/oauth/token/`, {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_key: TIKTOK_CLIENT_KEY, client_secret: TIKTOK_CLIENT_SECRET, ...params }),
+  });
+  const t = await r.json().catch(() => ({}));
+  if (!r.ok || !t.access_token) {
+    console.error('TikTok token', r.status, JSON.stringify(t));
+    throw new HttpError(409, 'O TikTok recusou o acesso, reconecte a conta');
+  }
+  return t;
+}
+
+/** Chamada à API do TikTok; lança erro com a mensagem deles. */
+export async function tiktok(path: string, token: string, body?: unknown) {
+  const r = await fetch(`${TIKTOK_API}${path}`, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json; charset=UTF-8' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await r.text();
+  let res: any = null;
+  try { res = JSON.parse(text); } catch { res = { error: { message: text } }; }
+  if (!r.ok || (res?.error?.code && res.error.code !== 'ok')) {
+    console.error(`TikTok ${path} [${r.status}]`, text);
+    throw new HttpError(r.status >= 500 ? 502 : 400, `TikTok: ${String(res?.error?.message || res?.error?.code || text).slice(0, 300)}`);
+  }
+  return res.data;
+}
+
+/** URL assinada da mídia, direto do storage (Meta) ou pelo domínio público (TikTok). */
+export async function mediaUrl(admin: SupabaseClient, path: string, viaProxy = false) {
+  const { data, error } = await admin.storage.from(MEDIA_BUCKET).createSignedUrl(path, 60 * 60 * 24);
+  if (error || !data?.signedUrl) throw new HttpError(500, 'Não foi possível gerar o link da mídia');
+  if (!viaProxy) return data.signedUrl;
+  const u = new URL(data.signedUrl);
+  return `${MEDIA_PROXY_BASE}${u.pathname.replace(/^\/storage\/v1\/object\/sign/, '')}${u.search}`;
 }
 
 export async function signedImage(admin: SupabaseClient, path: string | null) {

@@ -1,3 +1,9 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    {
+      "source": "/media/:path*",
+      "destination": "https://ocaruinsqobxbzcnrsiy.supabase.co/storage/v1/object/sign/:path*"
+    },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

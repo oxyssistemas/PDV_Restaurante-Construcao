@@ -1867,9 +1867,13 @@ export type Database = {
           external_ids: Json
           id: string
           image_path: string | null
+          locked_until: string | null
+          media_type: string
           metrics: Json
+          options: Json
           published_at: string | null
           restaurant_id: string
+          results: Json
           scheduled_for: string | null
           status: string
           updated_at: string
@@ -1883,9 +1887,13 @@ export type Database = {
           external_ids?: Json
           id?: string
           image_path?: string | null
+          locked_until?: string | null
+          media_type?: string
           metrics?: Json
+          options?: Json
           published_at?: string | null
           restaurant_id: string
+          results?: Json
           scheduled_for?: string | null
           status?: string
           updated_at?: string
@@ -1899,9 +1907,13 @@ export type Database = {
           external_ids?: Json
           id?: string
           image_path?: string | null
+          locked_until?: string | null
+          media_type?: string
           metrics?: Json
+          options?: Json
           published_at?: string | null
           restaurant_id?: string
+          results?: Json
           scheduled_for?: string | null
           status?: string
           updated_at?: string

@@ -1,8 +1,9 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import {
-  authorize, configured, getAccount, getCredential, google, GOOGLE_ADS_API, graph, HttpError, json, signedImage,
+  authorize, configured, getAccount, getCredential, google, GOOGLE_ADS_API, graph, HttpError, json, signedImage, tiktok,
 } from '../_shared/marketing.ts';
+import { processPost, syncAdMetrics } from '../_shared/jobs.ts';
 
 const EDIT_ACTIONS = new Set(['select_account', 'disconnect', 'publish_post', 'reply_comment', 'wa_send', 'wa_template_create', 'wa_broadcast', 'reply_review', 'google_post', 'ads_create', 'ads_status', 'ads_budget']);
 const str = (v: unknown, max: number, min = 0) => {
@@ -10,63 +11,6 @@ const str = (v: unknown, max: number, min = 0) => {
   return v.trim();
 };
 const digits = (v: unknown) => { const d = String(v ?? '').replace(/\D/g, ''); if (d.length < 10 || d.length > 15) throw new HttpError(400, 'Telefone inválido'); return d.length <= 11 ? `55${d}` : d; };
-
-export async function publishPost(admin: SupabaseClient, restaurantId: string, postId: string) {
-  const { data: post } = await admin.from('marketing_posts').select('*').eq('id', postId).eq('restaurant_id', restaurantId).single();
-  if (!post) throw new HttpError(404, 'Publicação não encontrada');
-  await admin.from('marketing_posts').update({ status: 'publishing', error_message: null }).eq('id', postId);
-  const ids: Record<string, string> = { ...(post.external_ids ?? {}) };
-  const image = await signedImage(admin, post.image_path);
-  try {
-    if (post.channels.includes('facebook') && !ids.facebook) {
-      const page = await getAccount(admin, restaurantId, 'facebook_page');
-      const tok = page.metadata.page_token;
-      const r = image
-        ? await graph(`/${page.external_id}/photos`, tok, { method: 'POST', params: { url: image, caption: post.caption } })
-        : await graph(`/${page.external_id}/feed`, tok, { method: 'POST', params: { message: post.caption } });
-      ids.facebook = r.post_id ?? r.id;
-    }
-    if (post.channels.includes('instagram') && !ids.instagram) {
-      if (!image) throw new HttpError(400, 'O Instagram exige uma imagem');
-      const ig = await getAccount(admin, restaurantId, 'instagram');
-      const tok = ig.metadata.page_token;
-      const c = await graph(`/${ig.external_id}/media`, tok, { method: 'POST', params: { image_url: image, caption: post.caption } });
-      const p = await graph(`/${ig.external_id}/media_publish`, tok, { method: 'POST', params: { creation_id: c.id } });
-      ids.instagram = p.id;
-    }
-    await admin.from('marketing_posts').update({ status: 'published', published_at: new Date().toISOString(), external_ids: ids }).eq('id', postId);
-  } catch (e) {
-    await admin.from('marketing_posts').update({ status: 'error', external_ids: ids, error_message: e instanceof Error ? e.message : 'Erro' }).eq('id', postId);
-    throw e;
-  }
-}
-
-export async function syncAdMetrics(admin: SupabaseClient, restaurantId: string, campaign: any) {
-  const since = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-  const rows: any[] = [];
-  let status = campaign.status;
-  if (campaign.platform === 'meta') {
-    const tok = await getCredential(admin, restaurantId, 'meta');
-    const c = await graph(`/${campaign.external_ids.campaign}`, tok, { params: { fields: 'effective_status' } });
-    status = String(c.effective_status).toLowerCase();
-    const r = await graph(`/${campaign.external_ids.campaign}/insights`, tok, { params: { fields: 'spend,impressions,clicks,actions', time_increment: '1', date_preset: 'last_30d' } });
-    for (const d of r.data ?? []) {
-      const conv = (d.actions ?? []).find((a: any) => a.action_type?.includes('messaging_conversation_started'))?.value ?? 0;
-      rows.push({ metric_date: d.date_start, spend: Number(d.spend ?? 0), impressions: Number(d.impressions ?? 0), clicks: Number(d.clicks ?? 0), conversations: Number(conv) });
-    }
-  } else {
-    const tok = await getCredential(admin, restaurantId, 'google');
-    const acc = await getAccount(admin, restaurantId, 'google_ads');
-    const q = `SELECT segments.date, campaign.status, metrics.cost_micros, metrics.impressions, metrics.clicks FROM campaign WHERE campaign.resource_name = '${campaign.external_ids.campaign}' AND segments.date >= '${since}'`;
-    const r = await google(`${GOOGLE_ADS_API}/customers/${acc.external_id}/googleAds:search`, tok, { method: 'POST', ads: true, body: { query: q } });
-    for (const row of r.results ?? []) {
-      status = String(row.campaign.status).toLowerCase();
-      rows.push({ metric_date: row.segments.date, spend: Number(row.metrics.costMicros ?? 0) / 1e6, impressions: Number(row.metrics.impressions ?? 0), clicks: Number(row.metrics.clicks ?? 0), conversations: 0 });
-    }
-  }
-  if (rows.length) await admin.from('ad_metrics_daily').upsert(rows.map(r => ({ ...r, restaurant_id: restaurantId, campaign_id: campaign.id })), { onConflict: 'campaign_id,metric_date' });
-  await admin.from('ad_campaigns').update({ status: status === 'enabled' ? 'active' : status, last_synced_at: new Date().toISOString(), error_message: null }).eq('id', campaign.id);
-}
 
 async function createMetaCampaign(admin: SupabaseClient, rid: string, c: any) {
   const tok = await getCredential(admin, rid, 'meta');
@@ -147,12 +91,37 @@ Deno.serve(async (req) => {
         return json({ ok: true });
       }
       case 'disconnect': {
-        const p = b.provider === 'meta' ? 'meta' : 'google';
+        const p = ['meta', 'google', 'tiktok'].includes(b.provider) ? b.provider : 'google';
         await admin.from('marketing_credentials').delete().eq('restaurant_id', rid).eq('provider', p);
         await admin.from('marketing_accounts').delete().eq('restaurant_id', rid).eq('provider', p);
         return json({ ok: true });
       }
-      case 'publish_post': { await publishPost(admin, rid, str(b.postId, 36, 36)); return json({ ok: true }); }
+      case 'publish_post': {
+        const postId = str(b.postId, 36, 36);
+        const { data: post } = await admin.from('marketing_posts').select('id, status').eq('id', postId).eq('restaurant_id', rid).single();
+        if (!post) throw new HttpError(404, 'Publicação não encontrada');
+        if (post.status === 'published') return json({ ok: true });
+        // Tentar de novo: volta as redes com erro para "pendente".
+        if (post.status === 'error' || post.status === 'partial') {
+          const { data: full } = await admin.from('marketing_posts').select('results').eq('id', postId).single();
+          const results = Object.fromEntries(Object.entries(full?.results ?? {}).filter(([, r]: any) => r.status !== 'error'));
+          await admin.from('marketing_posts').update({ results }).eq('id', postId);
+        }
+        await admin.from('marketing_posts').update({ status: 'publishing', scheduled_for: null }).eq('id', postId);
+        // Acompanha por até ~40s; o que ainda estiver processando o agendador termina.
+        const deadline = Date.now() + 40_000;
+        let results = await processPost(admin, postId);
+        while (results && Object.values(results).some((r: any) => r.status === 'processing') && Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, 5000));
+          results = await processPost(admin, postId) ?? results;
+        }
+        return json({ ok: true, results });
+      }
+      case 'tiktok_creator_info': {
+        const tok = await getCredential(admin, rid, 'tiktok');
+        const c = await tiktok('/post/publish/creator_info/query/', tok, {});
+        return json({ nickname: c.creator_nickname, username: c.creator_username, avatar: c.creator_avatar_url, privacy_options: c.privacy_level_options ?? [], max_video_seconds: c.max_video_post_duration_sec });
+      }
       case 'post_insights': {
         const { data: posts } = await admin.from('marketing_posts').select('*').eq('restaurant_id', rid).eq('status', 'published').order('published_at', { ascending: false }).limit(20);
         const summary: Record<string, unknown> = {};

@@ -70,6 +70,8 @@ import MarketingLayout from "./components/layouts/MarketingLayout";
 import IfoodPage from "./pages/shared/IfoodPage";
 import MarketingOverview from "./pages/marketing/Overview";
 import MarketingConnections from "./pages/marketing/Connections";
+import MarketingPublish from "./pages/marketing/Publish";
+import MarketingPosts from "./pages/marketing/Posts";
 import MarketingCampaigns from "./pages/marketing/Campaigns";
 
 
@@ -135,6 +137,8 @@ const App = () => (
               </ProtectedRoute>
             }>
               <Route index element={<MarketingOverview />} />
+              <Route path="publish" element={<MarketingPublish />} />
+              <Route path="posts" element={<MarketingPosts />} />
               <Route path="connections" element={<MarketingConnections />} />
               <Route path="campaigns" element={<MarketingCampaigns />} />
             </Route>

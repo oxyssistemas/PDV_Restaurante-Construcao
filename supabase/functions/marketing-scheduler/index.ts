@@ -1,24 +1,30 @@
 import { adminClient, json } from '../_shared/marketing.ts';
+import { processPost, syncAdMetrics } from '../_shared/jobs.ts';
 
-const CRON_SECRET = Deno.env.get('MARKETING_STATE_SECRET') ?? '';
-
-// Importa as rotinas do marketing-api dinamicamente para evitar iniciar o servidor dele.
+// Chamado a cada minuto pelo pg_cron (migração marketing_publishing_hub) com o segredo guardado no Vault.
 Deno.serve(async (req) => {
-  if (req.headers.get('x-cron-secret') !== CRON_SECRET || !CRON_SECRET) return json({ error: 'forbidden' }, 403);
   const admin = adminClient();
-  const base = `${Deno.env.get('SUPABASE_URL')}/functions/v1`;
-  void base;
-  const results = { published: 0, failed: 0 };
+  const { data: secret } = await admin.rpc('marketing_cron_secret');
+  if (!secret || req.headers.get('x-cron-secret') !== secret) return json({ error: 'forbidden' }, 403);
 
-  const { data: due } = await admin.from('marketing_posts').select('id, restaurant_id')
-    .eq('status', 'scheduled').lte('scheduled_for', new Date().toISOString()).limit(20);
-  const { publishPost, syncAdMetrics } = await import('./jobs.ts');
+  const now = new Date().toISOString();
+  const [{ data: due }, { data: running }] = await Promise.all([
+    admin.from('marketing_posts').select('id').eq('status', 'scheduled').lte('scheduled_for', now).limit(10),
+    admin.from('marketing_posts').select('id').eq('status', 'publishing').limit(20),
+  ]);
+
+  const results = { started: 0, checked: 0, failed: 0 };
   for (const p of due ?? []) {
-    try { await publishPost(admin, p.restaurant_id, p.id); results.published++; } catch { results.failed++; }
+    await admin.from('marketing_posts').update({ status: 'publishing' }).eq('id', p.id).eq('status', 'scheduled');
+    try { await processPost(admin, p.id); results.started++; } catch (e) { console.error('scheduler', p.id, e); results.failed++; }
+  }
+  for (const p of running ?? []) {
+    try { await processPost(admin, p.id); results.checked++; } catch (e) { console.error('scheduler', p.id, e); results.failed++; }
   }
 
-  const hour = new Date().getUTCHours();
-  if (hour === 9) {
+  // Métricas de anúncios uma vez por dia.
+  const d = new Date();
+  if (d.getUTCHours() === 9 && d.getUTCMinutes() === 0) {
     const { data: camps } = await admin.from('ad_campaigns').select('*').not('external_ids->>campaign', 'is', null).in('status', ['active', 'paused']);
     for (const c of camps ?? []) await syncAdMetrics(admin, c.restaurant_id, c).catch(() => null);
   }
