@@ -17,7 +17,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { authorLabel } from '@/lib/orders';
 import { cn } from '@/lib/utils';
-import logo from '@/assets/oxys-logo.png.asset.json';
+import logo from '@/assets/oxys-logo.png';
 import { OrderTicketCard, timeTone, type KdsTicket, type KdsItem } from '@/components/kitchen/OrderTicketCard';
 
 type ColumnKey = 'new' | 'preparing' | 'ready' | 'waiting';
@@ -336,7 +336,7 @@ export default function KitchenQueue() {
       {/* Sidebar */}
       <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-[#111827] p-4 lg:flex">
         <div className="flex items-center gap-2">
-          <img src={logo.url} alt="Oxys Sistemas" className="h-9 w-9 rounded-lg object-contain" />
+          <img src={logo} alt="Oxys Sistemas" className="h-9 w-9 rounded-lg object-contain" />
           <div>
             <p className="text-sm font-bold leading-tight">Oxys Sistemas</p>
             <p className="flex items-center gap-1 text-[11px] text-emerald-400">

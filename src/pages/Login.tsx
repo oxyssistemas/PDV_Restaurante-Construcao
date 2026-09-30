@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Loader2, ShieldAlert } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import oxysLogo from '@/assets/oxys-logo.png.asset.json';
+import oxysLogo from '@/assets/oxys-logo.png';
 
 const MAX_ATTEMPTS = 5;
 const LOCK_SECONDS = 300;
@@ -127,7 +127,7 @@ export default function Login() {
       <Card className="w-full max-w-md shadow-xl border-0">
         <CardHeader className="text-center space-y-4 pb-2">
           <img
-            src={oxysLogo.url}
+            src={oxysLogo}
             alt="Oxys Restaurante"
             className="mx-auto h-28 w-auto object-contain"
           />
