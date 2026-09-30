@@ -419,6 +419,34 @@ Segredos das Edge Functions (Supabase → Project Settings → Edge Functions �
 | `AI_API_URL` / `AI_MODEL` | Opcionais: outro provedor compatível com a API da OpenAI e o modelo |
 | `IFOOD_CLIENT_ID` / `IFOOD_CLIENT_SECRET` | Integração iFood |
 | `META_APP_ID` / `META_APP_SECRET` | Marketing (Facebook, Instagram, WhatsApp, Meta Ads) |
+| `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` | Marketing (publicação no TikTok) |
 | `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` / `GOOGLE_ADS_DEVELOPER_TOKEN` | Marketing (Google Meu Negócio e Google Ads) |
-| `MARKETING_STATE_SECRET` | Marketing (assinatura do OAuth e do agendador) |
+| `MARKETING_STATE_SECRET` | Opcional: assina o OAuth do marketing (sem ele, usa a service role) |
+| `MEDIA_PROXY_BASE` | Opcional: endereço público das mídias (padrão `https://www.oxysrestaurante.app/media`) |
 | `WHATSAPP_VERIFY_TOKEN` | Webhook do WhatsApp |
+
+## 📣 Central de publicação (marketing)
+
+O portal de marketing publica no Instagram, Facebook e TikTok de uma vez, com foto, vídeo ou só texto, na hora ou agendado. O agendador roda a cada minuto pelo `pg_cron` do banco (função `marketing-scheduler`), sem configuração extra.
+
+O endereço de retorno do login das redes (Redirect URI) é:
+
+```
+https://ocaruinsqobxbzcnrsiy.supabase.co/functions/v1/marketing-oauth
+```
+
+**Meta (Facebook + Instagram)**
+1. Crie um app do tipo "Empresa" em developers.facebook.com.
+2. Adicione o produto "Login do Facebook para Empresas" e cadastre o Redirect URI acima.
+3. Peça as permissões `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `instagram_basic` e `instagram_content_publish`.
+4. Cadastre `META_APP_ID` e `META_APP_SECRET` nos segredos do Supabase.
+5. Enquanto o app estiver em modo de desenvolvimento, só quem tiver papel no app consegue conectar. Para os clientes usarem, a Meta exige verificação da empresa e revisão do app.
+
+O Instagram precisa ser uma conta Profissional ligada a uma Página do Facebook.
+
+**TikTok**
+1. Crie um app em developers.tiktok.com com os produtos "Login Kit" e "Content Posting API" (ative o Direct Post).
+2. Cadastre o Redirect URI acima e peça os escopos `user.info.basic` e `video.publish`.
+3. Para postar fotos, verifique o domínio `oxysrestaurante.app` em "URL properties". O TikTok só busca fotos de domínios verificados. Vídeos não precisam disso.
+4. Cadastre `TIKTOK_CLIENT_KEY` e `TIKTOK_CLIENT_SECRET` nos segredos do Supabase.
+5. Até o TikTok aprovar (auditar) o app, os posts ficam visíveis só para o dono da conta.
