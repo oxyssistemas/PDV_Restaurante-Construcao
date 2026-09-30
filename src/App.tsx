@@ -71,6 +71,8 @@ import IfoodPage from "./pages/shared/IfoodPage";
 import MarketingOverview from "./pages/marketing/Overview";
 import MarketingConnections from "./pages/marketing/Connections";
 import MarketingPublish from "./pages/marketing/Publish";
+import Privacy from "./pages/legal/Privacy";
+import Terms from "./pages/legal/Terms";
 import MarketingPosts from "./pages/marketing/Posts";
 import MarketingCampaigns from "./pages/marketing/Campaigns";
 
@@ -93,6 +95,8 @@ const App = () => (
             <Route path="/setup" element={<Setup />} />
             <Route path="/" element={<Index />} />
             <Route path="/mesa/:token" element={<TableMenu />} />
+            <Route path="/privacidade" element={<Privacy />} />
+            <Route path="/termos" element={<Terms />} />
 
             {/* Super Admin */}
             <Route path="/super-admin" element={

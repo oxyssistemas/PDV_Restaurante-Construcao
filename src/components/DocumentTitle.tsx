@@ -6,6 +6,8 @@ const BRAND = "Oxys Restaurante";
 const TITLES: { match: RegExp; title: string }[] = [
   { match: /^\/login/, title: "Login" },
   { match: /^\/setup/, title: "Configuração inicial" },
+  { match: /^\/privacidade/, title: "Política de Privacidade" },
+  { match: /^\/termos/, title: "Termos de Uso" },
   { match: /^\/super-admin\/restaurants/, title: "Restaurantes" },
   { match: /^\/super-admin/, title: "Painel Super Admin" },
   { match: /^\/admin\/menu/, title: "Cardápio" },

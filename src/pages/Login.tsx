@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -123,7 +123,7 @@ export default function Login() {
 
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-xl border-0">
         <CardHeader className="text-center space-y-4 pb-2">
           <img
@@ -189,6 +189,11 @@ export default function Login() {
 
         </CardContent>
       </Card>
+      <p className="mt-4 text-xs text-muted-foreground">
+        <Link to="/privacidade" className="hover:text-foreground hover:underline">Política de Privacidade</Link>
+        {' · '}
+        <Link to="/termos" className="hover:text-foreground hover:underline">Termos de Uso</Link>
+      </p>
     </div>
   );
 }
