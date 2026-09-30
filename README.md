@@ -385,3 +385,40 @@ Projeto desenvolvido com foco em **desenvolvimento de software, arquitetura SaaS
 Este projeto possui código e funcionalidades proprietárias.
 
 A utilização, distribuição ou comercialização do sistema depende da autorização do proprietário do projeto.
+
+---
+
+## ⚙️ Rodando o projeto
+
+Requisitos: Node.js 18+ e npm.
+
+```bash
+npm install
+npm run dev      # http://localhost:8080
+npm run build    # gera a pasta dist/ para publicar
+```
+
+As variáveis do front ficam no `.env` (modelo em `.env.example`):
+
+| Variável | Valor |
+| --- | --- |
+| `VITE_SUPABASE_URL` | URL do projeto Supabase |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | chave `anon` (pública) do projeto |
+| `VITE_SUPABASE_PROJECT_ID` | ref do projeto |
+
+## 🗄️ Supabase
+
+- Migrações do banco: `supabase/migrations/`
+- Edge Functions: `supabase/functions/` (deploy com `npx supabase functions deploy --project-ref <ref>`)
+
+Segredos das Edge Functions (Supabase → Project Settings → Edge Functions → Secrets). `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` já vêm automaticamente.
+
+| Segredo | Usado por |
+| --- | --- |
+| `AI_API_KEY` | Assistente de IA (`restaurant-assistant`). Chave do Google AI Studio (Gemini) |
+| `AI_API_URL` / `AI_MODEL` | Opcionais: outro provedor compatível com a API da OpenAI e o modelo |
+| `IFOOD_CLIENT_ID` / `IFOOD_CLIENT_SECRET` | Integração iFood |
+| `META_APP_ID` / `META_APP_SECRET` | Marketing (Facebook, Instagram, WhatsApp, Meta Ads) |
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` / `GOOGLE_ADS_DEVELOPER_TOKEN` | Marketing (Google Meu Negócio e Google Ads) |
+| `MARKETING_STATE_SECRET` | Marketing (assinatura do OAuth e do agendador) |
+| `WHATSAPP_VERIFY_TOKEN` | Webhook do WhatsApp |

@@ -1,4 +1,14 @@
-project_id = "fciwnyshlwhgaqnohnwt"
+project_id = "ocaruinsqobxbzcnrsiy"
 
 [functions.public-menu]
+verify_jwt = false
+
+# Chamadas externas (retorno do OAuth, webhook da Meta, cron) não trazem JWT.
+[functions.marketing-oauth]
+verify_jwt = false
+
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+[functions.marketing-scheduler]
 verify_jwt = false

@@ -4,7 +4,10 @@ import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')!;
+// IA via API compatível com OpenAI (padrão: Google Gemini).
+const AI_API_KEY = Deno.env.get('AI_API_KEY') ?? '';
+const AI_API_URL = Deno.env.get('AI_API_URL') ?? 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+const AI_MODEL = Deno.env.get('AI_MODEL') ?? 'gemini-flash-latest';
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -103,11 +106,11 @@ Deno.serve(async (req) => {
       context,
     ].join('\n');
 
-    const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiRes = await fetch(AI_API_URL, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${AI_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'google/gemini-3.7-flash',
+        model: AI_MODEL,
         messages: [{ role: 'system', content: system }, ...messages],
       }),
     });

@@ -14,7 +14,7 @@ const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/business.manage https://w
 const allowedReturn = (u: string) => {
   try {
     const { hostname, protocol } = new URL(u);
-    return (protocol === 'https:' && (hostname.endsWith('.lovable.app') || hostname.endsWith('lovableproject.com') || hostname === 'oxysrestaurante.app' || hostname === 'www.oxysrestaurante.app')) || hostname === 'localhost';
+    return (protocol === 'https:' && (hostname === 'oxysrestaurante.app' || hostname === 'www.oxysrestaurante.app')) || hostname === 'localhost';
   } catch { return false; }
 };
 
