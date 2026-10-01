@@ -104,6 +104,28 @@
     font-family: 'Inter', sans-serif;
   }
 
+  /* Loja online (delivery): preto profundo + vermelho. Fica no <body> para valer também nos
+     painéis e menus que abrem fora da página (sacola, seletor de bairro). */
+  body.store-theme {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 356 84% 52%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 62%;
+    --accent: 24 95% 55%;
+    --accent-foreground: 0 0% 100%;
+    --border: 0 0% 15%;
+    --input: 0 0% 17%;
+    --ring: 356 84% 52%;
+  }
+
   /* App de celular: afasta o conteúdo do entalhe e da barra de gestos. */
   html.native-app body {
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);

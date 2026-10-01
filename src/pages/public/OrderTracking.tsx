@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,12 @@ export default function OrderTracking() {
   const { slug = '', orderId = '' } = useParams();
   const [params] = useSearchParams();
   const token = params.get('t') ?? '';
+
+  // Mesma identidade visual da loja online.
+  useEffect(() => {
+    document.body.classList.add('store-theme');
+    return () => document.body.classList.remove('store-theme');
+  }, []);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['order-tracking', orderId, token],
@@ -41,10 +48,11 @@ export default function OrderTracking() {
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="mx-auto max-w-lg space-y-5 px-4 py-8">
+      <div className="pointer-events-none fixed inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_at_top,rgba(225,29,42,0.22),transparent_70%)]" />
+      <main className="relative mx-auto max-w-lg space-y-5 px-4 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-8">
         <div className="text-center">
           <p className="text-sm text-muted-foreground">Pedido #{order.code}</p>
-          <h1 className="mt-1 text-2xl font-bold">
+          <h1 className="mt-1 text-3xl font-extrabold tracking-tight">
             {cancelled ? 'Pedido cancelado' : current >= 3 ? 'Bom apetite! 😋' : `Obrigado, ${order.customer_name?.split(' ')[0] ?? ''}!`}
           </h1>
           {!cancelled && current < 2 && eta && <p className="mt-1 text-sm text-muted-foreground">Previsão: cerca de {eta} min</p>}
@@ -55,14 +63,14 @@ export default function OrderTracking() {
             <XCircle className="h-5 w-5 text-destructive" /> O restaurante cancelou este pedido. Fale com eles para saber mais.
           </div>
         ) : (
-          <ol className="pdv-card space-y-4 p-5">
+          <ol className="space-y-4 rounded-3xl border border-white/[0.06] bg-card p-5">
             {labels.map((l, i) => {
               const Icon = icons[i];
               const done = i <= current;
               return (
                 <li key={l} className="flex items-center gap-3">
                   <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2',
-                    done ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground')}>
+                    done ? 'border-primary bg-primary text-primary-foreground shadow-[0_0_0_4px_rgba(225,29,42,0.18)]' : 'border-white/10 text-muted-foreground')}>
                     <Icon className="h-4 w-4" />
                   </span>
                   <span className={cn('text-sm', i === current ? 'font-bold' : done ? 'font-medium' : 'text-muted-foreground')}>{l}</span>
@@ -74,14 +82,14 @@ export default function OrderTracking() {
         )}
 
         {store?.whatsapp && !cancelled && current < 3 && (
-          <Button asChild size="lg" className="w-full gap-2 bg-[#25d366] text-white hover:bg-[#1fb457]">
+          <Button asChild size="lg" className="h-12 w-full gap-2 rounded-2xl bg-[#25d366] font-bold text-white hover:bg-[#1fb457]">
             <a href={waLink(store.whatsapp, `Olá! Quero acompanhar o pedido #${order.code}`)} target="_blank" rel="noreferrer">
               <MessageCircle className="h-5 w-5" /> Receber avisos pelo WhatsApp
             </a>
           </Button>
         )}
 
-        <section className="pdv-card space-y-2 p-5 text-sm">
+        <section className="space-y-2 rounded-3xl border border-white/[0.06] bg-card p-5 text-sm">
           <h2 className="font-semibold">Resumo</h2>
           <ul className="space-y-1">
             {items.map((i, idx) => (
@@ -93,7 +101,7 @@ export default function OrderTracking() {
           </ul>
           <div className="space-y-1 border-t border-border pt-2">
             {!pickup && <div className="flex justify-between"><span>Entrega</span><span>{Number(order.delivery_fee) > 0 ? brl(Number(order.delivery_fee)) : 'grátis'}</span></div>}
-            <div className="flex justify-between font-bold"><span>Total</span><span>{brl(Number(order.total) + Number(order.delivery_fee || 0))}</span></div>
+            <div className="flex justify-between text-base font-extrabold"><span>Total</span><span>{brl(Number(order.total) + Number(order.delivery_fee || 0))}</span></div>
           </div>
           {order.payment_hint && (
             <p className="text-muted-foreground">
@@ -104,7 +112,7 @@ export default function OrderTracking() {
           {order.customer_address && <p className="text-muted-foreground">Entregar em: {order.customer_address}</p>}
         </section>
 
-        <Button asChild variant="outline" className="w-full"><Link to={`/pedir/${slug}`}>Fazer outro pedido</Link></Button>
+        <Button asChild variant="outline" className="h-12 w-full rounded-2xl border-white/10 font-semibold"><Link to={`/pedir/${slug}`}>Fazer outro pedido</Link></Button>
       </main>
     </div>
   );
