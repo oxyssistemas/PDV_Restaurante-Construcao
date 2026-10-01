@@ -497,6 +497,15 @@ Pedido novo que não foi lançado pela equipe toca um bipe e mostra um aviso na 
 
 **Como colocar fotos na galeria de sugestões:** no painel do Supabase → Storage → bucket `store-media` → pasta `sugestoes` → Upload. Aceita JPG, PNG ou WEBP até 5 MB (de preferência horizontais, 1600×900). Subpastas viram grupos na galeria (ex.: `sugestoes/pizzas`, `sugestoes/hamburgueres`). Todas as lojas veem as mesmas sugestões; só a Oxys (painel do Supabase) consegue adicionar ou apagar.
 
+### Conta do cliente na loja online
+- Para enviar o pedido o cliente **entra ou cria conta** (nome, WhatsApp, email e senha). A conta vale para todas as lojas Oxys.
+- A conta é criada já confirmada pelo servidor (`delivery-store` → `signup`), sem email de confirmação: o envio de emails padrão do Supabase só chega para membros da equipe do projeto.
+- Ao criar conta, entrar ou pedir, a ficha do cliente é criada/atualizada no **CRM da loja** (nome, WhatsApp, email, endereço, etiqueta "loja online"). Se já existia uma ficha com o mesmo telefone, ela é ligada à conta.
+- O cliente vê **Meus pedidos** (com acompanhamento) e **Meus dados** pelo botão Entrar/conta (no celular: Pedidos e Perfil na barra de baixo).
+- A sessão do cliente fica separada da equipe (`storeClient`, chave `oxys-store-auth`): no mesmo computador o caixa continua logado no sistema.
+- Clientes não têm papel em `user_roles`, então não acessam nenhum portal da equipe.
+- "Esqueci minha senha" depende de um servidor de email próprio (SMTP) configurado no Supabase; até lá, a loja orienta pelo WhatsApp.
+
 ### Robô de WhatsApp (portal Delivery → WhatsApp)
 Cada restaurante usa o próprio número do WhatsApp Business:
 1. O administrador conecta a conta Meta do restaurante em **Marketing → Conexões** (a mesma do Instagram/Facebook).

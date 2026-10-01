@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { storeClient } from '@/integrations/supabase/storeClient';
 import { publicOrigin } from '@/lib/native';
 
 /** Loja online (delivery próprio): www.oxysrestaurante.app/pedir/<slug> */
@@ -15,6 +16,13 @@ export type PublicStore = {
 export type StorePromotion = { id: string; title: string; subtitle: string | null; image: string | null; menu_item_id: string | null };
 export type StoreItem = { id: string; name: string; description: string | null; price: number; image_url: string | null; category_id: string | null };
 export type StoreData = { store: PublicStore; promotions: StorePromotion[]; categories: { id: string; name: string }[]; items: StoreItem[] };
+
+export type CustomerProfile = { name: string; phone: string; address: string | null; complement: string | null };
+export type MyOrder = {
+  id: string; code: string; created_at: string; delivery_status: string; order_type: string; total: number; delivery_fee: number; public_token: string | null;
+  order_items: { quantity: number; status: string; menu_items: { name: string } | null }[];
+};
+export type CustomerAccount = { email: string | null; profile: CustomerProfile | null; orders: MyOrder[] };
 
 export type TrackedOrder = {
   id: string; code: string; order_type: string; delivery_status: string; total: number; delivery_fee: number;
@@ -44,8 +52,9 @@ export const storeUrl = (slug: string) => `${publicOrigin()}/pedir/${slug}`;
 /** Link do WhatsApp com mensagem pronta (o robô reconhece o código do pedido). */
 export const waLink = (phone: string, text: string) => `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`;
 
+/** Chamadas da loja online; vão com a sessão do cliente (quando logado). */
 export async function callStore<T>(body: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase.functions.invoke('delivery-store', { body });
+  const { data, error } = await storeClient.functions.invoke('delivery-store', { body });
   if (error) {
     const ctx = (error as { context?: Response }).context;
     const parsed = ctx ? await ctx.json().catch(() => null) : null;

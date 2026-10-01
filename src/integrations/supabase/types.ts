@@ -569,6 +569,36 @@ export type Database = {
           },
         ]
       }
+      customer_profiles: {
+        Row: {
+          address: string | null
+          complement: string | null
+          created_at: string
+          name: string
+          phone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          complement?: string | null
+          created_at?: string
+          name: string
+          phone: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          complement?: string | null
+          created_at?: string
+          name?: string
+          phone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           address: string | null
@@ -584,6 +614,7 @@ export type Database = {
           restaurant_id: string
           tags: string[]
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           address?: string | null
@@ -599,6 +630,7 @@ export type Database = {
           restaurant_id: string
           tags?: string[]
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           address?: string | null
@@ -614,6 +646,7 @@ export type Database = {
           restaurant_id?: string
           tags?: string[]
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -2490,6 +2523,7 @@ export type Database = {
           customer_address: string | null
           customer_name: string | null
           customer_phone: string | null
+          customer_user_id: string | null
           delivery_fee: number
           delivery_status: string
           id: string
@@ -2519,6 +2553,7 @@ export type Database = {
           customer_address?: string | null
           customer_name?: string | null
           customer_phone?: string | null
+          customer_user_id?: string | null
           delivery_fee?: number
           delivery_status?: string
           id?: string
@@ -2548,6 +2583,7 @@ export type Database = {
           customer_address?: string | null
           customer_name?: string | null
           customer_phone?: string | null
+          customer_user_id?: string | null
           delivery_fee?: number
           delivery_status?: string
           id?: string
@@ -3475,7 +3511,7 @@ export type Database = {
       }
       clear_login_attempts: { Args: { _email: string }; Returns: undefined }
       create_online_order: {
-        Args: { _order: Json; _slug: string }
+        Args: { _order: Json; _slug: string; _user_id: string }
         Returns: {
           order_id: string
           public_token: string
@@ -3508,6 +3544,10 @@ export type Database = {
       is_restaurant_active: {
         Args: { _restaurant_id: string }
         Returns: boolean
+      }
+      link_store_customer: {
+        Args: { _restaurant_id: string; _user_id: string }
+        Returns: string
       }
       login_lock_seconds: { Args: { _email: string }; Returns: number }
       marketing_cron_secret: { Args: never; Returns: string }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,12 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   ArrowRight, Beef, Bike, Megaphone, CakeSlice, ChevronDown, Clock, Coffee, CupSoda, Drumstick, Fish, Flame, Home, ImageIcon,
   LayoutGrid, Loader2, MapPin, MessageCircle, Minus, Pizza, Plus, Salad, Sandwich, Search, ShoppingBag, Soup, Store,
-  UtensilsCrossed, Wallet, Wine,
+  ReceiptText, UserRound, UtensilsCrossed, Wallet, Wine,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
-import { brl, callStore, PAYMENT_LABELS, waLink, type StoreData, type StoreItem } from '@/lib/deliveryStore';
+import { brl, callStore, PAYMENT_LABELS, waLink, type CustomerAccount, type StoreData, type StoreItem } from '@/lib/deliveryStore';
+import { formatPhone, StoreAccountSheet, StoreAuthDialog, useStoreSession } from '@/components/store/StoreAccount';
 
 type CartLine = { qty: number; notes: string };
 type Saved = { name: string; phone: string; address: string; complement: string; zone: string };
@@ -23,13 +24,6 @@ type Saved = { name: string; phone: string; address: string; complement: string;
 const SAVED_KEY = 'oxys.delivery.customer';
 const loadSaved = (): Partial<Saved> => {
   try { return JSON.parse(localStorage.getItem(SAVED_KEY) || '{}'); } catch { return {}; }
-};
-const formatPhone = (v: string) => {
-  const d = v.replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '').slice(0, 11);
-  if (d.length <= 2) return d;
-  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
-  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
-  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 };
 
 // ---------- apresentação ----------
@@ -131,6 +125,24 @@ export default function OnlineStore() {
   const menuRef = useRef<HTMLDivElement>(null);
   const aboutRef = useRef<HTMLElement>(null);
 
+  // Conta do cliente: precisa entrar para pedir; dados vão para o CRM da loja.
+  const qc = useQueryClient();
+  const { session } = useStoreSession();
+  const [authOpen, setAuthOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [accountTab, setAccountTab] = useState<'orders' | 'profile'>('orders');
+  const [afterLogin, setAfterLogin] = useState<null | 'bag' | 'orders' | 'profile'>(null);
+  const userId = session?.user.id ?? null;
+  const { data: account, isLoading: accountLoading } = useQuery({
+    queryKey: ['store-account', slug, userId],
+    enabled: !!userId,
+    queryFn: () => callStore<CustomerAccount>({ action: 'me', slug }),
+  });
+  const openAccount = (tab: 'orders' | 'profile') => {
+    if (!userId) { setAfterLogin(tab); setAuthOpen(true); return; }
+    setAccountTab(tab); setAccountOpen(true);
+  };
+
   // Tema da loja (preto + vermelho) também nos painéis que abrem fora da página.
   useEffect(() => {
     document.body.classList.add('store-theme');
@@ -151,6 +163,16 @@ export default function OnlineStore() {
     if (!store.delivery_enabled && store.pickup_enabled) setMode('pickup');
     if (store.zones.length && zone && !store.zones.some(z => z.name === zone)) setZone('');
   }, [store, zone]);
+
+  // Dados da conta preenchem o pedido (sem apagar o que o cliente já digitou).
+  useEffect(() => {
+    const p = account?.profile;
+    if (!p) return;
+    setName(v => v || p.name);
+    setPhone(v => v || formatPhone(p.phone));
+    setAddress(v => v || p.address || '');
+    setComplement(v => v || p.complement || '');
+  }, [account]);
 
   const items = data?.items ?? [];
   const lines = Object.entries(cart).map(([id, l]) => ({ item: items.find(i => i.id === id), ...l })).filter(l => l.item);
@@ -175,12 +197,14 @@ export default function OnlineStore() {
         name, phone, mode, channel, payment, notes,
         change_for: payment === 'cash' ? changeFor.replace(',', '.') : '',
         address: mode === 'delivery' ? [address.trim(), complement.trim()].filter(Boolean).join(' · ') : '',
+        address_line: address.trim(), complement: complement.trim(),
         zone: mode === 'delivery' ? zone : '',
         items: lines.map(l => ({ menu_item_id: l.item!.id, quantity: l.qty, notes: l.notes || null })),
       },
     }),
     onSuccess: ({ orderId, token }) => {
       try { localStorage.setItem(SAVED_KEY, JSON.stringify({ name, phone, address, complement, zone })); } catch { /* sem armazenamento */ }
+      qc.invalidateQueries({ queryKey: ['store-account', slug] });
       navigate(`/pedir/${slug}/pedido/${orderId}?t=${token}`);
     },
     onError: (e: Error) => toast({ title: 'Não foi possível enviar', description: e.message, variant: 'destructive' }),
@@ -281,6 +305,11 @@ export default function OnlineStore() {
             <button type="button" onClick={focusSearch} aria-label="Buscar"
               className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] transition-colors hover:border-white/25">
               <Search className="h-[18px] w-[18px]" />
+            </button>
+            <button type="button" onClick={() => openAccount('orders')} aria-label={userId ? 'Minha conta' : 'Entrar'}
+              className={cn('hidden h-10 items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold transition-colors hover:border-white/25 md:flex', userId && 'border-primary/40')}>
+              <UserRound className="h-[18px] w-[18px]" />
+              <span className="max-w-[110px] truncate">{userId ? (account?.profile?.name?.split(' ')[0] ?? 'Minha conta') : 'Entrar'}</span>
             </button>
             {bagButton}
           </div>
@@ -514,14 +543,13 @@ export default function OnlineStore() {
           {[
             { label: 'Início', icon: Home, on: () => { setActiveCat('all'); window.scrollTo({ top: 0, behavior: 'smooth' }); }, active: activeCat === 'all' && !q },
             { label: 'Cardápio', icon: UtensilsCrossed, on: () => goTo(menuRef.current), active: activeCat !== 'all' && !q },
-            { label: 'Buscar', icon: Search, on: focusSearch, active: !!q },
-            { label: 'Sacola', icon: ShoppingBag, on: () => setOpen(true), active: open, badge: count },
+            { label: 'Pedidos', icon: ReceiptText, on: () => openAccount('orders'), active: accountOpen && accountTab === 'orders' },
+            { label: userId ? 'Perfil' : 'Entrar', icon: UserRound, on: () => openAccount('profile'), active: accountOpen && accountTab === 'profile' },
           ].map(n => (
             <button key={n.label} type="button" onClick={n.on}
               className={cn('relative flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors', n.active ? 'text-primary' : 'text-muted-foreground')}>
               <span className="relative">
                 <n.icon className="h-5 w-5" />
-                {!!n.badge && <span key={bump} className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 animate-in zoom-in-50 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">{n.badge}</span>}
               </span>
               {n.label}
             </button>
@@ -660,13 +688,34 @@ export default function OnlineStore() {
               <div className="flex justify-between pt-1 text-lg font-extrabold"><span>Total</span><span>{brl(total)}</span></div>
               {belowMin && <p className="text-xs font-semibold text-red-400">Pedido mínimo: {brl(store.min_order)}</p>}
             </div>
-            <Button size="lg" className="h-12 w-full gap-2 rounded-2xl text-base font-bold shadow-[0_14px_30px_-12px_rgba(225,29,42,0.8)]" disabled={!canSubmit || submit.isPending} onClick={() => submit.mutate()}>
-              {submit.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {store.is_open ? `Fazer pedido · ${brl(total)}` : 'Loja fechada'}
-            </Button>
+            {userId ? (
+              <Button size="lg" className="h-12 w-full gap-2 rounded-2xl text-base font-bold shadow-[0_14px_30px_-12px_rgba(225,29,42,0.8)]" disabled={!canSubmit || submit.isPending} onClick={() => submit.mutate()}>
+                {submit.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                {store.is_open ? `Fazer pedido · ${brl(total)}` : 'Loja fechada'}
+              </Button>
+            ) : (
+              <>
+                <Button size="lg" className="h-12 w-full gap-2 rounded-2xl text-base font-bold shadow-[0_14px_30px_-12px_rgba(225,29,42,0.8)]"
+                  disabled={!count || !store.is_open} onClick={() => { setAfterLogin('bag'); setAuthOpen(true); }}>
+                  <UserRound className="h-4 w-4" /> Entrar para fazer o pedido
+                </Button>
+                <p className="text-center text-[11px] text-muted-foreground">Crie sua conta ou entre para enviar o pedido e acompanhar a entrega.</p>
+              </>
+            )}
           </div>
         </SheetContent>
       </Sheet>
+
+      <StoreAuthDialog open={authOpen} onOpenChange={setAuthOpen} slug={slug} storeName={store.name}
+        onDone={() => {
+          qc.invalidateQueries({ queryKey: ['store-account', slug] });
+          if (afterLogin === 'bag') setOpen(true);
+          else if (afterLogin) { setAccountTab(afterLogin); setAccountOpen(true); }
+          setAfterLogin(null);
+        }} />
+      <StoreAccountSheet open={accountOpen} onOpenChange={setAccountOpen} side={isMobile ? 'bottom' : 'right'} slug={slug}
+        account={account} loading={accountLoading} tab={accountTab} onTab={setAccountTab}
+        onSaved={() => qc.invalidateQueries({ queryKey: ['store-account', slug] })} />
     </div>
   );
 }
