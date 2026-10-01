@@ -61,7 +61,7 @@ export default function PrintStationRunner() {
           try {
             if (!printer || !printer.enabled) throw new Error('Impressora desativada');
             publish({ printing: true });
-            await printHtml(renderJob(job.document, printer));
+            await printHtml(await renderJob(job.document, printer));
             await supabase.from('print_jobs').update({ status: 'done', printed_at: new Date().toISOString(), error: null }).eq('id', job.id);
             publish({ printing: false, lastPrintedAt: new Date().toISOString(), lastError: null });
           } catch (e) {

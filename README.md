@@ -418,6 +418,8 @@ Segredos das Edge Functions (Supabase → Project Settings → Edge Functions �
 | `AI_API_KEY` | Assistente de IA (`restaurant-assistant`). Chave do Google AI Studio (Gemini) |
 | `AI_API_URL` / `AI_MODEL` | Opcionais: outro provedor compatível com a API da OpenAI e o modelo |
 | `IFOOD_CLIENT_ID` / `IFOOD_CLIENT_SECRET` | Integração iFood |
+| `FISCAL_PROVIDER` | Emissor de NFC-e da plataforma: `simulado` (padrão, só testes) ou `focus` |
+| `FOCUS_NFE_TOKEN` | Token de revenda da Focus NFe (cadastra os restaurantes como empresas) |
 | `META_APP_ID` / `META_APP_SECRET` | Marketing (Facebook, Instagram, WhatsApp, Meta Ads) |
 | `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` | Marketing (publicação no TikTok) |
 | `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` / `GOOGLE_ADS_DEVELOPER_TOKEN` | Marketing (Google Meu Negócio e Google Ads) |
@@ -450,3 +452,16 @@ O Instagram precisa ser uma conta Profissional ligada a uma Página do Facebook.
 3. Para postar fotos, verifique o domínio `oxysrestaurante.app` em "URL properties". O TikTok só busca fotos de domínios verificados. Vídeos não precisam disso.
 4. Cadastre `TIKTOK_CLIENT_KEY` e `TIKTOK_CLIENT_SECRET` nos segredos do Supabase.
 5. Até o TikTok aprovar (auditar) o app, os posts ficam visíveis só para o dono da conta.
+
+## 🧾 NFC-e (nota fiscal de consumidor)
+
+- O restaurante preenche a configuração fiscal (Configurações → Configuração fiscal) e liga "Emitir NFC-e neste restaurante" e, se quiser, "Emitir automaticamente ao quitar o pedido".
+- Quando a conta é quitada, o banco cria a nota e chama a função `fiscal`, que emite em segundo plano (o caixa não espera). Falhas de conexão são repetidas sozinhas; rejeições da SEFAZ aparecem em CRM → Notas fiscais com o motivo, para corrigir e "Tentar de novo".
+- Com a nota autorizada, o DANFE vai para as impressoras marcadas com "Nota fiscal".
+- Emissor: `FISCAL_PROVIDER=simulado` gera notas fictícias em homologação para testar o fluxo. Para produção, contrate a Focus NFe, cadastre `FISCAL_PROVIDER=focus` e `FOCUS_NFE_TOKEN`, e em cada restaurante clique em "Enviar ao emissor" com a senha do certificado A1.
+
+## 🖨️ Impressão
+
+- Cadastro em Configurações → Impressoras: o que cada impressora imprime (cozinha, comanda, recibo, nota) e se imprime sozinha.
+- Pedidos novos geram a via da cozinha e contas quitadas geram o recibo direto no banco, então funciona de qualquer aparelho (garçom no celular, QR Code, iFood).
+- No computador ligado à impressora, abra "Estação de impressão" e marque as impressoras dele. Para não aparecer a janela de impressão, abra o Chrome com `--kiosk-printing` (passo a passo na própria tela).

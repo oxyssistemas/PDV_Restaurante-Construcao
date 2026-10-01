@@ -282,3 +282,72 @@ export const renderReceipt = (opts: ReceiptOptions) => compose(receiptBody(opts)
 export function printReceipt(opts: ReceiptOptions) {
   emit(receiptBody(opts), opts.config, opts.width);
 }
+
+// ---------- DANFE NFC-e ----------
+export interface NfceDocument {
+  restaurant_name: string;
+  emitter: { legal_name: string; trade_name: string | null; cnpj: string; state_registration: string | null; address: string };
+  environment: 'homologation' | 'production';
+  number: string | null; series: string | null; issued_at: string | null; access_key: string | null;
+  protocol: string | null; consult_url: string | null; qrcode_url: string | null;
+  consumer: { document: string | null; name: string | null };
+  items: { code: string; name: string; quantity: number; unit: string; unit_price: number; total: number }[];
+  delivery_fee: number; discount: number; total: number;
+  payments: { code: string; amount: number }[]; change: number;
+}
+
+const NFCE_PAYMENT_LABELS: Record<string, string> = {
+  '01': 'Dinheiro', '03': 'Cartao de Credito', '04': 'Cartao de Debito', '17': 'PIX', '99': 'Outros',
+};
+const fmtCnpj = (v: string) => v.replace(/\D/g, '').replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+const fmtDoc = (v: string) => {
+  const d = v.replace(/\D/g, '');
+  return d.length === 11 ? d.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4') : fmtCnpj(d);
+};
+
+/** DANFE NFC-e para bobina térmica, com QR Code da consulta (layout simplificado do Manual de Especificações). */
+export async function renderNfce(doc: NfceDocument, config?: PrinterConfig | null): Promise<string> {
+  const { default: QRCode } = await import('qrcode');
+  const qr = doc.qrcode_url ? await QRCode.toDataURL(doc.qrcode_url, { margin: 0, width: 220, errorCorrectionLevel: 'M' }) : null;
+  const homolog = doc.environment === 'homologation';
+  const subtotal = doc.items.reduce((s, i) => s + i.total, 0);
+  const key = (doc.access_key ?? '').replace(/(\d{4})(?=\d)/g, '$1 ');
+  const body = [
+    `<div class="center bold">${esc(doc.emitter.trade_name || doc.emitter.legal_name)}</div>`,
+    `<div class="center small">${esc(doc.emitter.legal_name)}</div>`,
+    `<div class="center small">CNPJ ${esc(fmtCnpj(doc.emitter.cnpj))}${doc.emitter.state_registration ? ` IE ${esc(doc.emitter.state_registration)}` : ''}</div>`,
+    `<div class="center small">${esc(doc.emitter.address)}</div>`,
+    '<div class="sep"></div>',
+    '<div class="center small bold">DANFE NFC-e - Documento Auxiliar da Nota Fiscal de Consumidor Eletronica</div>',
+    homolog ? '<div class="center small bold">EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL</div>' : '',
+    '<div class="sep"></div>',
+    '<div class="row small bold"><span>Codigo Descricao</span><span>Qtde Un x Vl Unit = Total</span></div>',
+    ...doc.items.map(i =>
+      `<div class="item small"><div>${esc(i.code)} ${esc(i.name)}</div>` +
+      `<div class="row"><span></span><span>${i.quantity} ${esc(i.unit)} x ${money(i.unit_price)} = ${money(i.total)}</span></div></div>`),
+    '<div class="sep"></div>',
+    `<div class="row"><span>Qtde. total de itens</span><span>${doc.items.length}</span></div>`,
+    `<div class="row"><span>Valor total R$</span><span>${money(subtotal)}</span></div>`,
+    doc.delivery_fee > 0 ? `<div class="row"><span>Outras despesas</span><span>${money(doc.delivery_fee)}</span></div>` : '',
+    doc.discount > 0 ? `<div class="row"><span>Desconto R$</span><span>-${money(doc.discount)}</span></div>` : '',
+    `<div class="row total"><span>Valor a pagar R$</span><span>${money(doc.total)}</span></div>`,
+    '<div class="row small bold"><span>FORMA DE PAGAMENTO</span><span>VALOR PAGO R$</span></div>',
+    ...doc.payments.map(p => `<div class="row small"><span>${esc(NFCE_PAYMENT_LABELS[p.code] ?? 'Outros')}</span><span>${money(p.amount)}</span></div>`),
+    doc.change > 0 ? `<div class="row small"><span>Troco R$</span><span>${money(doc.change)}</span></div>` : '',
+    '<div class="sep"></div>',
+    `<div class="center small">Consulte pela Chave de Acesso em</div>`,
+    `<div class="center small" style="word-break:break-all">${esc(doc.consult_url ?? '')}</div>`,
+    `<div class="center small bold" style="word-break:break-all">${esc(key)}</div>`,
+    '<div class="sep"></div>',
+    `<div class="center small">${doc.consumer.document
+      ? `CONSUMIDOR - ${esc(fmtDoc(doc.consumer.document))}${doc.consumer.name ? ` ${esc(doc.consumer.name)}` : ''}`
+      : 'CONSUMIDOR NAO IDENTIFICADO'}</div>`,
+    `<div class="center small bold">NFC-e n ${esc(doc.number ?? '')} Serie ${esc(doc.series ?? '')} ${esc(dt(doc.issued_at))}</div>`,
+    `<div class="center small">Protocolo de autorizacao: ${esc(doc.protocol ?? '')}</div>`,
+    `<div class="center small">Data de autorizacao: ${esc(dt(doc.issued_at))}</div>`,
+    qr ? `<div class="center" style="margin:6px 0"><img src="${qr}" style="width:34mm;height:34mm" /></div>` : '',
+    homolog ? '<div class="center small bold">EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL</div>' : '',
+    '<div class="small">&nbsp;</div><div class="small">&nbsp;</div>',
+  ].join('');
+  return compose(body, config);
+}

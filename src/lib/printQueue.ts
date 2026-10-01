@@ -1,7 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 import {
-  renderOrderTicket, renderReceipt, type PrintItem, type PrintOrder, type PrintPayment, type PrinterConfig, type ThermalWidth,
+  renderNfce, renderOrderTicket, renderReceipt, type NfceDocument, type PrintItem, type PrintOrder, type PrintPayment,
+  type PrinterConfig, type ThermalWidth,
 } from '@/lib/printing';
 
 /** Para que serve cada impressora. 'test' é só para a página de teste. */
@@ -19,6 +20,7 @@ export const PRINTER_COLUMNS =
 export type PrintDocument =
   | { kind: 'kitchen' | 'order'; restaurant_name: string; order: PrintOrder; items: PrintItem[] }
   | { kind: 'receipt'; restaurant_name: string; order: PrintOrder; items: PrintItem[]; payments: PrintPayment[]; change?: number }
+  | ({ kind: 'nfce' } & NfceDocument)
   | { kind: 'test'; restaurant_name: string; printer_name: string };
 
 export type PrintJob = {
@@ -78,7 +80,7 @@ export const printerConfig = (p: Printer): PrinterConfig => ({
 });
 
 /** HTML do trabalho para a impressora informada. */
-export function renderJob(doc: PrintDocument, printer: Printer): string {
+export async function renderJob(doc: PrintDocument, printer: Printer): Promise<string> {
   const config = printerConfig(printer);
   switch (doc.kind) {
     case 'kitchen':
@@ -87,6 +89,8 @@ export function renderJob(doc: PrintDocument, printer: Printer): string {
       return renderOrderTicket({ restaurantName: doc.restaurant_name, order: doc.order, items: doc.items, config });
     case 'receipt':
       return renderReceipt({ restaurantName: doc.restaurant_name, order: doc.order, items: doc.items, payments: doc.payments, change: doc.change, config });
+    case 'nfce':
+      return renderNfce(doc, config);
     case 'test':
       return renderOrderTicket({
         restaurantName: doc.restaurant_name,

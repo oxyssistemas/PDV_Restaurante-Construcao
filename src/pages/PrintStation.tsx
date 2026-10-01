@@ -94,7 +94,7 @@ export default function PrintStation() {
   const printHere = async (job: PrintJob) => {
     const p = byId[job.printer_id];
     if (!p) return;
-    await printHtml(renderJob(job.document, p));
+    await printHtml(await renderJob(job.document, p));
     await supabase.from('print_jobs').update({ status: 'done', printed_at: new Date().toISOString(), error: null }).eq('id', job.id);
     qc.invalidateQueries({ queryKey: ['print-jobs'] });
   };

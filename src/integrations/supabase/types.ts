@@ -793,6 +793,13 @@ export type Database = {
       }
       fiscal_invoices: {
         Row: {
+          cancel_reason: string | null
+          cancelled_at: string | null
+          consult_url: string | null
+          locked_until: string | null
+          next_attempt_at: string | null
+          payments: Json
+          provider_response: Json | null
           access_key: string | null
           attempts: number
           created_at: string
@@ -826,6 +833,13 @@ export type Database = {
           xml_url: string | null
         }
         Insert: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          consult_url?: string | null
+          locked_until?: string | null
+          next_attempt_at?: string | null
+          payments?: Json
+          provider_response?: Json | null
           access_key?: string | null
           attempts?: number
           created_at?: string
@@ -859,6 +873,13 @@ export type Database = {
           xml_url?: string | null
         }
         Update: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          consult_url?: string | null
+          locked_until?: string | null
+          next_attempt_at?: string | null
+          payments?: Json
+          provider_response?: Json | null
           access_key?: string | null
           attempts?: number
           created_at?: string

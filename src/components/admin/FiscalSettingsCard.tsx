@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Check, CircleAlert, FileCheck2, Loader2, ShieldCheck, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { logAudit } from '@/lib/audit';
+import { fiscalApi, SIMULATED_PROVIDER } from '@/lib/fiscalApi';
 import {
   certificateDaysLeft, csosnOptions, cstOptions, environmentLabels, fiscalReadiness,
   formatCnpj, isSimples, ncmSuggestions, onlyDigits, originOptions, providerLabels,
@@ -27,7 +28,7 @@ interface FormState {
   street: string; number: string; complement: string; district: string;
   city: string; city_code: string; state: string; zip_code: string; phone: string;
   environment: FiscalEnvironment; provider: string; nfce_series: string; nfce_next_number: string;
-  csc_id: string; auto_emit_on_payment: boolean;
+  csc_id: string; auto_emit_on_payment: boolean; active: boolean;
   default_ncm: string; default_cfop: string; default_csosn: string;
   default_origin: string; default_unit: string;
 }
@@ -37,7 +38,7 @@ const emptyForm: FormState = {
   tax_regime: 'simples_nacional', street: '', number: '', complement: '', district: '',
   city: '', city_code: '', state: '', zip_code: '', phone: '',
   environment: 'homologation', provider: 'focus_nfe', nfce_series: '1', nfce_next_number: '1',
-  csc_id: '', auto_emit_on_payment: false,
+  csc_id: '', auto_emit_on_payment: false, active: false,
   default_ncm: '', default_cfop: '5102', default_csosn: '', default_origin: '0', default_unit: 'UN',
 };
 
@@ -85,7 +86,7 @@ export default function FiscalSettingsCard({ restaurantId, role }: Props) {
       state: profile.state || '', zip_code: profile.zip_code || '', phone: profile.phone || '',
       environment: profile.environment as FiscalEnvironment, provider: profile.provider,
       nfce_series: profile.nfce_series, nfce_next_number: String(profile.nfce_next_number),
-      csc_id: profile.csc_id || '', auto_emit_on_payment: profile.auto_emit_on_payment,
+      csc_id: profile.csc_id || '', auto_emit_on_payment: profile.auto_emit_on_payment, active: profile.active,
       default_ncm: profile.default_ncm || '', default_cfop: profile.default_cfop || '5102',
       default_csosn: profile.default_csosn || '', default_origin: profile.default_origin,
       default_unit: profile.default_unit,
@@ -94,11 +95,25 @@ export default function FiscalSettingsCard({ restaurantId, role }: Props) {
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm(p => ({ ...p, [k]: v }));
 
+  const { data: fiscalConfig, refetch: refetchConfig } = useQuery({
+    queryKey: ['fiscal-config', restaurantId],
+    queryFn: () => fiscalApi.config(restaurantId),
+    retry: false,
+  });
+  const simulated = fiscalConfig?.provider === SIMULATED_PROVIDER;
+  const [certPassword, setCertPassword] = useState('');
+  const sync = useMutation({
+    mutationFn: () => fiscalApi.syncCompany(restaurantId, certPassword || undefined),
+    onSuccess: () => { setCertPassword(''); refetchConfig(); toast.success('Dados enviados ao emissor fiscal'); },
+    onError: (e: Error) => { refetchConfig(); toast.error(e.message); },
+  });
+
+  // No emissor simulado (testes) não há certificado nem CSC de verdade.
   const checks = fiscalReadiness(
     { ...profile, cnpj: form.cnpj, city_code: form.city_code, state: form.state, csc_id: form.csc_id,
       default_ncm: form.default_ncm, default_cfop: form.default_cfop, default_csosn: form.default_csosn },
     itemsMissingNcm,
-  );
+  ).filter(c => !(simulated && (c.key === 'certificate' || c.key === 'csc')));
   const ready = checks.every(c => c.done);
   const daysLeft = certificateDaysLeft(profile?.certificate_expires_at);
 
@@ -126,7 +141,8 @@ export default function FiscalSettingsCard({ restaurantId, role }: Props) {
         nfce_series: form.nfce_series.trim() || '1',
         nfce_next_number: Math.max(1, Number(form.nfce_next_number) || 1),
         csc_id: form.csc_id.trim() || null,
-        auto_emit_on_payment: form.auto_emit_on_payment,
+        auto_emit_on_payment: form.active && form.auto_emit_on_payment,
+        active: form.active,
         default_ncm: onlyDigits(form.default_ncm) || null,
         default_cfop: onlyDigits(form.default_cfop) || null,
         default_csosn: form.default_csosn || null,
@@ -360,15 +376,6 @@ export default function FiscalSettingsCard({ restaurantId, role }: Props) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Emissor fiscal</Label>
-                <Select value={form.provider} onValueChange={v => set('provider', v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(providerLabels).map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
                 <Label>CSC — Identificador (ID do token)</Label>
                 <Input value={form.csc_id} onChange={e => set('csc_id', e.target.value)} placeholder="Ex.: 000001" />
               </div>
@@ -401,6 +408,54 @@ export default function FiscalSettingsCard({ restaurantId, role }: Props) {
               </div>
             </div>
 
+            <div className="space-y-3 rounded-lg border p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium">Emissor fiscal</p>
+                <Badge variant="outline">{fiscalConfig?.provider_label ?? '...'}</Badge>
+                {fiscalConfig?.needs_company_sync && (
+                  <Badge variant={fiscalConfig.account?.registered && !fiscalConfig.account.last_error ? 'secondary' : 'destructive'}>
+                    {fiscalConfig.account?.registered ? 'Restaurante cadastrado no emissor' : 'Restaurante ainda não cadastrado'}
+                  </Badge>
+                )}
+              </div>
+              {simulated ? (
+                <p className="text-xs text-muted-foreground">
+                  Modo de testes: gera notas fictícias em homologação, com chave de acesso e DANFE, para validar o fluxo
+                  (caixa, fila e impressão). Nenhuma nota é enviada à SEFAZ. Para emitir de verdade, a plataforma precisa
+                  contratar um emissor fiscal.
+                </p>
+              ) : fiscalConfig?.needs_company_sync && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    Envia os dados do emitente, o CSC e o certificado ao emissor. Repita sempre que trocar o certificado ou o CSC.
+                    A senha do certificado é usada só neste envio e não fica guardada no sistema.
+                  </p>
+                  {fiscalConfig.account?.last_error && <p className="text-xs text-destructive">{fiscalConfig.account.last_error}</p>}
+                  <div className="flex flex-wrap gap-2">
+                    <Input type="password" className="sm:w-64" placeholder="Senha do certificado A1" value={certPassword}
+                      onChange={e => setCertPassword(e.target.value)} disabled={!profile?.certificate_path} />
+                    <Button type="button" variant="outline" disabled={sync.isPending || !profile?.id} onClick={() => sync.mutate()}>
+                      {sync.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Enviar ao emissor
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <Label className="text-sm font-medium">Emitir NFC-e neste restaurante</Label>
+                <p className="text-xs text-muted-foreground">
+                  Liga a emissão (manual e automática). Requer o checklist completo.
+                </p>
+              </div>
+              <Switch
+                checked={form.active}
+                disabled={!ready && !form.active}
+                onCheckedChange={v => set('active', v)}
+              />
+            </div>
+
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div>
                 <Label className="text-sm font-medium">Emitir automaticamente ao quitar o pedido</Label>
@@ -409,8 +464,8 @@ export default function FiscalSettingsCard({ restaurantId, role }: Props) {
                 </p>
               </div>
               <Switch
-                checked={form.auto_emit_on_payment}
-                disabled={!ready}
+                checked={form.active && form.auto_emit_on_payment}
+                disabled={!ready || !form.active}
                 onCheckedChange={v => set('auto_emit_on_payment', v)}
               />
             </div>

@@ -9,11 +9,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Loader2, Plus, Pencil, Trash2, Printer, FileText, Send } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, Printer, FileText, Send, Ban, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { logAudit } from '@/lib/audit';
 import { brl } from '@/lib/finance';
-import { printOrderTicket, type PrintItem } from '@/lib/printing';
+import { printHtml, printOrderTicket, renderNfce, type PrintItem } from '@/lib/printing';
+import { fiscalApi } from '@/lib/fiscalApi';
 
 interface Props { restaurantId: string; role?: string | null; canEdit?: boolean; restaurantName?: string }
 
@@ -24,7 +25,7 @@ interface Form {
 const empty: Form = { order_id: '', customer_name: '', customer_document: '', customer_email: '', customer_address: '', total: '', discount: '', notes: '' };
 
 const statusLabels: Record<string, string> = {
-  draft: 'Rascunho', pending: 'Aguardando emissor', issued: 'Emitida', cancelled: 'Cancelada', error: 'Erro',
+  draft: 'Rascunho', pending: 'Emitindo...', issued: 'Autorizada', cancelled: 'Cancelada', error: 'Rejeitada',
 };
 
 interface InvoiceItem { name: string; quantity: number; unit_price: number }
@@ -33,6 +34,7 @@ export default function InvoicesPanel({ restaurantId, role, canEdit = true, rest
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Form>(empty);
+  const [cancelling, setCancelling] = useState<{ id: string; reason: string } | null>(null);
 
   const { data: invoices, isLoading } = useQuery({
     queryKey: ['fiscal-invoices', restaurantId],
@@ -44,6 +46,8 @@ export default function InvoicesPanel({ restaurantId, role, canEdit = true, rest
       if (error) throw error;
       return data || [];
     },
+    // Enquanto alguma nota está sendo emitida, acompanha sozinho.
+    refetchInterval: q => ((q.state.data as { status: string }[] | undefined)?.some(i => i.status === 'pending') ? 5000 : false),
   });
 
   // Pedidos recentes finalizados, para gerar nota a partir do pedido
@@ -111,16 +115,45 @@ export default function InvoicesPanel({ restaurantId, role, canEdit = true, rest
   const issue = useMutation({
     mutationFn: async (id: string) => {
       const before = (invoices || []).find(i => i.id === id);
-      const payload = { status: 'pending' as const, provider: 'pendente_integracao' };
-      const { error } = await supabase.from('fiscal_invoices').update(payload).eq('id', id);
-      if (error) throw error;
-      await logAudit({ restaurantId, role, action: 'issue', entity: 'invoice', entityId: id, summary: `Nota fiscal de "${before?.customer_name ?? id}" enviada para emissão`, before, after: payload });
+      const res = await fiscalApi.emit(restaurantId, id);
+      await logAudit({ restaurantId, role, action: 'issue', entity: 'invoice', entityId: id, summary: `NFC-e de "${before?.customer_name ?? id}" enviada para emissão (${res.invoice.status})` });
+      return res;
+    },
+    onSuccess: res => {
+      qc.invalidateQueries({ queryKey: ['fiscal-invoices'] });
+      qc.invalidateQueries({ queryKey: ['audit-logs'] });
+      if (res.invoice.status === 'issued') toast.success(`NFC-e ${res.invoice.number} autorizada`);
+      else if (res.invoice.status === 'error') toast.error('NFC-e rejeitada', { description: res.invoice.error_message ?? undefined });
+      else toast.message('NFC-e em processamento', { description: 'O resultado aparece aqui em instantes.' });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const cancel = useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      const before = (invoices || []).find(i => i.id === id);
+      await fiscalApi.cancel(restaurantId, id, reason);
+      await logAudit({ restaurantId, role, action: 'status', entity: 'invoice', entityId: id, summary: `NFC-e ${before?.number ?? ''} cancelada: ${reason}` });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fiscal-invoices'] });
       qc.invalidateQueries({ queryKey: ['audit-logs'] });
-      toast.success('Nota marcada para emissão', { description: 'Será transmitida quando o emissor fiscal for integrado.' });
+      setCancelling(null);
+      toast.success('NFC-e cancelada');
     },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // DANFE: vai para a impressora de notas (estação) se houver; senão abre a impressão aqui.
+  const printDanfe = useMutation({
+    mutationFn: async (id: string) => {
+      const { printers } = await fiscalApi.print(restaurantId, id);
+      if (printers > 0) return 'queue';
+      const { document } = await fiscalApi.danfe(restaurantId, id);
+      await printHtml(await renderNfce(document));
+      return 'local';
+    },
+    onSuccess: where => { if (where === 'queue') toast.success('DANFE enviado para a impressora'); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -162,7 +195,7 @@ export default function InvoicesPanel({ restaurantId, role, canEdit = true, rest
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <p className="flex-1 text-sm text-muted-foreground">
-          Emissão preparada para integração com emissor fiscal. Enquanto isso, as notas ficam registradas e podem ser impressas como pré-nota.
+          Notas fiscais de consumidor (NFC-e). Com a emissão automática ligada na configuração fiscal, a nota sai sozinha quando a conta é quitada; aqui você acompanha, reemite, cancela e imprime o DANFE.
         </p>
         {canEdit && (
           <Button className="gap-2" onClick={() => { setForm(empty); setOpen(true); }}>
@@ -186,21 +219,38 @@ export default function InvoicesPanel({ restaurantId, role, canEdit = true, rest
                   <div className="text-sm text-muted-foreground">
                     {inv.customer_document ? `${inv.customer_document} · ` : ''}
                     {new Date(inv.created_at).toLocaleString('pt-BR')}
-                    {inv.number ? ` · NF ${inv.number}` : ''}
+                    {inv.number ? ` · NFC-e ${inv.number}${inv.series ? ` série ${inv.series}` : ''}` : ''}
+                    {inv.status === 'issued' && inv.environment === 'homologation' ? ' · homologação (sem valor fiscal)' : ''}
                   </div>
+                  {inv.access_key && <div className="font-mono text-xs text-muted-foreground">Chave {inv.access_key}</div>}
+                  {inv.status === 'error' && inv.error_message && <div className="text-xs text-destructive">{inv.error_message}</div>}
+                  {inv.status === 'cancelled' && inv.cancel_reason && <div className="text-xs text-muted-foreground">Cancelada: {inv.cancel_reason}</div>}
                 </div>
                 <div className="text-lg font-bold">{brl(Number(inv.total))}</div>
                 <Badge variant={inv.status === 'issued' ? 'secondary' : inv.status === 'error' ? 'destructive' : 'outline'}>
                   {statusLabels[inv.status]}
                 </Badge>
                 <div className="flex gap-1">
-                  <Button size="icon" variant="ghost" onClick={() => printInvoice(inv)}><Printer className="h-4 w-4" /></Button>
-                  {canEdit && inv.status === 'draft' && (
-                    <Button size="sm" variant="outline" className="gap-1" onClick={() => issue.mutate(inv.id)}>
-                      <Send className="h-4 w-4" /> Emitir
+                  {inv.status === 'issued' ? (
+                    <Button size="icon" variant="ghost" title="Imprimir DANFE" disabled={printDanfe.isPending} onClick={() => printDanfe.mutate(inv.id)}>
+                      {printDanfe.isPending && printDanfe.variables === inv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                    </Button>
+                  ) : (
+                    <Button size="icon" variant="ghost" title="Imprimir pré-nota" onClick={() => printInvoice(inv)}><Printer className="h-4 w-4" /></Button>
+                  )}
+                  {canEdit && (inv.status === 'draft' || inv.status === 'error') && (
+                    <Button size="sm" variant="outline" className="gap-1" disabled={issue.isPending} onClick={() => issue.mutate(inv.id)}>
+                      {issue.isPending && issue.variables === inv.id ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : inv.status === 'error' ? <RotateCw className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+                      {inv.status === 'error' ? 'Tentar de novo' : 'Emitir NFC-e'}
                     </Button>
                   )}
-                  {canEdit && (
+                  {canEdit && (inv.status === 'issued' || inv.status === 'pending') && (
+                    <Button size="icon" variant="ghost" title="Cancelar NFC-e" onClick={() => setCancelling({ id: inv.id, reason: '' })}>
+                      <Ban className="h-4 w-4 text-destructive" />
+                    </Button>
+                  )}
+                  {canEdit && inv.status !== 'issued' && inv.status !== 'pending' && inv.status !== 'cancelled' && (
                     <>
                       <Button size="icon" variant="ghost" onClick={() => {
                         setForm({
@@ -220,6 +270,22 @@ export default function InvoicesPanel({ restaurantId, role, canEdit = true, rest
           ))}
         </div>
       )}
+
+      <Dialog open={!!cancelling} onOpenChange={o => !o && setCancelling(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Cancelar NFC-e</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">A SEFAZ aceita o cancelamento em até 30 minutos depois da autorização. Informe o motivo (mínimo 15 caracteres).</p>
+          <Textarea rows={3} value={cancelling?.reason ?? ''} placeholder="Ex.: cliente desistiu da compra após a emissão"
+            onChange={e => setCancelling(c => (c ? { ...c, reason: e.target.value } : c))} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelling(null)}>Voltar</Button>
+            <Button variant="destructive" disabled={!cancelling || cancelling.reason.trim().length < 15 || cancel.isPending}
+              onClick={() => cancelling && cancel.mutate({ id: cancelling.id, reason: cancelling.reason.trim() })}>
+              {cancel.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Cancelar nota
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
