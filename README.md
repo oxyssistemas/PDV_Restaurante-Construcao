@@ -473,7 +473,7 @@ O Instagram precisa ser uma conta Profissional ligada a uma Página do Facebook.
 | Versão | Onde está | Como é feita |
 | --- | --- | --- |
 | Web (nuvem) | https://www.oxysrestaurante.app | Vercel, a cada push |
-| Windows e Mac | Releases do GitHub (`Oxys-Restaurante-Setup.exe`, `Oxys-Restaurante-Mac.dmg`) | `desktop/` (Electron), workflow **App de computador** |
+| Windows, Mac e Linux | Releases do GitHub (`Oxys-Restaurante-Setup.exe`, `Oxys-Restaurante-Mac.dmg`, `Oxys-Restaurante-Linux.deb` / `.AppImage`) | `desktop/` (Electron), workflow **App de computador** |
 | Android e iOS | Play Store / App Store | Capacitor (`android/`, `ios/`), workflow **App de celular** |
 
 ### App de computador (`desktop/`)
@@ -487,11 +487,13 @@ Abre o sistema online, então está sempre atualizado sem reinstalar. Além do n
 
 Testar localmente: `cd desktop && npm install && npm start` (use `OXYS_URL=http://localhost:8080 npm start` para abrir o servidor local).
 
-**Lançar uma versão:** `git tag v1.0.1 && git push origin v1.0.1`. O GitHub gera o `.exe` e o `.dmg`, publica em Releases e os apps instalados se atualizam.
+**Lançar uma versão:** `git tag v1.0.1 && git push origin v1.0.1`. O GitHub gera o `.exe`, o `.dmg`, o `.deb` e o `.AppImage`, publica em Releases e os apps instalados se atualizam (no Linux, a atualização automática vale para o `.AppImage`; o `.deb` se atualiza instalando a versão nova).
 
 Sem certificado de assinatura digital:
 - **Windows** mostra "O Windows protegeu o computador" na primeira instalação → *Mais informações* → *Executar assim mesmo*. Para remover o aviso, compre um certificado de assinatura de código e salve `WIN_CERTIFICATE_PFX` (base64) e `WIN_CERTIFICATE_PASSWORD` nos segredos do GitHub.
 - **Mac** bloqueia na primeira abertura → Ajustes do Sistema → Privacidade e Segurança → *Abrir mesmo assim*. Atualização automática no Mac só funciona com app assinado: com a conta Apple Developer, salve `MAC_CERTIFICATE_P12`, `MAC_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` e `APPLE_TEAM_ID`.
+
+**Linux (Ubuntu/Debian):** `sudo apt install ./Oxys-Restaurante-Linux.deb`. Outras distribuições: dê permissão de execução ao `.AppImage` e abra (precisa do pacote `libfuse2`).
 
 ### App de celular (Capacitor)
 

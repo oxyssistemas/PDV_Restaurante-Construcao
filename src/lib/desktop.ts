@@ -1,4 +1,4 @@
-/** Recursos do app Oxys para Windows/Mac (pasta desktop/). No navegador comum, `desktop` é null. */
+/** Recursos do app Oxys para Windows/Mac/Linux (pasta desktop/). No navegador comum, `desktop` é null. */
 export type DesktopPrinter = { name: string; displayName: string; isDefault: boolean };
 
 type OxysDesktop = {
@@ -19,4 +19,5 @@ const RELEASES = 'https://github.com/oxyssistemas/PDV_Restaurante-Construcao/rel
 export const DESKTOP_DOWNLOADS = {
   windows: `${RELEASES}/Oxys-Restaurante-Setup.exe`,
   mac: `${RELEASES}/Oxys-Restaurante-Mac.dmg`,
+  linux: `${RELEASES}/Oxys-Restaurante-Linux.deb`,
 };

@@ -1,4 +1,4 @@
-# App de computador (Windows e Mac). Para lançar uma versão:
+# App de computador (Windows, Mac e Linux). Para lançar uma versão:
 #   git tag v1.0.1 && git push origin v1.0.1
 # Os instaladores vão para a página Releases do GitHub e os apps já instalados se atualizam sozinhos.
 name: App de computador
@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -49,8 +49,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Certificados opcionais (sem eles o instalador sai sem assinatura digital).
-          CSC_LINK: ${{ matrix.os == 'macos-latest' && secrets.MAC_CERTIFICATE_P12 || secrets.WIN_CERTIFICATE_PFX }}
-          CSC_KEY_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.MAC_CERTIFICATE_PASSWORD || secrets.WIN_CERTIFICATE_PASSWORD }}
+          CSC_LINK: ${{ matrix.os == 'macos-latest' && secrets.MAC_CERTIFICATE_P12 || matrix.os == 'windows-latest' && secrets.WIN_CERTIFICATE_PFX || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.MAC_CERTIFICATE_PASSWORD || matrix.os == 'windows-latest' && secrets.WIN_CERTIFICATE_PASSWORD || '' }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -63,4 +63,6 @@ jobs:
           path: |
             desktop/release/*.exe
             desktop/release/*.dmg
+            desktop/release/*.AppImage
+            desktop/release/*.deb
           if-no-files-found: ignore

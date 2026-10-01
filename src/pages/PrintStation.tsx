@@ -201,6 +201,7 @@ export default function PrintStation() {
             <span className="min-w-0 flex-1">Mais fácil: instale o app Oxys Restaurante no computador. Ele imprime sozinho e deixa escolher a impressora de cada setor.</span>
             <Button size="sm" variant="outline" className="gap-2" asChild><a href={DESKTOP_DOWNLOADS.windows}><Download className="h-4 w-4" /> Windows</a></Button>
             <Button size="sm" variant="outline" className="gap-2" asChild><a href={DESKTOP_DOWNLOADS.mac}><Download className="h-4 w-4" /> Mac</a></Button>
+            <Button size="sm" variant="outline" className="gap-2" asChild><a href={DESKTOP_DOWNLOADS.linux}><Download className="h-4 w-4" /> Linux</a></Button>
           </div>
           <Tabs defaultValue="windows">
             <TabsList>
