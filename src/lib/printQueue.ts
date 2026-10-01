@@ -56,13 +56,13 @@ export const CONNECTIONS: Record<Connection, { label: string; description: strin
   },
   cloudprnt: {
     label: 'Star CloudPRNT',
-    description: 'Impressoras Star com CloudPRNT buscam os cupons sozinhas, sem computador.',
-    available: false,
+    description: 'Impressoras Star com CloudPRNT (mC-Print3, TSP143IV...) buscam os cupons sozinhas pela internet, sem computador.',
+    available: true,
   },
   epson_sdp: {
     label: 'Epson Server Direct Print',
-    description: 'Impressoras Epson compatíveis buscam os cupons sozinhas, sem computador.',
-    available: false,
+    description: 'Impressoras Epson com Server Direct Print (TM-m30, TM-T88VI/VII...) buscam os cupons sozinhas pela internet, sem computador.',
+    available: true,
   },
 };
 
@@ -116,6 +116,10 @@ export async function requeueJob(jobId: string) {
     .update({ status: 'queued', error: null, claimed_by: null, claimed_at: null }).eq('id', jobId);
   if (error) throw error;
 }
+
+/** Endereço que a impressora nuvem consulta (a chave fica no caminho). */
+export const cloudPrintUrl = (connection: Connection, token: string) =>
+  `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cloud-print/${connection === 'cloudprnt' ? 'star' : 'epson'}/${token}`;
 
 // ---------- Estação de impressão (este navegador) ----------
 const STATION_KEY = 'oxys.printStation';

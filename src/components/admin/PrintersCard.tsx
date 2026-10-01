@@ -16,6 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Loader2, MonitorSmartphone, Pencil, Plus, Printer as PrinterIcon, RotateCw, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import PrintAgentPanel from '@/components/admin/PrintAgentPanel';
+import CloudPrinterLink from '@/components/admin/CloudPrinterLink';
 import { printerModels, type ThermalWidth } from '@/lib/printing';
 import {
   CONNECTIONS, enqueueJob, JOB_PURPOSES, PRINTER_COLUMNS, PURPOSE_AUTO_HINT, PURPOSE_LABELS, requeueJob, STATUS_LABELS,
@@ -30,6 +31,8 @@ const emptyDraft = (): Draft => ({
 });
 
 const fmt = (d: string) => new Date(d).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+/** Agente e impressoras nuvem avisam o servidor a cada poucos segundos. */
+const isOnline = (p: Printer) => !!p.last_seen_at && Date.now() - new Date(p.last_seen_at).getTime() < 90_000;
 
 export default function PrintersCard({ restaurantId }: { restaurantId: string }) {
   const qc = useQueryClient();
@@ -38,6 +41,7 @@ export default function PrintersCard({ restaurantId }: { restaurantId: string })
 
   const { data: printers, isLoading } = useQuery({
     queryKey: ['printers-admin', restaurantId],
+    refetchInterval: 30_000,
     queryFn: async () => {
       const { data, error } = await supabase.from('printers').select(PRINTER_COLUMNS).eq('restaurant_id', restaurantId).order('name');
       if (error) throw error;
@@ -139,12 +143,16 @@ export default function PrintersCard({ restaurantId }: { restaurantId: string })
                     {p.name}
                     <Badge variant="outline">{CONNECTIONS[p.connection].label}</Badge>
                     {p.auto_print && <Badge variant="secondary">Automática</Badge>}
+                    {p.connection !== 'browser' && (
+                      <Badge variant={isOnline(p) ? 'secondary' : 'destructive'}>{isOnline(p) ? 'Conectada' : 'Sem contato'}</Badge>
+                    )}
                   </p>
                   <p className="text-xs text-muted-foreground">{p.purposes.map(x => PURPOSE_LABELS[x]).join(' · ')} · {p.width} · {p.copies} via(s)</p>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Switch checked={p.enabled} onCheckedChange={() => toggle.mutate(p)} aria-label="Ativa" /> {p.enabled ? 'Ativa' : 'Desativada'}
                 </div>
+                {(p.connection === 'cloudprnt' || p.connection === 'epson_sdp') && <CloudPrinterLink printer={p} />}
                 <Button size="sm" variant="outline" className="gap-2" disabled={test.isPending || !p.enabled} onClick={() => test.mutate(p)}><Send className="h-4 w-4" /> Testar</Button>
                 <Button size="icon" variant="ghost" onClick={() => setDraft({ ...p })} aria-label="Editar"><Pencil className="h-4 w-4" /></Button>
                 <AlertDialog>

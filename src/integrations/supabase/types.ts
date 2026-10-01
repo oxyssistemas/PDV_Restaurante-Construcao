@@ -3163,6 +3163,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      printer_device_token: { Args: { _printer_id: string }; Returns: string }
+      rotate_printer_token: { Args: { _printer_id: string }; Returns: string }
       claim_print_job: {
         Args: { _job_id: string; _station: string }
         Returns: {

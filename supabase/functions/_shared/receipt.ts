@@ -184,7 +184,7 @@ export function row(l: string, r: string, width: number): string[] {
 const ESC = 0x1b, GS = 0x1d;
 const enc = new TextEncoder();
 
-export function toEscPos(ops: Op[], width: '58mm' | '80mm'): Uint8Array {
+export function toEscPos(ops: Op[], width: '58mm' | '80mm'): Uint8Array<ArrayBuffer> {
   const cols = columns(width);
   const bytes: number[] = [ESC, 0x40]; // inicializa
   const push = (...b: number[]) => bytes.push(...b);
@@ -233,3 +233,83 @@ export const toBase64 = (b: Uint8Array) => {
   for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
   return btoa(s);
 };
+
+// ---------- Star (StarPRNT, impressoras com CloudPRNT) ----------
+export function toStarPrnt(ops: Op[], width: '58mm' | '80mm'): Uint8Array<ArrayBuffer> {
+  const cols = columns(width);
+  const bytes: number[] = [ESC, 0x40];
+  const push = (...b: number[]) => bytes.push(...b);
+  const text = (s: string) => bytes.push(...enc.encode(ascii(s)));
+  const style = (bold?: boolean, big?: boolean) => { push(ESC, bold ? 0x45 : 0x46); push(ESC, 0x69, big ? 1 : 0, big ? 1 : 0); };
+  const align = (a?: Align) => push(ESC, GS, 0x61, a === 'center' ? 1 : a === 'right' ? 2 : 0);
+
+  for (const op of ops) {
+    switch (op.t) {
+      case 'text': {
+        const w = op.big ? Math.floor(cols / 2) : cols;
+        align(op.align); style(op.bold, op.big);
+        for (const line of wrap(ascii(op.s), w)) { text(line); push(0x0a); }
+        style(false, false); align('left');
+        break;
+      }
+      case 'row': {
+        const w = op.big ? Math.floor(cols / 2) : cols;
+        style(op.bold, op.big);
+        for (const line of row(op.l, op.r, w)) { text(line); push(0x0a); }
+        style(false, false);
+        break;
+      }
+      case 'sep': text('-'.repeat(cols)); push(0x0a); break;
+      case 'feed': push(ESC, 0x61, Math.min(op.n, 10)); break;
+      case 'qr': {
+        const data = enc.encode(op.data);
+        align('center');
+        push(ESC, GS, 0x79, 0x53, 0x30, 0x02);                 // modelo 2
+        push(ESC, GS, 0x79, 0x53, 0x31, 0x01);                 // correção M
+        push(ESC, GS, 0x79, 0x53, 0x32, width === '58mm' ? 4 : 5); // tamanho da célula
+        push(ESC, GS, 0x79, 0x44, 0x31, 0x00, data.length & 0xff, data.length >> 8, ...data);
+        push(ESC, GS, 0x79, 0x50, 0x0a);
+        align('left');
+        break;
+      }
+      case 'cut': push(ESC, 0x64, 0x03); break; // corte parcial após avanço
+    }
+  }
+  return new Uint8Array(bytes);
+}
+
+/** Texto puro: todo equipamento CloudPRNT aceita (sem negrito/QR), usado como reserva. */
+export function toPlainText(ops: Op[], width: '58mm' | '80mm'): string {
+  const cols = columns(width);
+  const out: string[] = [];
+  const center = (s: string) => ' '.repeat(Math.max(0, Math.floor((cols - s.length) / 2))) + s;
+  for (const op of ops) {
+    if (op.t === 'text') for (const l of wrap(ascii(op.s), cols)) out.push(op.align === 'center' ? center(l) : op.align === 'right' ? l.padStart(cols) : l);
+    else if (op.t === 'row') out.push(...row(op.l, op.r, cols));
+    else if (op.t === 'sep') out.push('-'.repeat(cols));
+    else if (op.t === 'feed') out.push(...Array(op.n).fill(''));
+    else if (op.t === 'qr') out.push(center('[QR Code: consulte pela chave de acesso]'));
+  }
+  return out.join('\n') + '\n';
+}
+
+// ---------- Epson ePOS-Print XML (Server Direct Print) ----------
+const xmlEsc = (s: string) => ascii(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+export function toEposXml(ops: Op[], width: '58mm' | '80mm'): string {
+  const cols = columns(width);
+  const parts: string[] = [];
+  const t = (s: string, a: { align?: Align; bold?: boolean; big?: boolean } = {}) =>
+    parts.push(`<text align="${a.align ?? 'left'}" em="${a.bold ? 'true' : 'false'}" dw="${a.big ? 'true' : 'false'}" dh="${a.big ? 'true' : 'false'}">${xmlEsc(s)}&#10;</text>`);
+  for (const op of ops) {
+    switch (op.t) {
+      case 'text': for (const l of wrap(ascii(op.s), op.big ? Math.floor(cols / 2) : cols)) t(l, op); break;
+      case 'row': for (const l of row(op.l, op.r, op.big ? Math.floor(cols / 2) : cols)) t(l, op); break;
+      case 'sep': t('-'.repeat(cols)); break;
+      case 'feed': parts.push(`<feed line="${Math.min(op.n, 10)}"/>`); break;
+      case 'qr': parts.push(`<text align="center"/><symbol type="qrcode_model_2" level="level_m" width="${width === '58mm' ? 4 : 5}">${xmlEsc(op.data)}</symbol><feed/><text align="left"/>`); break;
+      case 'cut': parts.push('<cut type="feed"/>'); break;
+    }
+  }
+  return `<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">${parts.join('')}</epos-print>`;
+}
