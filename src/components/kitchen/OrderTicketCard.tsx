@@ -29,6 +29,13 @@ export function elapsedMinutes(iso: string) {
   return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
 }
 
+/** 45m · 2h05 · 3d — tempo de espera curto o bastante para caber no cartão. */
+export function formatWait(mins: number) {
+  if (mins < 60) return `${mins}m`;
+  if (mins < 24 * 60) return `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, '0')}`;
+  return `${Math.floor(mins / (24 * 60))}d`;
+}
+
 export function timeTone(mins: number) {
   if (mins < 5) return 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10';
   if (mins < 10) return 'text-amber-400 border-amber-500/40 bg-amber-500/10';
@@ -65,14 +72,14 @@ function OrderTicketCardBase({ ticket, now, selected, onSelect, onDragStart }: P
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-sm font-semibold">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-1.5 text-sm font-semibold leading-snug">
             {ticket.isDelivery ? (
-              <Bike className="h-4 w-4 shrink-0 text-primary" />
+              <Bike className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
             ) : (
-              <UtensilsCrossed className="h-4 w-4 shrink-0 text-primary" />
+              <UtensilsCrossed className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
             )}
-            <span className="truncate">{ticket.title}</span>
+            <span className="line-clamp-2 break-words">{ticket.title}</span>
           </div>
           <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
             <User className="h-3 w-3" />
@@ -80,7 +87,7 @@ function OrderTicketCardBase({ ticket, now, selected, onSelect, onDragStart }: P
           </div>
         </div>
         <Badge variant="outline" className={cn('shrink-0 gap-1 text-[11px] font-semibold', timeTone(mins))}>
-          <Clock className="h-3 w-3" /> {mins}m
+          <Clock className="h-3 w-3" /> {formatWait(mins)}
         </Badge>
       </div>
 

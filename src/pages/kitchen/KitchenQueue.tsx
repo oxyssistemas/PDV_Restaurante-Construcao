@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import {
   Loader2, Clock, Flame, CheckCircle2, ChefHat, Printer, LogOut, Search, Bike,
-  UtensilsCrossed, X, Timer, Wifi, RefreshCw, ArrowRightLeft, Ban, User, AlertTriangle, Power,
+  UtensilsCrossed, X, Timer, Wifi, RefreshCw, ArrowRightLeft, Ban, User, AlertTriangle, Power, Menu,
 } from 'lucide-react';
 import { useEffect, useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -18,7 +19,7 @@ import { ptBR } from 'date-fns/locale';
 import { authorLabel } from '@/lib/orders';
 import { cn } from '@/lib/utils';
 import logo from '@/assets/oxys-logo.png';
-import { OrderTicketCard, timeTone, type KdsTicket, type KdsItem } from '@/components/kitchen/OrderTicketCard';
+import { OrderTicketCard, formatWait, timeTone, type KdsTicket, type KdsItem } from '@/components/kitchen/OrderTicketCard';
 
 type ColumnKey = 'new' | 'preparing' | 'ready' | 'waiting';
 
@@ -51,6 +52,8 @@ export default function KitchenQueue() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [dragging, setDragging] = useState<KdsTicket | null>(null);
   const [dragOver, setDragOver] = useState<ColumnKey | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileCol, setMobileCol] = useState<ColumnKey>('new');
 
   useEffect(() => {
     const t = setInterval(() => { setNow(Date.now()); setClock(new Date()); }, 1000);
@@ -331,10 +334,8 @@ export default function KitchenQueue() {
   }, [tickets, closeKitchen]);
 
 
-  return (
-    <div className="flex h-screen w-full">
-      {/* Sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-[#111827] p-4 lg:flex">
+  const sidebarContent = (
+    <>
         <div className="flex items-center gap-2">
           <img src={logo} alt="Oxys Sistemas" className="h-9 w-9 rounded-lg object-contain" />
           <div>
@@ -349,7 +350,7 @@ export default function KitchenQueue() {
         <ScrollArea className="mt-2 flex-1">
           <div className="space-y-1 pr-2">
             <button
-              onClick={() => setSector('all')}
+              onClick={() => { setSector('all'); setMenuOpen(false); }}
               className={cn('flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm transition-colors',
                 sector === 'all' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:bg-muted/40')}
             >
@@ -359,7 +360,7 @@ export default function KitchenQueue() {
             {sectors.map(([name, count]) => (
               <button
                 key={name}
-                onClick={() => setSector(name)}
+                onClick={() => { setSector(name); setMenuOpen(false); }}
                 className={cn('flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm transition-colors',
                   sector === name ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:bg-muted/40')}
               >
@@ -380,20 +381,37 @@ export default function KitchenQueue() {
           onClick={async () => { await signOut(); navigate('/login'); }}>
           <LogOut className="mr-2 h-4 w-4" /> Sair
         </Button>
+    </>
+  );
+
+  return (
+    <div className="flex h-screen w-full">
+      {/* Sidebar (computador) e menu lateral (tablet/celular) */}
+      <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-[#111827] p-4 lg:flex">
+        {sidebarContent}
       </aside>
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+        <SheetContent side="left" className="flex w-72 flex-col bg-[#111827] p-4">
+          <SheetTitle className="sr-only">Menu da cozinha</SheetTitle>
+          {sidebarContent}
+        </SheetContent>
+      </Sheet>
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-wrap items-center gap-3 border-b border-border bg-[#111827] px-4 py-3">
-          <div className="flex items-center gap-2">
-            <ChefHat className="h-6 w-6 text-primary" />
-            <h1 className="text-lg font-bold">Portal da Cozinha</h1>
-            <Badge variant="outline" className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-[11px] text-emerald-400">
+        <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-[#111827] px-3 py-3 sm:px-4">
+          <div className="flex min-w-0 items-center gap-2">
+            <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0 lg:hidden" aria-label="Menu" onClick={() => setMenuOpen(true)}>
+              <Menu className="h-5 w-5" />
+            </Button>
+            <ChefHat className="h-6 w-6 shrink-0 text-primary" />
+            <h1 className="truncate text-lg font-bold">Portal da Cozinha</h1>
+            <Badge variant="outline" className="hidden gap-1 border-emerald-500/40 bg-emerald-500/10 text-[11px] text-emerald-400 sm:inline-flex">
               <Wifi className="h-3 w-3" /> Online
             </Badge>
           </div>
 
-          <div className="relative ml-auto w-full max-w-xs">
+          <div className="relative order-last w-full md:order-none md:ml-auto md:w-64 xl:w-80">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
@@ -404,18 +422,18 @@ export default function KitchenQueue() {
           </div>
 
           {kitchenOpen ? (
-            <Button variant="outline" className="h-10 gap-2 rounded-xl border-destructive/40 text-destructive"
-              disabled={closeKitchen.isPending} onClick={handleCloseKitchen}>
-              <Power className="h-4 w-4" /> Fechar cozinha
+            <Button variant="outline" className="ml-auto h-10 gap-2 rounded-xl border-destructive/40 text-destructive md:ml-0"
+              disabled={closeKitchen.isPending} onClick={handleCloseKitchen} aria-label="Fechar cozinha">
+              <Power className="h-4 w-4" /> <span className="hidden sm:inline">Fechar cozinha</span>
             </Button>
           ) : (
-            <Button className="h-10 gap-2 rounded-xl" disabled={openKitchen.isPending || loadingSession}
+            <Button className="ml-auto h-10 gap-2 rounded-xl md:ml-0" disabled={openKitchen.isPending || loadingSession}
               onClick={() => openKitchen.mutate()}>
               <Power className="h-4 w-4" /> Abrir cozinha
             </Button>
           )}
 
-          <div className="text-right">
+          <div className="hidden text-right sm:block">
             <p className="font-mono text-xl font-bold leading-none">{format(clock, 'HH:mm:ss')}</p>
             <p className="text-[11px] text-muted-foreground">
               {format(clock, "EEE, dd 'de' MMM", { locale: ptBR })} · sync {format(lastSync, 'HH:mm')}
@@ -442,7 +460,7 @@ export default function KitchenQueue() {
         </div>
 
         {/* Kanban */}
-        <div className="min-h-0 flex-1 overflow-x-auto">
+        <div className="min-h-0 flex-1">
           {isLoading || loadingSession ? (
             <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
           ) : !kitchenOpen ? (
@@ -458,14 +476,27 @@ export default function KitchenQueue() {
             </div>
           ) : (
 
-            <div className="flex h-full min-w-[900px] gap-3 p-3">
+            <div className="flex h-full flex-col">
+              {/* Celular/tablet pequeno: uma coluna por vez */}
+              <div className="grid grid-cols-4 gap-1 border-b border-border p-2 md:hidden">
+                {columns.map((col) => (
+                  <button key={col.key} type="button" onClick={() => setMobileCol(col.key)}
+                    className={cn('flex flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-bold tracking-wide transition-colors',
+                      mobileCol === col.key ? 'bg-primary/15 text-primary' : 'text-muted-foreground')}>
+                    <span className="flex items-center gap-1"><span className={cn('h-1.5 w-1.5 rounded-full', col.dot)} />{byColumn[col.key].length}</span>
+                    <span className="truncate">{col.label}</span>
+                  </button>
+                ))}
+              </div>
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 md:grid-cols-4">
               {columns.map((col) => (
                 <section
                   key={col.key}
                   onDragOver={(e) => { e.preventDefault(); setDragOver(col.key); }}
                   onDragLeave={() => setDragOver((c) => (c === col.key ? null : c))}
                   onDrop={() => { if (dragging) moveTicket(dragging, col.key); setDragging(null); setDragOver(null); }}
-                  className={cn('flex min-w-0 flex-1 flex-col rounded-2xl border border-border bg-card/40 transition-colors',
+                  className={cn('min-h-0 min-w-0 flex-col rounded-2xl border border-border bg-card/40 transition-colors md:flex',
+                    mobileCol === col.key ? 'flex' : 'hidden',
                     dragOver === col.key && 'border-primary bg-primary/5')}
                 >
                   <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
@@ -477,7 +508,7 @@ export default function KitchenQueue() {
                       {byColumn[col.key].length}
                     </Badge>
                   </div>
-                  <ScrollArea className="flex-1">
+                  <ScrollArea className="min-h-0 flex-1 [&_[data-radix-scroll-area-viewport]>div]:!block">
                     <div className="space-y-2 p-2">
                       <AnimatePresence mode="popLayout">
                         {byColumn[col.key].map((t) => (
@@ -499,16 +530,17 @@ export default function KitchenQueue() {
                 </section>
               ))}
             </div>
+            </div>
           )}
         </div>
 
         {/* Footer status bar */}
-        <footer className="flex flex-wrap items-center gap-4 border-t border-border bg-[#111827] px-4 py-2 text-[11px] text-muted-foreground">
+        <footer className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border bg-[#111827] px-4 py-2 text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1"><Flame className="h-3.5 w-3.5 text-primary" /> Novos: <b className="text-foreground">{byColumn.new.length}</b></span>
           <span className="flex items-center gap-1"><Timer className="h-3.5 w-3.5 text-amber-400" /> Em preparo: <b className="text-foreground">{byColumn.preparing.length}</b></span>
           <span className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Prontos: <b className="text-foreground">{byColumn.ready.length}</b></span>
           <span className="flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5 text-red-400" /> Atrasados: <b className="text-foreground">{lateCount}</b></span>
-          <span className="ml-auto flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> Última sinc.: {format(lastSync, 'HH:mm:ss')}</span>
+          <span className="ml-auto hidden items-center gap-1 sm:flex"><Clock className="h-3.5 w-3.5" /> Última sinc.: {format(lastSync, 'HH:mm:ss')}</span>
           <span className="flex items-center gap-1 text-emerald-400"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Online</span>
         </footer>
       </div>
@@ -521,7 +553,7 @@ export default function KitchenQueue() {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 380, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 32 }}
-            className="flex w-[360px] shrink-0 flex-col border-l border-border bg-[#111827]"
+            className="fixed inset-y-0 right-0 z-40 flex w-full max-w-[380px] flex-col border-l border-border bg-[#111827] shadow-2xl xl:static xl:z-auto xl:w-[360px] xl:shadow-none"
           >
             <div className="flex items-start justify-between gap-2 border-b border-border p-4">
               <div className="min-w-0">
@@ -533,7 +565,7 @@ export default function KitchenQueue() {
                   <User className="h-3 w-3" /> {selected.waiter}
                 </p>
                 <Badge variant="outline" className={cn('mt-2 gap-1 text-[11px]', timeTone(Math.floor((now - new Date(selected.createdAt).getTime()) / 60000)))}>
-                  <Clock className="h-3 w-3" /> {Math.floor((now - new Date(selected.createdAt).getTime()) / 60000)} min · {format(new Date(selected.createdAt), 'HH:mm')}
+                  <Clock className="h-3 w-3" /> {formatWait(Math.floor((now - new Date(selected.createdAt).getTime()) / 60000))} · {format(new Date(selected.createdAt), 'HH:mm')}
                 </Badge>
               </div>
               <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setSelectedKey(null)}>
