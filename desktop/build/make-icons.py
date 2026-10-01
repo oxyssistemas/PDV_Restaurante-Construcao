@@ -34,6 +34,10 @@ out = ROOT / 'desktop/build'
 # Placa branca arredondada: o azul-escuro do logo some na barra de tarefas escura.
 win = compose(1024, 0.84, rounded=True, margin=0.02)
 win.save(out / 'icon.png')
+# Linux: o tema de ícones do sistema só procura tamanhos padrão (até 512 px).
+(out / 'icons').mkdir(exist_ok=True)
+for n in (16, 24, 32, 48, 64, 128, 256, 512):
+    win.resize((n, n), Image.LANCZOS).save(out / 'icons' / f'{n}x{n}.png')
 win.save(out / 'icon.ico', sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
 compose(1024, 0.68, rounded=True).save(out / 'icon.icns')
 

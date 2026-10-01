@@ -104,7 +104,7 @@
           ]
         }
       ],
-      "icon": "build/icon.png",
+      "icon": "build/icons",
       "category": "Office",
       "maintainer": "Oxys Sistemas <oxyssistemas@gmail.com>",
       "synopsis": "Sistema para restaurantes",
