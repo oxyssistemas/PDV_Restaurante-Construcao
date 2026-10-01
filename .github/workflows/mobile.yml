@@ -73,6 +73,7 @@ jobs:
       # Até existir a conta Apple Developer: só confere que o app compila (para o simulador, sem assinatura).
       - name: Compilar para o simulador
         working-directory: ios/App
+        shell: bash  # com pipefail: erro do xcodebuild não some no "| tail"
         run: |
           xcodebuild -project App.xcodeproj -scheme App -configuration Debug \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
