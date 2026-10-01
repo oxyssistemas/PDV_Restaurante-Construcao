@@ -7,16 +7,22 @@ import { useBranding } from '@/contexts/BrandingContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Loader2, Printer as PrinterIcon, RotateCw, Send, Wifi, WifiOff } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, Monitor, Printer as PrinterIcon, RotateCw, Send, Wifi, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { printHtml } from '@/lib/printing';
+import { desktop, DESKTOP_DOWNLOADS } from '@/lib/desktop';
 import {
   enqueueJob, loadStation, PRINTER_COLUMNS, PURPOSE_LABELS, renderJob, requeueJob, saveStation, STATUS_LABELS,
   type JobPurpose, type PrintJob, type Printer,
 } from '@/lib/printQueue';
 import { getStationActivity, type StationActivity } from '@/components/print/PrintStationRunner';
+
+const DEFAULT_DEVICE = '__padrao__';
+const sameDevices = (a: Record<string, string>, b: Record<string, string>) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
 
 const fmt = (d: string) => new Date(d).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' });
 
@@ -28,12 +34,16 @@ export default function PrintStation() {
   const qc = useQueryClient();
   const [saved, setSaved] = useState<string[]>(() => loadStation(restaurantId)?.printerIds ?? []);
   const [selected, setSelected] = useState<string[]>(saved);
+  const [savedDevices, setSavedDevices] = useState<Record<string, string>>(() => loadStation(restaurantId)?.devices ?? {});
+  const [devices, setDevices] = useState<Record<string, string>>(savedDevices);
   const [activity, setActivity] = useState<StationActivity>(getStationActivity);
 
   useEffect(() => {
-    const ids = loadStation(restaurantId)?.printerIds ?? [];
-    setSaved(ids);
-    setSelected(ids);
+    const station = loadStation(restaurantId);
+    setSaved(station?.printerIds ?? []);
+    setSelected(station?.printerIds ?? []);
+    setSavedDevices(station?.devices ?? {});
+    setDevices(station?.devices ?? {});
   }, [restaurantId]);
   useEffect(() => {
     const on = (e: Event) => {
@@ -68,12 +78,17 @@ export default function PrintStation() {
     },
   });
 
+  // App de computador: impressoras instaladas no Windows/Mac e opção de abrir com o computador.
+  const { data: osPrinters } = useQuery({ queryKey: ['desktop-printers'], enabled: !!desktop, queryFn: () => desktop!.listPrinters() });
+  const { data: appInfo, refetch: refetchInfo } = useQuery({ queryKey: ['desktop-info'], enabled: !!desktop, queryFn: () => desktop!.info() });
+
   const byId = useMemo(() => Object.fromEntries((printers || []).map(p => [p.id, p])), [printers]);
-  const dirty = selected.slice().sort().join() !== saved.slice().sort().join();
+  const dirty = selected.slice().sort().join() !== saved.slice().sort().join() || !sameDevices(devices, savedDevices);
 
   const save = () => {
-    saveStation(restaurantId!, selected);
+    saveStation(restaurantId!, selected, devices);
     setSaved(selected);
+    setSavedDevices(devices);
     qc.invalidateQueries({ queryKey: ['print-jobs'] });
     toast.success(selected.length ? 'Este computador agora imprime as impressoras marcadas' : 'Estação desligada neste computador');
   };
@@ -94,7 +109,9 @@ export default function PrintStation() {
   const printHere = async (job: PrintJob) => {
     const p = byId[job.printer_id];
     if (!p) return;
-    await printHtml(await renderJob(job.document, p));
+    const html = await renderJob(job.document, p);
+    if (desktop) await desktop.printHtml(html, { deviceName: devices[p.id] });
+    else await printHtml(html);
     await supabase.from('print_jobs').update({ status: 'done', printed_at: new Date().toISOString(), error: null }).eq('id', job.id);
     qc.invalidateQueries({ queryKey: ['print-jobs'] });
   };
@@ -133,6 +150,16 @@ export default function PrintStation() {
                 <span className="flex items-center gap-2 font-medium"><PrinterIcon className="h-4 w-4" /> {p.name} {!p.enabled && <Badge variant="outline">Desativada</Badge>}</span>
                 <span className="block text-xs text-muted-foreground">{p.purposes.map(x => PURPOSE_LABELS[x as JobPurpose]).join(' · ')} · {p.width}</span>
               </label>
+              {desktop && selected.includes(p.id) && (
+                <Select value={devices[p.id] || DEFAULT_DEVICE}
+                  onValueChange={v => setDevices(d => { const next = { ...d }; if (v === DEFAULT_DEVICE) delete next[p.id]; else next[p.id] = v; return next; })}>
+                  <SelectTrigger className="h-9 w-full sm:w-60" aria-label={`Impressora do computador para ${p.name}`}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={DEFAULT_DEVICE}>Padrão do computador</SelectItem>
+                    {(osPrinters || []).map(o => <SelectItem key={o.name} value={o.name}>{o.displayName}{o.isDefault ? ' (padrão)' : ''}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
               <Button size="sm" variant="outline" className="gap-2" disabled={test.isPending} onClick={() => test.mutate(p)}>
                 <Send className="h-4 w-4" /> Testar
               </Button>
@@ -145,6 +172,21 @@ export default function PrintStation() {
         </CardContent>
       </Card>
 
+      {desktop ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">App Oxys Restaurante neste computador</CardTitle>
+            <CardDescription>Os cupons saem sozinhos, sem janela de impressão, na impressora escolhida para cada setor acima.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <label className="flex items-center justify-between gap-3">
+              <span>Abrir o Oxys quando o computador ligar</span>
+              <Switch checked={!!appInfo?.autoStart} onCheckedChange={async v => { await desktop!.setAutoStart(v); refetchInfo(); }} />
+            </label>
+            {appInfo && <p className="text-xs text-muted-foreground">Versão {appInfo.version}. O app se atualiza sozinho.</p>}
+          </CardContent>
+        </Card>
+      ) : (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Imprimir sem abrir a janela de impressão</CardTitle>
@@ -153,7 +195,13 @@ export default function PrintStation() {
             atalho do Google Chrome com a impressão silenciosa ligada. Os cupons vão para a <strong>impressora padrão</strong> do computador.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+            <Monitor className="h-4 w-4 text-primary" />
+            <span className="min-w-0 flex-1">Mais fácil: instale o app Oxys Restaurante no computador. Ele imprime sozinho e deixa escolher a impressora de cada setor.</span>
+            <Button size="sm" variant="outline" className="gap-2" asChild><a href={DESKTOP_DOWNLOADS.windows}><Download className="h-4 w-4" /> Windows</a></Button>
+            <Button size="sm" variant="outline" className="gap-2" asChild><a href={DESKTOP_DOWNLOADS.mac}><Download className="h-4 w-4" /> Mac</a></Button>
+          </div>
           <Tabs defaultValue="windows">
             <TabsList>
               <TabsTrigger value="windows">Windows</TabsTrigger>
@@ -184,6 +232,7 @@ export default function PrintStation() {
           </Tabs>
         </CardContent>
       </Card>
+      )}
 
       {saved.length > 0 && (
         <Card>

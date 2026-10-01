@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { edgeErrorMessage } from '@/lib/functionError';
+import { publicOrigin } from '@/lib/native';
 
 export type Network = 'facebook' | 'instagram' | 'tiktok';
 export type Provider = 'meta' | 'tiktok';
@@ -56,7 +57,8 @@ export const marketingConfig = async () =>
 
 /** Abre o login oficial da rede; ela devolve o usuário para a tela de Conexões. */
 export async function startConnect(restaurantId: string, provider: Provider) {
-  const returnTo = `${window.location.origin}/marketing/connections`;
+  // No app de celular o login abre no navegador e volta para o site; a tela de Conexões atualiza ao voltar.
+  const returnTo = `${publicOrigin()}/marketing/connections`;
   const { url } = await invoke('marketing-oauth', { action: 'start', restaurantId, provider, returnTo });
   window.location.href = url;
 }

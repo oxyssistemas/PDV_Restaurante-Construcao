@@ -1,0 +1,54 @@
+{
+  "name": "oxys-restaurante-desktop",
+  "productName": "Oxys Restaurante",
+  "version": "1.0.0",
+  "description": "Oxys Restaurante para Windows e Mac",
+  "author": "Oxys Sistemas <oxyssistemas@gmail.com>",
+  "homepage": "https://www.oxysrestaurante.app",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "icons": "python3 build/make-icons.py",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "release": "electron-builder --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "app.oxysrestaurante.desktop",
+    "productName": "Oxys Restaurante",
+    "copyright": "Oxys Sistemas",
+    "files": ["main.cjs", "preload.cjs", "offline.html", "build/icon.png"],
+    "directories": { "output": "release", "buildResources": "build" },
+    "publish": [{ "provider": "github", "owner": "oxyssistemas", "repo": "PDV_Restaurante-Construcao", "releaseType": "release" }],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.ico",
+      "artifactName": "Oxys-Restaurante-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Oxys Restaurante",
+      "language": "1046"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["universal"] }, { "target": "zip", "arch": ["universal"] }],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.business",
+      "artifactName": "Oxys-Restaurante-Mac.${ext}",
+      "hardenedRuntime": true
+    },
+    "dmg": { "title": "Oxys Restaurante" }
+  }
+}

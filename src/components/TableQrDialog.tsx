@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Copy, Download, Printer, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { publicOrigin } from '@/lib/native';
 
 interface Props {
   tableNumber: number;
@@ -15,7 +16,7 @@ interface Props {
 
 export default function TableQrDialog({ tableNumber, qrToken, brandName }: Props) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
-  const link = `${window.location.origin}/mesa/${qrToken}`;
+  const link = `${publicOrigin()}/mesa/${qrToken}`;
 
   useEffect(() => {
     QRCode.toDataURL(link, { width: 600, margin: 1 })

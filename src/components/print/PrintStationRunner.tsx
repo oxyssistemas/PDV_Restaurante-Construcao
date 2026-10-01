@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { printHtml } from '@/lib/printing';
+import { desktop } from '@/lib/desktop';
 import { loadStation, PRINTER_COLUMNS, renderJob, type PrintJob, type Printer, type StationConfig } from '@/lib/printQueue';
 
 /** Trabalhos mais antigos que isso não saem sozinhos (ex.: estação ficou desligada); dá para imprimir pela tela. */
@@ -61,7 +62,10 @@ export default function PrintStationRunner() {
           try {
             if (!printer || !printer.enabled) throw new Error('Impressora desativada');
             publish({ printing: true });
-            await printHtml(await renderJob(job.document, printer));
+            const html = await renderJob(job.document, printer);
+            // No app de computador sai direto na impressora escolhida, sem janela.
+            if (desktop) await desktop.printHtml(html, { deviceName: station.devices?.[printer.id] });
+            else await printHtml(html);
             await supabase.from('print_jobs').update({ status: 'done', printed_at: new Date().toISOString(), error: null }).eq('id', job.id);
             publish({ printing: false, lastPrintedAt: new Date().toISOString(), lastError: null });
           } catch (e) {

@@ -467,3 +467,62 @@ O Instagram precisa ser uma conta Profissional ligada a uma Página do Facebook.
 - No computador ligado à impressora, abra "Estação de impressão" e marque as impressoras dele. Para não aparecer a janela de impressão, abra o Chrome com `--kiosk-printing` (passo a passo na própria tela).
 - Agente local (`public/agente/`, baixado pelo restaurante em Configurações → Impressoras): roda com Node.js em qualquer PC da casa e manda ESC/POS direto para impressoras de rede (IP:9100) ou instaladas no Windows/Linux/Mac, sem janela. Usa a função `print-agent` com a chave gerada pelo admin. Os cupons em ESC/POS são montados no servidor (`supabase/functions/_shared/receipt.ts`).
 - Impressoras nuvem, sem computador: Star CloudPRNT (StarPRNT, com texto puro como reserva) e Epson Server Direct Print (ePOS-Print XML), pela função `cloud-print`. Cada impressora tem um link secreto (botão "Link" na lista de impressoras) que é configurado na página da própria impressora.
+
+## 💻📱 Apps de computador e celular
+
+| Versão | Onde está | Como é feita |
+| --- | --- | --- |
+| Web (nuvem) | https://www.oxysrestaurante.app | Vercel, a cada push |
+| Windows e Mac | Releases do GitHub (`Oxys-Restaurante-Setup.exe`, `Oxys-Restaurante-Mac.dmg`) | `desktop/` (Electron), workflow **App de computador** |
+| Android e iOS | Play Store / App Store | Capacitor (`android/`, `ios/`), workflow **App de celular** |
+
+### App de computador (`desktop/`)
+
+Abre o sistema online, então está sempre atualizado sem reinstalar. Além do navegador, ele:
+
+- imprime os cupons **direto na impressora, sem janela** (Estação de impressão → escolha a impressora do computador para cada setor);
+- abre junto com o computador (opção na Estação de impressão), com atalho na área de trabalho;
+- mostra uma tela própria quando a internet cai e volta sozinho;
+- se atualiza sozinho pelas Releases do GitHub (por isso o repositório precisa continuar **público**; se ficar privado, troque o `publish` em `desktop/package.json` por um servidor próprio).
+
+Testar localmente: `cd desktop && npm install && npm start` (use `OXYS_URL=http://localhost:8080 npm start` para abrir o servidor local).
+
+**Lançar uma versão:** `git tag v1.0.1 && git push origin v1.0.1`. O GitHub gera o `.exe` e o `.dmg`, publica em Releases e os apps instalados se atualizam.
+
+Sem certificado de assinatura digital:
+- **Windows** mostra "O Windows protegeu o computador" na primeira instalação → *Mais informações* → *Executar assim mesmo*. Para remover o aviso, compre um certificado de assinatura de código e salve `WIN_CERTIFICATE_PFX` (base64) e `WIN_CERTIFICATE_PASSWORD` nos segredos do GitHub.
+- **Mac** bloqueia na primeira abertura → Ajustes do Sistema → Privacidade e Segurança → *Abrir mesmo assim*. Atualização automática no Mac só funciona com app assinado: com a conta Apple Developer, salve `MAC_CERTIFICATE_P12`, `MAC_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` e `APPLE_TEAM_ID`.
+
+### App de celular (Capacitor)
+
+O app leva o sistema completo dentro dele (todos os portais). Comandos:
+
+```bash
+npm run mobile:sync      # compila e copia para android/ e ios/
+npm run mobile:android   # abre no Android Studio
+npm run mobile:ios       # abre no Xcode (só no Mac)
+```
+
+Ícones e tela de abertura: `python3 desktop/build/make-icons.py && npm run mobile:assets`.
+
+No celular:
+- links de QR Code das mesas e o retorno do login das redes sociais usam o endereço público do site;
+- conectar Instagram/Facebook/TikTok abre o navegador do celular; ao voltar ao app, a tela de Conexões atualiza;
+- a impressão automática fica com a estação no computador, o agente local ou as impressoras nuvem (Star/Epson), porque o celular não imprime sem confirmação.
+
+**GitHub Actions:** em *Settings → Secrets and variables → Actions → Variables*, crie `VITE_SUPABASE_PROJECT_ID`, `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` (mesmos valores do `.env`). Cada versão gera um APK de teste (baixe em Actions → execução → Artifacts) e confere que o iOS compila.
+
+### Publicar nas lojas (checklist)
+
+**Google Play** (conta de desenvolvedor: US$ 25, pagamento único)
+1. Gere a chave de assinatura uma única vez e guarde em local seguro (se perder, não dá para atualizar o app):
+   `keytool -genkeypair -v -keystore oxys.jks -alias oxys -keyalg RSA -keysize 2048 -validity 10000`
+2. Segredos no GitHub: `ANDROID_KEYSTORE_BASE64` (`base64 -w0 oxys.jks`), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`oxys`), `ANDROID_KEY_PASSWORD`. O workflow passa a gerar o `.aab` assinado.
+3. No Play Console: crie o app `app.oxysrestaurante`, envie o `.aab` em *Teste interno*, preencha a ficha (ícone 512 px em `resources/icon-only.png`, capturas de tela, descrição), a *Segurança dos dados*, a classificação de conteúdo e a política de privacidade `https://www.oxysrestaurante.app/privacidade`.
+4. Contas pessoais novas precisam de um teste fechado com 12 testadores por 14 dias antes de publicar para todos.
+
+**App Store** (Apple Developer: US$ 99/ano; precisa de um Mac ou do workflow com certificados)
+1. No App Store Connect crie o app com o identificador `app.oxysrestaurante`.
+2. No Xcode (`npm run mobile:ios`): selecione o time em *Signing & Capabilities*, depois *Product → Archive → Distribute App*.
+3. Informe uma conta de demonstração para a revisão da Apple (usuário e senha de um restaurante de teste) e a URL de privacidade.
+4. Atenção à regra 4.2 da Apple (apps que são "só um site"): o app tem o sistema embutido, botão voltar, tela de abertura e funciona como ferramenta de trabalho, mas na descrição destaque os portais (garçom, cozinha, caixa) para a revisão.

@@ -123,7 +123,8 @@ export const cloudPrintUrl = (connection: Connection, token: string) =>
 
 // ---------- Estação de impressão (este navegador) ----------
 const STATION_KEY = 'oxys.printStation';
-export type StationConfig = { id: string; restaurantId: string; printerIds: string[] };
+/** `devices`: no app de computador, a impressora do Windows/Mac usada para cada impressora do sistema. */
+export type StationConfig = { id: string; restaurantId: string; printerIds: string[]; devices?: Record<string, string> };
 
 export function loadStation(restaurantId: string | null | undefined): StationConfig | null {
   if (!restaurantId) return null;
@@ -136,9 +137,9 @@ export function loadStation(restaurantId: string | null | undefined): StationCon
   }
 }
 
-export function saveStation(restaurantId: string, printerIds: string[]) {
+export function saveStation(restaurantId: string, printerIds: string[], devices?: Record<string, string>) {
   const current = loadStation(restaurantId);
-  const station: StationConfig = { id: current?.id ?? crypto.randomUUID(), restaurantId, printerIds };
+  const station: StationConfig = { id: current?.id ?? crypto.randomUUID(), restaurantId, printerIds, devices: devices ?? current?.devices };
   try {
     localStorage.setItem(STATION_KEY, JSON.stringify(station));
   } catch { /* navegador sem armazenamento: a estação vale só nesta aba */ }

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Oxys Restaurante</title>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body { display: grid; place-items: center; background: #0f172a; color: #e2e8f0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 420px; padding: 24px; text-align: center; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  p { color: #94a3b8; margin: 0 0 24px; }
+  button { background: #f97316; color: #fff; border: 0; border-radius: 8px; padding: 12px 24px; font-size: 16px; cursor: pointer; }
+  button:hover { background: #ea580c; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Sem conexão com a internet</h1>
+  <p>O Oxys Restaurante precisa de internet para funcionar. Verifique o cabo ou o Wi-Fi e tente de novo.</p>
+  <button id="retry">Tentar de novo</button>
+</main>
+<script>
+  const retry = () => window.oxysDesktop?.retry();
+  document.getElementById('retry').onclick = retry;
+  window.addEventListener('online', retry);
+  setInterval(() => { if (navigator.onLine) retry(); }, 15000);
+</script>
+</body>
+</html>
