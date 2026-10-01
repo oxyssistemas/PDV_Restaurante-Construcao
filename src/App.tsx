@@ -72,6 +72,8 @@ import MarketingOverview from "./pages/marketing/Overview";
 import MarketingConnections from "./pages/marketing/Connections";
 import MarketingPublish from "./pages/marketing/Publish";
 import Privacy from "./pages/legal/Privacy";
+import PrintStation from "./pages/PrintStation";
+import PrintStationRunner from "./components/print/PrintStationRunner";
 import Terms from "./pages/legal/Terms";
 import MarketingPosts from "./pages/marketing/Posts";
 import MarketingCampaigns from "./pages/marketing/Campaigns";
@@ -90,6 +92,7 @@ const App = () => (
         <AuthProvider>
           <BrandingProvider>
           <DocumentTitle />
+          <PrintStationRunner />
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/setup" element={<Setup />} />
@@ -97,6 +100,7 @@ const App = () => (
             <Route path="/mesa/:token" element={<TableMenu />} />
             <Route path="/privacidade" element={<Privacy />} />
             <Route path="/termos" element={<Terms />} />
+            <Route path="/impressao" element={<ProtectedRoute><PrintStation /></ProtectedRoute>} />
 
             {/* Super Admin */}
             <Route path="/super-admin" element={

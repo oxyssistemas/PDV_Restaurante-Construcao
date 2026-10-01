@@ -11,6 +11,7 @@ import {
   X,
   Circle,
   Clock,
+  Printer,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
@@ -25,6 +26,7 @@ const navItems = [
   { to: '/cashier/orders', icon: ShoppingCart, label: 'Lançar Pedido', end: false },
   { to: '/cashier/payments', icon: ReceiptText, label: 'Pagamentos', end: false },
   { to: '/cashier/movements', icon: ArrowDownUp, label: 'Movimentações', end: false },
+  { to: '/impressao', icon: Printer, label: 'Impressão', end: false },
 ];
 
 export default function CashierLayout() {

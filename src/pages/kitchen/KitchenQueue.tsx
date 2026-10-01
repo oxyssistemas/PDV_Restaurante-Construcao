@@ -373,6 +373,9 @@ export default function KitchenQueue() {
         <Button variant="outline" className="mt-3 w-full rounded-xl" onClick={() => printTickets(filtered)}>
           <Printer className="mr-2 h-4 w-4" /> Imprimir todos
         </Button>
+        <Button variant="ghost" className="mt-2 w-full rounded-xl text-muted-foreground" onClick={() => navigate('/impressao')}>
+          <Printer className="mr-2 h-4 w-4" /> Estação de impressão
+        </Button>
         <Button variant="ghost" className="mt-2 w-full rounded-xl text-muted-foreground"
           onClick={async () => { await signOut(); navigate('/login'); }}>
           <LogOut className="mr-2 h-4 w-4" /> Sair

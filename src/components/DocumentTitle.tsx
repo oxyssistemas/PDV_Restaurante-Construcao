@@ -8,6 +8,7 @@ const TITLES: { match: RegExp; title: string }[] = [
   { match: /^\/setup/, title: "Configuração inicial" },
   { match: /^\/privacidade/, title: "Política de Privacidade" },
   { match: /^\/termos/, title: "Termos de Uso" },
+  { match: /^\/impressao/, title: "Estação de impressão" },
   { match: /^\/super-admin\/restaurants/, title: "Restaurantes" },
   { match: /^\/super-admin/, title: "Painel Super Admin" },
   { match: /^\/admin\/menu/, title: "Cardápio" },

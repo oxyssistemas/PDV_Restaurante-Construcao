@@ -2542,6 +2542,79 @@ export type Database = {
         }
         Relationships: []
       }
+      print_jobs: {
+        Row: {
+          attempts: number
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string
+          created_by: string | null
+          document: Json
+          error: string | null
+          id: string
+          order_id: string | null
+          printed_at: string | null
+          printer_id: string
+          purpose: string
+          restaurant_id: string
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          document: Json
+          error?: string | null
+          id?: string
+          order_id?: string | null
+          printed_at?: string | null
+          printer_id: string
+          purpose: string
+          restaurant_id: string
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          document?: Json
+          error?: string | null
+          id?: string
+          order_id?: string | null
+          printed_at?: string | null
+          printer_id?: string
+          purpose?: string
+          restaurant_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "print_jobs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_jobs_printer_id_fkey"
+            columns: ["printer_id"]
+            isOneToOne: false
+            referencedRelation: "printers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_jobs_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       printer_settings: {
         Row: {
           copies: number
@@ -2588,6 +2661,74 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "printer_settings_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      printers: {
+        Row: {
+          address: string | null
+          auto_print: boolean
+          connection: string
+          copies: number
+          created_at: string
+          device_token: string
+          enabled: boolean
+          footer_note: string | null
+          header_note: string | null
+          id: string
+          last_seen_at: string | null
+          model: string
+          name: string
+          purposes: string[]
+          restaurant_id: string
+          updated_at: string
+          width: string
+        }
+        Insert: {
+          address?: string | null
+          auto_print?: boolean
+          connection?: string
+          copies?: number
+          created_at?: string
+          device_token?: string
+          enabled?: boolean
+          footer_note?: string | null
+          header_note?: string | null
+          id?: string
+          last_seen_at?: string | null
+          model?: string
+          name: string
+          purposes?: string[]
+          restaurant_id: string
+          updated_at?: string
+          width?: string
+        }
+        Update: {
+          address?: string | null
+          auto_print?: boolean
+          connection?: string
+          copies?: number
+          created_at?: string
+          device_token?: string
+          enabled?: boolean
+          footer_note?: string | null
+          header_note?: string | null
+          id?: string
+          last_seen_at?: string | null
+          model?: string
+          name?: string
+          purposes?: string[]
+          restaurant_id?: string
+          updated_at?: string
+          width?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "printers_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
@@ -3001,6 +3142,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_print_job: {
+        Args: { _job_id: string; _station: string }
+        Returns: {
+          attempts: number
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string
+          created_by: string | null
+          document: Json
+          error: string | null
+          id: string
+          order_id: string | null
+          printed_at: string | null
+          printer_id: string
+          purpose: string
+          restaurant_id: string
+          status: string
+        }[]
+      }
       clear_login_attempts: { Args: { _email: string }; Returns: undefined }
       create_qr_order: {
         Args: { _customer_name: string; _items: Json; _qr_token: string }

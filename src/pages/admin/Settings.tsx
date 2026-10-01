@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import PrinterSettingsCard from '@/components/admin/PrinterSettingsCard';
+import PrintersCard from '@/components/admin/PrintersCard';
 import FiscalSettingsCard from '@/components/admin/FiscalSettingsCard';
 
 export default function SettingsPage() {
@@ -96,7 +96,7 @@ export default function SettingsPage() {
       )}
 
       {restaurantId && (
-        <PrinterSettingsCard restaurantId={restaurantId} restaurantName={restaurant?.name || 'Oxys Restaurante'} />
+        <PrintersCard restaurantId={restaurantId} />
       )}
       </div>
     </div>

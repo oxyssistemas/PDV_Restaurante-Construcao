@@ -1,4 +1,8 @@
-/** Impressão térmica (58mm / 80mm) via iframe oculto. */
+/**
+ * Impressão térmica (58mm / 80mm).
+ * As funções render* montam o HTML do cupom; printHtml manda para a impressora do navegador
+ * (janela de impressão, ou direto quando o Chrome roda com --kiosk-printing).
+ */
 
 export type ThermalWidth = '58mm' | '80mm';
 
@@ -127,7 +131,8 @@ function shell(width: ThermalWidth, body: string) {
 </style></head><body>${body}</body></html>`;
 }
 
-function printHtml(html: string) {
+export function printHtml(html: string): Promise<void> {
+  return new Promise(resolve => {
   const iframe = document.createElement('iframe');
   iframe.style.position = 'fixed';
   iframe.style.right = '0';
@@ -137,17 +142,18 @@ function printHtml(html: string) {
   iframe.style.border = '0';
   document.body.appendChild(iframe);
   const doc = iframe.contentWindow?.document;
-  if (!doc) return;
+  if (!doc) { iframe.remove(); resolve(); return; }
   doc.open();
   doc.write(html);
   doc.close();
   const run = () => {
     iframe.contentWindow?.focus();
-    iframe.contentWindow?.print();
-    setTimeout(() => iframe.remove(), 1500);
+    iframe.contentWindow?.print(); // bloqueia até a janela de impressão fechar (ou imprime direto no modo quiosque)
+    setTimeout(() => { iframe.remove(); resolve(); }, 1500);
   };
   if (iframe.contentWindow?.document.readyState === 'complete') setTimeout(run, 150);
   else iframe.onload = () => setTimeout(run, 150);
+  });
 }
 
 function header(restaurantName: string, title: string, order: PrintOrder) {
@@ -177,20 +183,23 @@ function itemsBlock(items: PrintItem[], showPrices: boolean) {
   return `<div class="sep"></div>${rows.join('')}`;
 }
 
-/** Emite o HTML respeitando a configuração da impressora (largura, vias, notas). */
-function emit(body: string, config?: PrinterConfig | null, widthOverride?: ThermalWidth) {
-  if (config && config.enabled === false) return;
+/** Monta o HTML final respeitando a configuração da impressora (largura, vias, notas). */
+function compose(body: string, config?: PrinterConfig | null, widthOverride?: ThermalWidth) {
   const width = widthOverride || config?.width || '80mm';
   const copies = Math.min(Math.max(config?.copies ?? 1, 1), 5);
   const pre = config?.header_note ? `<div class="center small">${esc(config.header_note)}</div><div class="sep"></div>` : '';
   const post = config?.footer_note ? `<div class="sep"></div><div class="center small">${esc(config.footer_note)}</div>` : '';
   const one = pre + body + post;
   const all = Array.from({ length: copies }, (_, i) => (i === 0 ? one : `<div class="cut"></div>${one}`)).join('');
-  printHtml(shell(width, all));
+  return shell(width, all);
 }
 
-/** Pedido detalhado (comanda / via da cozinha). */
-export function printOrderTicket(opts: {
+function emit(body: string, config?: PrinterConfig | null, widthOverride?: ThermalWidth) {
+  if (config && config.enabled === false) return;
+  printHtml(compose(body, config, widthOverride));
+}
+
+type OrderTicketOptions = {
   restaurantName: string;
   order: PrintOrder;
   items: PrintItem[];
@@ -198,7 +207,9 @@ export function printOrderTicket(opts: {
   title?: string;
   showPrices?: boolean;
   config?: PrinterConfig | null;
-}) {
+};
+
+function orderTicketBody(opts: OrderTicketOptions) {
   const { restaurantName, order, items, title = 'Pedido detalhado', showPrices = true } = opts;
   const subtotal = items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
   const fee = Number(order.delivery_fee || 0);
@@ -214,11 +225,18 @@ export function printOrderTicket(opts: {
     `<div class="center small">${esc(dt())}</div>`,
     '<div class="small">&nbsp;</div><div class="small">&nbsp;</div>',
   ].join('');
-  emit(body, opts.config, opts.width);
+  return body;
 }
 
-/** Recibo de pagamento (nao possui valor fiscal). */
-export function printReceipt(opts: {
+/** HTML do pedido detalhado (comanda / via da cozinha). */
+export const renderOrderTicket = (opts: OrderTicketOptions) => compose(orderTicketBody(opts), opts.config, opts.width);
+
+/** Pedido detalhado (comanda / via da cozinha). */
+export function printOrderTicket(opts: OrderTicketOptions) {
+  emit(orderTicketBody(opts), opts.config, opts.width);
+}
+
+type ReceiptOptions = {
   restaurantName: string;
   order: PrintOrder;
   items: PrintItem[];
@@ -227,7 +245,9 @@ export function printReceipt(opts: {
   width?: ThermalWidth;
   footerNote?: string;
   config?: PrinterConfig | null;
-}) {
+};
+
+function receiptBody(opts: ReceiptOptions) {
   const { restaurantName, order, items, payments, change = 0 } = opts;
   const subtotal = items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
   const fee = Number(order.delivery_fee || 0);
@@ -252,5 +272,13 @@ export function printReceipt(opts: {
     `<div class="center small">${esc(dt())}</div>`,
     '<div class="small">&nbsp;</div><div class="small">&nbsp;</div>',
   ].join('');
-  emit(body, opts.config, opts.width);
+  return body;
+}
+
+/** HTML do recibo de pagamento (sem valor fiscal). */
+export const renderReceipt = (opts: ReceiptOptions) => compose(receiptBody(opts), opts.config, opts.width);
+
+/** Recibo de pagamento (nao possui valor fiscal). */
+export function printReceipt(opts: ReceiptOptions) {
+  emit(receiptBody(opts), opts.config, opts.width);
 }
