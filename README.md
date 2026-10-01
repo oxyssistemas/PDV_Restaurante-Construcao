@@ -465,3 +465,4 @@ O Instagram precisa ser uma conta Profissional ligada a uma Página do Facebook.
 - Cadastro em Configurações → Impressoras: o que cada impressora imprime (cozinha, comanda, recibo, nota) e se imprime sozinha.
 - Pedidos novos geram a via da cozinha e contas quitadas geram o recibo direto no banco, então funciona de qualquer aparelho (garçom no celular, QR Code, iFood).
 - No computador ligado à impressora, abra "Estação de impressão" e marque as impressoras dele. Para não aparecer a janela de impressão, abra o Chrome com `--kiosk-printing` (passo a passo na própria tela).
+- Agente local (`public/agente/`, baixado pelo restaurante em Configurações → Impressoras): roda com Node.js em qualquer PC da casa e manda ESC/POS direto para impressoras de rede (IP:9100) ou instaladas no Windows/Linux/Mac, sem janela. Usa a função `print-agent` com a chave gerada pelo admin. Os cupons em ESC/POS são montados no servidor (`supabase/functions/_shared/receipt.ts`).

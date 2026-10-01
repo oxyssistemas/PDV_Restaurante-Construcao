@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Loader2, MonitorSmartphone, Pencil, Plus, Printer as PrinterIcon, RotateCw, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import PrintAgentPanel from '@/components/admin/PrintAgentPanel';
 import { printerModels, type ThermalWidth } from '@/lib/printing';
 import {
   CONNECTIONS, enqueueJob, JOB_PURPOSES, PRINTER_COLUMNS, PURPOSE_AUTO_HINT, PURPOSE_LABELS, requeueJob, STATUS_LABELS,
@@ -66,6 +67,7 @@ export default function PrintersCard({ restaurantId }: { restaurantId: string })
     mutationFn: async (d: Draft) => {
       if (!d.name.trim()) throw new Error('Dê um nome para a impressora (ex.: Cozinha, Bar, Caixa)');
       if (!d.purposes.length) throw new Error('Escolha pelo menos um uso para a impressora');
+      if (d.connection === 'agent' && !d.address?.trim()) throw new Error('Informe o endereço da impressora (IP ou nome no Windows)');
       const row = {
         restaurant_id: restaurantId, name: d.name.trim(), connection: d.connection, purposes: d.purposes,
         auto_print: d.auto_print, enabled: d.enabled, model: d.model, width: d.width, copies: d.copies,
@@ -100,7 +102,7 @@ export default function PrintersCard({ restaurantId }: { restaurantId: string })
 
   const test = useMutation({
     mutationFn: (p: Printer) => enqueueJob(p, 'test', { kind: 'test', restaurant_name: branding?.brand_name?.trim() || 'Oxys Restaurante', printer_name: p.name }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['print-jobs-admin'] }); toast.success('Teste enviado. Ele sai na estação ligada a esta impressora.'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['print-jobs-admin'] }); toast.success('Teste enviado para a fila desta impressora.'); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -162,6 +164,8 @@ export default function PrintersCard({ restaurantId }: { restaurantId: string })
             ))}
           </div>
         )}
+
+        <PrintAgentPanel restaurantId={restaurantId} />
 
         {!!jobs?.length && (
           <div className="space-y-2">
@@ -255,7 +259,7 @@ export default function PrintersCard({ restaurantId }: { restaurantId: string })
                 {draft.connection === 'agent' && (
                   <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="pr-address">Endereço</Label>
-                    <Input id="pr-address" value={draft.address ?? ''} placeholder="192.168.0.50 ou nome da impressora no PC" onChange={e => setD({ address: e.target.value })} />
+                    <Input id="pr-address" value={draft.address ?? ''} placeholder="Ex.: 192.168.0.50 ou EPSON TM-T20 (nome no Windows)" onChange={e => setD({ address: e.target.value })} />
                   </div>
                 )}
               </div>

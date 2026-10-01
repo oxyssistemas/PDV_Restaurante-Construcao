@@ -51,8 +51,8 @@ export const CONNECTIONS: Record<Connection, { label: string; description: strin
   },
   agent: {
     label: 'Agente local',
-    description: 'Programa instalado em qualquer PC do restaurante que envia direto para impressoras de rede ou USB.',
-    available: false,
+    description: 'Programa instalado em qualquer PC do restaurante que envia direto para impressoras de rede (IP) ou USB, sem janela de impressão.',
+    available: true,
   },
   cloudprnt: {
     label: 'Star CloudPRNT',
