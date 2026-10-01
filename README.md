@@ -468,6 +468,38 @@ O Instagram precisa ser uma conta Profissional ligada a uma Página do Facebook.
 - Agente local (`public/agente/`, baixado pelo restaurante em Configurações → Impressoras): roda com Node.js em qualquer PC da casa e manda ESC/POS direto para impressoras de rede (IP:9100) ou instaladas no Windows/Linux/Mac, sem janela. Usa a função `print-agent` com a chave gerada pelo admin. Os cupons em ESC/POS são montados no servidor (`supabase/functions/_shared/receipt.ts`).
 - Impressoras nuvem, sem computador: Star CloudPRNT (StarPRNT, com texto puro como reserva) e Epson Server Direct Print (ePOS-Print XML), pela função `cloud-print`. Cada impressora tem um link secreto (botão "Link" na lista de impressoras) que é configurado na página da própria impressora.
 
+## 🛵 Delivery próprio, WhatsApp e apps de entrega
+
+Todos os pedidos de entrega e retirada caem no **portal Delivery → Pedidos**, cada um com uma bolinha que mostra de onde veio:
+
+| Bolinha | Origem | Como entra |
+| --- | --- | --- |
+| 🌐 azul | Loja online | Cliente pede pelo link `www.oxysrestaurante.app/pedir/<loja>` |
+| 💬 verde | WhatsApp | Cliente pede pelo link que o robô manda (ou a equipe lança como "WhatsApp") |
+| iF vermelha | iFood | Integração automática (portal Delivery → iFood) |
+| 99 / K / R | 99Food, Keeta, Rappi | Lançado pela equipe em "Novo Pedido" escolhendo a origem |
+| 🎧 cinza | Equipe / telefone | Lançado pela equipe |
+
+Pedido novo que não foi lançado pela equipe toca um bipe e mostra um aviso na tela de pedidos. A via da cozinha sai sozinha como nos outros pedidos.
+
+### Loja online (portal Delivery → Loja online)
+- Endereço próprio (`/pedir/nome-da-loja`), QR Code para panfletos e botão para abrir/fechar na hora.
+- Entrega com taxa por bairro (ou taxa única), retirada no local, pedido mínimo e tempo estimado.
+- Pagamento na entrega/retirada (dinheiro com troco, cartão ou Pix); o pagamento é registrado na tela de pedidos como antes.
+- Preço, taxa e total são calculados no servidor (função `delivery-store` + `create_online_order`), nunca no navegador do cliente.
+- O cliente acompanha o pedido em uma página própria e o cadastro dele entra no CRM pelo telefone.
+
+### Robô de WhatsApp (portal Delivery → WhatsApp)
+Cada restaurante usa o próprio número do WhatsApp Business:
+1. O administrador conecta a conta Meta do restaurante em **Marketing → Conexões** (a mesma do Instagram/Facebook).
+2. Em **Delivery → WhatsApp → Robô e número**, escolhe o número e liga o robô.
+
+O robô responde com um menu (fazer pedido pelo link da loja, acompanhar pedido, horário e endereço, falar com atendente), avisa cada mudança de status do pedido e, quando o cliente pede um atendente, pausa e marca a conversa para a equipe responder pela aba **Conversas**.
+
+A Meta só deixa mandar mensagem livre até 24 h depois da última mensagem do cliente. Por isso a página do pedido tem o botão **"Receber avisos pelo WhatsApp"**: o cliente manda o código do pedido e passa a receber os avisos.
+
+**Configuração única no app da Meta (Oxys):** produto WhatsApp adicionado, webhook `https://ocaruinsqobxbzcnrsiy.supabase.co/functions/v1/whatsapp-webhook` com o token do segredo `WHATSAPP_VERIFY_TOKEN`, campo `messages` assinado, e as permissões `whatsapp_business_messaging` e `whatsapp_business_management` aprovadas na revisão do app.
+
 ## 💻📱 Apps de computador e celular
 
 | Versão | Onde está | Como é feita |

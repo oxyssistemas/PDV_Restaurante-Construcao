@@ -1,4 +1,5 @@
 import { adminClient, verifyMetaSignature } from '../_shared/marketing.ts';
+import { handleInbound } from '../_shared/whatsappBot.ts';
 
 const VERIFY_TOKEN = Deno.env.get('WHATSAPP_VERIFY_TOKEN') ?? '';
 
@@ -37,7 +38,10 @@ Deno.serve(async (req) => {
             const { data } = await admin.from('whatsapp_conversations').insert({ restaurant_id: rid, phone: m.from, contact_name: contact?.profile?.name ?? null, last_message: body, last_message_at: now, last_inbound_at: now, unread_count: 1 }).select('id').single();
             convId = data?.id;
           }
-          if (convId) await admin.from('whatsapp_messages').upsert({ restaurant_id: rid, conversation_id: convId, direction: 'in', body, message_type: m.type, external_id: m.id, status: 'received', created_at: now }, { onConflict: 'restaurant_id,external_id', ignoreDuplicates: true });
+          if (!convId) continue;
+          const { data: saved } = await admin.from('whatsapp_messages').upsert({ restaurant_id: rid, conversation_id: convId, direction: 'in', body, message_type: m.type, external_id: m.id, status: 'received', created_at: now }, { onConflict: 'restaurant_id,external_id', ignoreDuplicates: true }).select('id');
+          // Robô de atendimento (só na primeira vez que a mensagem chega; a Meta reenvia em caso de falha).
+          if (saved?.length) await handleInbound(admin, rid, convId, body).catch(e => console.error('whatsapp-bot inbound', e));
         }
         for (const s of v.statuses ?? []) {
           await admin.from('whatsapp_messages').update({ status: s.status, error_message: s.errors?.[0]?.title ?? null }).eq('restaurant_id', rid).eq('external_id', s.id);

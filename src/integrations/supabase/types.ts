@@ -625,6 +625,77 @@ export type Database = {
           },
         ]
       }
+      delivery_stores: {
+        Row: {
+          address: string | null
+          created_at: string
+          default_fee: number
+          delivery_enabled: boolean
+          enabled: boolean
+          eta_minutes: number
+          hours_text: string | null
+          is_open: boolean
+          min_order: number
+          notice: string | null
+          payment_methods: string[]
+          pickup_enabled: boolean
+          pickup_eta_minutes: number
+          restaurant_id: string
+          slug: string
+          updated_at: string
+          whatsapp: string | null
+          zones: Json
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          default_fee?: number
+          delivery_enabled?: boolean
+          enabled?: boolean
+          eta_minutes?: number
+          hours_text?: string | null
+          is_open?: boolean
+          min_order?: number
+          notice?: string | null
+          payment_methods?: string[]
+          pickup_enabled?: boolean
+          pickup_eta_minutes?: number
+          restaurant_id: string
+          slug: string
+          updated_at?: string
+          whatsapp?: string | null
+          zones?: Json
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          default_fee?: number
+          delivery_enabled?: boolean
+          enabled?: boolean
+          eta_minutes?: number
+          hours_text?: string | null
+          is_open?: boolean
+          min_order?: number
+          notice?: string | null
+          payment_methods?: string[]
+          pickup_enabled?: boolean
+          pickup_eta_minutes?: number
+          restaurant_id?: string
+          slug?: string
+          updated_at?: string
+          whatsapp?: string | null
+          zones?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_stores_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dre_categories: {
         Row: {
           created_at: string
@@ -793,15 +864,11 @@ export type Database = {
       }
       fiscal_invoices: {
         Row: {
+          access_key: string | null
+          attempts: number
           cancel_reason: string | null
           cancelled_at: string | null
           consult_url: string | null
-          locked_until: string | null
-          next_attempt_at: string | null
-          payments: Json
-          provider_response: Json | null
-          access_key: string | null
-          attempts: number
           created_at: string
           created_by: string | null
           customer_address: string | null
@@ -815,13 +882,17 @@ export type Database = {
           id: string
           issued_at: string | null
           items: Json
+          locked_until: string | null
+          next_attempt_at: string | null
           notes: string | null
           number: string | null
           order_id: string | null
+          payments: Json
           pdf_url: string | null
           protocol: string | null
           provider: string | null
           provider_ref: string | null
+          provider_response: Json | null
           qrcode_url: string | null
           restaurant_id: string
           series: string | null
@@ -833,15 +904,11 @@ export type Database = {
           xml_url: string | null
         }
         Insert: {
+          access_key?: string | null
+          attempts?: number
           cancel_reason?: string | null
           cancelled_at?: string | null
           consult_url?: string | null
-          locked_until?: string | null
-          next_attempt_at?: string | null
-          payments?: Json
-          provider_response?: Json | null
-          access_key?: string | null
-          attempts?: number
           created_at?: string
           created_by?: string | null
           customer_address?: string | null
@@ -855,13 +922,17 @@ export type Database = {
           id?: string
           issued_at?: string | null
           items?: Json
+          locked_until?: string | null
+          next_attempt_at?: string | null
           notes?: string | null
           number?: string | null
           order_id?: string | null
+          payments?: Json
           pdf_url?: string | null
           protocol?: string | null
           provider?: string | null
           provider_ref?: string | null
+          provider_response?: Json | null
           qrcode_url?: string | null
           restaurant_id: string
           series?: string | null
@@ -873,15 +944,11 @@ export type Database = {
           xml_url?: string | null
         }
         Update: {
+          access_key?: string | null
+          attempts?: number
           cancel_reason?: string | null
           cancelled_at?: string | null
           consult_url?: string | null
-          locked_until?: string | null
-          next_attempt_at?: string | null
-          payments?: Json
-          provider_response?: Json | null
-          access_key?: string | null
-          attempts?: number
           created_at?: string
           created_by?: string | null
           customer_address?: string | null
@@ -895,13 +962,17 @@ export type Database = {
           id?: string
           issued_at?: string | null
           items?: Json
+          locked_until?: string | null
+          next_attempt_at?: string | null
           notes?: string | null
           number?: string | null
           order_id?: string | null
+          payments?: Json
           pdf_url?: string | null
           protocol?: string | null
           provider?: string | null
           provider_ref?: string | null
+          provider_response?: Json | null
           qrcode_url?: string | null
           restaurant_id?: string
           series?: string | null
@@ -1051,6 +1122,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "fiscal_profiles_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fiscal_provider_accounts: {
+        Row: {
+          company_ref: string | null
+          last_error: string | null
+          provider: string
+          restaurant_id: string
+          synced_at: string | null
+          token_homologation: string | null
+          token_production: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_ref?: string | null
+          last_error?: string | null
+          provider: string
+          restaurant_id: string
+          synced_at?: string | null
+          token_homologation?: string | null
+          token_production?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_ref?: string | null
+          last_error?: string | null
+          provider?: string
+          restaurant_id?: string
+          synced_at?: string | null
+          token_homologation?: string | null
+          token_production?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiscal_provider_accounts_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: true
             referencedRelation: "restaurants"
@@ -2300,6 +2412,7 @@ export type Database = {
         Row: {
           archived_at: string | null
           archived_by: string | null
+          change_for: number | null
           courier_id: string | null
           created_at: string
           created_by: string | null
@@ -2314,6 +2427,8 @@ export type Database = {
           kitchen_session_id: string | null
           notes: string | null
           order_type: string
+          payment_hint: string | null
+          public_token: string | null
           reservation_id: string | null
           restaurant_id: string
           source: string
@@ -2326,6 +2441,7 @@ export type Database = {
         Insert: {
           archived_at?: string | null
           archived_by?: string | null
+          change_for?: number | null
           courier_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -2340,6 +2456,8 @@ export type Database = {
           kitchen_session_id?: string | null
           notes?: string | null
           order_type?: string
+          payment_hint?: string | null
+          public_token?: string | null
           reservation_id?: string | null
           restaurant_id: string
           source?: string
@@ -2352,6 +2470,7 @@ export type Database = {
         Update: {
           archived_at?: string | null
           archived_by?: string | null
+          change_for?: number | null
           courier_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -2366,6 +2485,8 @@ export type Database = {
           kitchen_session_id?: string | null
           notes?: string | null
           order_type?: string
+          payment_hint?: string | null
+          public_token?: string | null
           reservation_id?: string | null
           restaurant_id?: string
           source?: string
@@ -2562,6 +2683,41 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      print_agent_keys: {
+        Row: {
+          agent_info: Json | null
+          created_at: string
+          key_hash: string
+          key_hint: string
+          last_seen_at: string | null
+          restaurant_id: string
+        }
+        Insert: {
+          agent_info?: Json | null
+          created_at?: string
+          key_hash: string
+          key_hint: string
+          last_seen_at?: string | null
+          restaurant_id: string
+        }
+        Update: {
+          agent_info?: Json | null
+          created_at?: string
+          key_hash?: string
+          key_hint?: string
+          last_seen_at?: string | null
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "print_agent_keys_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       print_jobs: {
         Row: {
@@ -2997,41 +3153,94 @@ export type Database = {
           },
         ]
       }
+      whatsapp_bot_settings: {
+        Row: {
+          closed_message: string
+          created_at: string
+          enabled: boolean
+          greeting: string
+          human_pause_minutes: number
+          notify_status: boolean
+          restaurant_id: string
+          updated_at: string
+        }
+        Insert: {
+          closed_message?: string
+          created_at?: string
+          enabled?: boolean
+          greeting?: string
+          human_pause_minutes?: number
+          notify_status?: boolean
+          restaurant_id: string
+          updated_at?: string
+        }
+        Update: {
+          closed_message?: string
+          created_at?: string
+          enabled?: boolean
+          greeting?: string
+          human_pause_minutes?: number
+          notify_status?: boolean
+          restaurant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_bot_settings_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_conversations: {
         Row: {
+          bot_paused_until: string | null
           contact_name: string | null
           created_at: string
           customer_id: string | null
           id: string
+          last_bot_at: string | null
           last_inbound_at: string | null
           last_message: string | null
           last_message_at: string | null
+          last_order_id: string | null
+          needs_human: boolean
           phone: string
           restaurant_id: string
           unread_count: number
           updated_at: string
         }
         Insert: {
+          bot_paused_until?: string | null
           contact_name?: string | null
           created_at?: string
           customer_id?: string | null
           id?: string
+          last_bot_at?: string | null
           last_inbound_at?: string | null
           last_message?: string | null
           last_message_at?: string | null
+          last_order_id?: string | null
+          needs_human?: boolean
           phone: string
           restaurant_id: string
           unread_count?: number
           updated_at?: string
         }
         Update: {
+          bot_paused_until?: string | null
           contact_name?: string | null
           created_at?: string
           customer_id?: string | null
           id?: string
+          last_bot_at?: string | null
           last_inbound_at?: string | null
           last_message?: string | null
           last_message_at?: string | null
+          last_order_id?: string | null
+          needs_human?: boolean
           phone?: string
           restaurant_id?: string
           unread_count?: number
@@ -3043,6 +3252,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_last_order_id_fkey"
+            columns: ["last_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
           {
@@ -3163,8 +3379,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      printer_device_token: { Args: { _printer_id: string }; Returns: string }
-      rotate_printer_token: { Args: { _printer_id: string }; Returns: string }
       claim_print_job: {
         Args: { _job_id: string; _station: string }
         Returns: {
@@ -3183,12 +3397,27 @@ export type Database = {
           restaurant_id: string
           status: string
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "print_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       clear_login_attempts: { Args: { _email: string }; Returns: undefined }
+      create_online_order: {
+        Args: { _order: Json; _slug: string }
+        Returns: {
+          order_id: string
+          public_token: string
+        }[]
+      }
       create_qr_order: {
         Args: { _customer_name: string; _items: Json; _qr_token: string }
         Returns: string
       }
+      fiscal_cron_secret: { Args: never; Returns: string }
+      fiscal_kick: { Args: { _invoice_id: string }; Returns: undefined }
       get_user_restaurant_id: { Args: { _user_id: string }; Returns: string }
       has_module_access: {
         Args: {
@@ -3206,24 +3435,34 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_delivery_staff: { Args: { _restaurant_id: string }; Returns: boolean }
       is_restaurant_active: {
         Args: { _restaurant_id: string }
         Returns: boolean
       }
       login_lock_seconds: { Args: { _email: string }; Returns: number }
+      marketing_cron_secret: { Args: never; Returns: string }
       module_guard: {
         Args: { _edit?: boolean; _module: string; _restaurant_id: string }
         Returns: boolean
       }
+      print_order_header: { Args: { _order_id: string }; Returns: Json }
+      print_restaurant_name: {
+        Args: { _restaurant_id: string }
+        Returns: string
+      }
+      printer_device_token: { Args: { _printer_id: string }; Returns: string }
       register_login_failure: { Args: { _email: string }; Returns: number }
       restaurant_has_feature: {
         Args: { _feature: string; _restaurant_id: string }
         Returns: boolean
       }
+      rotate_printer_token: { Args: { _printer_id: string }; Returns: string }
       user_belongs_to_restaurant: {
         Args: { _restaurant_id: string; _user_id: string }
         Returns: boolean
       }
+      whatsapp_bot_secret: { Args: never; Returns: string }
     }
     Enums: {
       app_role:

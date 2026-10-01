@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { pushIfoodStatus } from '@/lib/ifood';
@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Bike, Phone, MapPin, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, Bike, Phone, MapPin, CheckCircle2, XCircle, ShoppingBag, Wallet, StickyNote } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -15,14 +15,30 @@ import { courierStatusLabels, courierDotClass } from '@/lib/delivery';
 import { paymentMethodLabel } from '@/lib/finance';
 
 import { cn } from '@/lib/utils';
+import SourceBadge, { sourceLabel } from '@/components/delivery/SourceBadge';
+import { PAYMENT_LABELS, brl } from '@/lib/deliveryStore';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const columns: { key: string; label: string; next?: string; nextLabel?: string }[] = [
   { key: 'pending', label: 'Aguardando', next: 'preparing', nextLabel: 'Em preparo' },
   { key: 'preparing', label: 'Em preparo', next: 'out_for_delivery', nextLabel: 'Saiu para entrega' },
-  { key: 'out_for_delivery', label: 'Em rota', next: 'delivered', nextLabel: 'Entregue' },
+  { key: 'out_for_delivery', label: 'Em rota / retirada', next: 'delivered', nextLabel: 'Entregue' },
   { key: 'delivered', label: 'Entregues' },
 ];
+
+/** Bipe curto quando chega pedido novo (loja online, WhatsApp, apps). */
+function beep() {
+  try {
+    const ctx = new AudioContext();
+    [0, 0.25].forEach(t => {
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.frequency.value = 880; g.gain.value = 0.15;
+      o.connect(g); g.connect(ctx.destination);
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.15);
+    });
+    setTimeout(() => ctx.close(), 1000);
+  } catch { /* navegador sem áudio */ }
+}
 
 export default function DeliveryOrders() {
   const { currentRole } = useAuth();
@@ -38,7 +54,7 @@ export default function DeliveryOrders() {
         .from('orders')
         .select('*, order_items(id, quantity, unit_price, status, menu_items(name))')
         .eq('restaurant_id', restaurantId!)
-        .eq('order_type', 'delivery')
+        .in('order_type', ['delivery', 'takeaway'])
         .neq('delivery_status', 'cancelled')
         .order('created_at', { ascending: false })
         .limit(60);
@@ -72,6 +88,21 @@ export default function DeliveryOrders() {
     },
   });
   const paidOrderIds = new Set((payments || []).map(p => p.order_id));
+
+  // Avisa quando entra pedido novo que a equipe não lançou (loja online, WhatsApp, iFood...).
+  const seen = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!orders) return;
+    const ids = new Set(orders.map(o => o.id));
+    if (seen.current) {
+      const fresh = orders.filter(o => !seen.current!.has(o.id) && o.delivery_status === 'pending' && (o as any).created_by_role !== 'delivery' && (o as any).created_by_role !== 'admin');
+      if (fresh.length) {
+        beep();
+        fresh.forEach(o => toast.info(`Novo pedido · ${sourceLabel((o as any).source)}`, { description: o.customer_name || undefined }));
+      }
+    }
+    seen.current = ids;
+  }, [orders]);
 
   const registerPayment = useMutation({
     mutationFn: async ({ order, method }: { order: any; method: string }) => {
@@ -182,11 +213,18 @@ export default function DeliveryOrders() {
                     const activeItems = items.filter((i: any) => i.status !== 'cancelled');
                     const isReady = activeItems.length > 0 && activeItems.every((i: any) => ['ready', 'delivered'].includes(i.status));
                     const courierId = (o as any).courier_id as string | null;
-                    const blockRoute = col.next === 'out_for_delivery' && (!isReady || !courierId);
+                    const pickup = o.order_type === 'takeaway';
+                    const blockRoute = col.next === 'out_for_delivery' && (!isReady || (!pickup && !courierId));
+                    const nextLabel = pickup && col.next === 'out_for_delivery' ? 'Pronto p/ retirada' : pickup && col.next === 'delivered' ? 'Retirado' : col.nextLabel;
+                    const hint = (o as any).payment_hint as string | null;
+                    const changeFor = Number((o as any).change_for || 0);
                     return (
                       <div key={o.id} className="rounded-xl border p-3">
                         <div className="flex items-start justify-between gap-2">
-                          <span className="font-semibold">{o.customer_name || 'Cliente'}</span>
+                          <span className="flex items-start gap-2 font-semibold">
+                            <SourceBadge source={(o as any).source} className="shrink-0" />
+                            <span>{o.customer_name || 'Cliente'}</span>
+                          </span>
                           <span className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(o.created_at), { addSuffix: true, locale: ptBR })}
                           </span>
@@ -196,6 +234,11 @@ export default function DeliveryOrders() {
                             <Phone className="h-3 w-3" /> {o.customer_phone}
                           </div>
                         )}
+                        {pickup && (
+                          <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                            <ShoppingBag className="h-3 w-3" /> Retirada no local
+                          </div>
+                        )}
                         {o.customer_address && (
                           <div className="mt-0.5 flex items-start gap-1 text-xs text-muted-foreground">
                             <MapPin className="mt-0.5 h-3 w-3 shrink-0" /> {o.customer_address}
@@ -203,9 +246,20 @@ export default function DeliveryOrders() {
                         )}
                         <ul className="mt-2 space-y-0.5 text-xs">
                           {items.map((i: any) => (
-                            <li key={i.id}>{i.quantity}x {i.menu_items?.name}</li>
+                            <li key={i.id}>{i.quantity}x {i.menu_items?.name}{i.notes && <span className="text-muted-foreground"> · {i.notes}</span>}</li>
                           ))}
                         </ul>
+                        {o.notes && (
+                          <div className="mt-1 flex items-start gap-1 text-[11px] text-muted-foreground">
+                            <StickyNote className="mt-0.5 h-3 w-3 shrink-0" /> {o.notes}
+                          </div>
+                        )}
+                        {hint && !paidOrderIds.has(o.id) && (
+                          <div className="mt-1 flex items-center gap-1 text-[11px] font-medium">
+                            <Wallet className="h-3 w-3" /> Cliente paga na {pickup ? 'retirada' : 'entrega'}: {PAYMENT_LABELS[hint] ?? hint}
+                            {hint === 'cash' && changeFor > 0 && ` · troco p/ ${brl(changeFor)}`}
+                          </div>
+                        )}
                         <div className="mt-2 flex items-center justify-between text-sm font-bold">
                           <span>Total</span>
                           <span>R$ {(Number(o.total) + Number(o.delivery_fee || 0)).toFixed(2)}</span>
@@ -213,7 +267,7 @@ export default function DeliveryOrders() {
                         <div className="mt-1 text-[10px] text-muted-foreground">
                           Lançado por {authorLabel(o as any)} · {deliveryStatusLabels[o.delivery_status]}
                         </div>
-                        <Select
+                        {!pickup && <Select
                           value={(o as any).courier_id || undefined}
                           onValueChange={v => assignCourier.mutate({ id: o.id, courierId: v })}
                         >
@@ -230,7 +284,7 @@ export default function DeliveryOrders() {
                               </SelectItem>
                             ))}
                           </SelectContent>
-                        </Select>
+                        </Select>}
                         {paidOrderIds.has(o.id) ? (
                           <div className="mt-2 rounded-lg border border-[hsl(var(--success))]/40 bg-[hsl(var(--success))]/10 px-2 py-1 text-[11px] text-[hsl(var(--success))]">
                             Pago · contabilizado no financeiro
@@ -251,10 +305,10 @@ export default function DeliveryOrders() {
                         <div className="mt-2 flex gap-2">
                           {col.next && (
                             <Button size="sm" className="flex-1 gap-1" disabled={setStatus.isPending || blockRoute}
-                              title={blockRoute ? (!courierId ? 'Atribua um entregador' : 'Aguardando a cozinha marcar como pronto') : undefined}
+                              title={blockRoute ? (!pickup && !courierId ? 'Atribua um entregador' : 'Aguardando a cozinha marcar como pronto') : undefined}
                               onClick={() => setStatus.mutate({ id: o.id, status: col.next!, courierId })}>
                               <CheckCircle2 className="h-3 w-3" />{' '}
-                              {blockRoute ? (!courierId ? 'Sem entregador' : 'Aguardando cozinha') : col.nextLabel}
+                              {blockRoute ? (!pickup && !courierId ? 'Sem entregador' : 'Aguardando cozinha') : nextLabel}
                             </Button>
                           )}
                           {col.key !== 'delivered' && (

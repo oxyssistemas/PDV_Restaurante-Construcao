@@ -54,6 +54,10 @@ import FinanceInventory from "./pages/finance/Inventory";
 import DeliveryLayout from "./components/layouts/DeliveryLayout";
 import DeliveryOrders from "./pages/delivery/DeliveryOrders";
 import NewDelivery from "./pages/delivery/NewDelivery";
+import StoreSettings from "./pages/delivery/StoreSettings";
+import WhatsAppBot from "./pages/delivery/WhatsAppBot";
+import OnlineStore from "./pages/public/OnlineStore";
+import OrderTracking from "./pages/public/OrderTracking";
 
 import CourierLayout from "./components/layouts/CourierLayout";
 import MyDeliveries from "./pages/courier/MyDeliveries";
@@ -100,6 +104,8 @@ const App = () => (
             <Route path="/setup" element={<Setup />} />
             <Route path="/" element={<Index />} />
             <Route path="/mesa/:token" element={<TableMenu />} />
+            <Route path="/pedir/:slug" element={<OnlineStore />} />
+            <Route path="/pedir/:slug/pedido/:orderId" element={<OrderTracking />} />
             <Route path="/privacidade" element={<Privacy />} />
             <Route path="/termos" element={<Terms />} />
             <Route path="/impressao" element={<ProtectedRoute><PrintStation /></ProtectedRoute>} />
@@ -206,6 +212,8 @@ const App = () => (
               <Route index element={<DeliveryOrders />} />
               <Route path="new" element={<NewDelivery />} />
               <Route path="ifood" element={<IfoodPage />} />
+              <Route path="loja" element={<StoreSettings />} />
+              <Route path="whatsapp" element={<WhatsAppBot />} />
             </Route>
             <Route path="/courier" element={
               <ProtectedRoute allowedRoles={['courier']}>

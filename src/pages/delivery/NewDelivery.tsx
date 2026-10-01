@@ -15,6 +15,7 @@ import { authorFields } from '@/lib/orders';
 import { cn } from '@/lib/utils';
 import { courierStatusLabels, courierDotClass } from '@/lib/delivery';
 import { paymentMethodLabel } from '@/lib/finance';
+import SourceBadge, { MANUAL_SOURCES, ORDER_SOURCES } from '@/components/delivery/SourceBadge';
 
 
 interface CartItem { id: string; name: string; price: number; quantity: number; }
@@ -33,6 +34,7 @@ export default function NewDelivery() {
   const [fee, setFee] = useState('0');
   const [courierId, setCourierId] = useState<string | null>(null);
   const [payMethod, setPayMethod] = useState<string | null>(null);
+  const [source, setSource] = useState<string>('internal');
 
 
   const { data: couriers } = useQuery({
@@ -103,6 +105,7 @@ export default function NewDelivery() {
           delivery_fee: parseFloat(fee) || 0,
           total: subtotal,
           courier_id: courierId,
+          source,
           ...authorFields(user, currentRole?.role),
         })
         .select()
@@ -182,6 +185,21 @@ export default function NewDelivery() {
         <Card className="h-fit">
           <CardHeader className="pb-3"><CardTitle className="text-lg">Dados da entrega</CardTitle></CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Origem do pedido</Label>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {MANUAL_SOURCES.map(k => (
+                  <button key={k} type="button" onClick={() => setSource(k)}
+                    className={cn(
+                      'flex items-center gap-2 rounded-xl border p-2 text-left text-xs transition-colors',
+                      source === k ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'
+                    )}>
+                    <SourceBadge source={k} showLabel={false} />
+                    <span className="truncate">{ORDER_SOURCES[k].label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="space-y-2">
               <Label>Cliente *</Label>
               <Input value={name} onChange={e => setName(e.target.value)} placeholder="Nome do cliente" />

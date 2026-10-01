@@ -164,14 +164,14 @@ export default function KitchenQueue() {
       const item = raw as any;
       const order = item.orders;
       const key = order?.id || 'unknown';
-      const isDelivery = order?.order_type === 'delivery';
+      const isDelivery = order?.order_type === 'delivery' || order?.order_type === 'takeaway';
       if (!map.has(key)) {
         map.set(key, {
           key,
           orderId: key,
           isDelivery,
           title: isDelivery
-            ? `Delivery — ${order?.customer_name || 'Cliente'}`
+            ? `${order?.order_type === 'takeaway' ? 'Retirada' : 'Delivery'} — ${order?.customer_name || 'Cliente'}`
             : `Mesa ${order?.restaurant_tables?.number ?? '?'}${order?.customer_name ? ` — ${order.customer_name}` : ''}`,
           waiter: authorLabel(order || {}),
           createdAt: item.created_at,
