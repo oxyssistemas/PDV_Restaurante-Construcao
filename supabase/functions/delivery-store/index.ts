@@ -25,6 +25,10 @@ async function signed(sb: DB, path: string | null | undefined) {
   return data?.signedUrl ?? null;
 }
 
+/** Imagem do bucket público da vitrine (foto enviada pela loja ou sugestão). */
+const mediaUrl = (path: string | null | undefined) =>
+  !path ? null : path.startsWith('http') ? path : `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/store-media/${path.split('/').map(encodeURIComponent).join('/')}`;
+
 async function storeBySlug(sb: DB, slug: string) {
   const { data } = await sb.from('delivery_stores').select('*, restaurants!inner(id, name, status)').eq('slug', slug).maybeSingle();
   const r = (data as any)?.restaurants;
@@ -45,11 +49,13 @@ Deno.serve(async (req) => {
       const store = await storeBySlug(sb, slug);
       if (!store) return json({ error: 'Loja não encontrada.' }, 404);
       const rid = store.restaurant_id;
-      const [{ data: categories }, { data: items }, { data: branding }] = await Promise.all([
+      const [{ data: categories }, { data: items }, { data: branding }, { data: promos }] = await Promise.all([
         sb.from('menu_categories').select('id, name, sort_order').eq('restaurant_id', rid).order('sort_order'),
         sb.from('menu_items').select('id, name, description, price, image_url, category_id').eq('restaurant_id', rid).eq('available', true).order('name'),
         sb.from('branding_settings').select('brand_name, logo_light_url, logo_dark_url').eq('restaurant_id', rid).maybeSingle(),
+        sb.from('delivery_promotions').select('id, title, subtitle, image, menu_item_id').eq('restaurant_id', rid).eq('active', true).order('sort_order').order('created_at'),
       ]);
+      const available = new Set((items ?? []).map(i => i.id));
       const withImages = await Promise.all((items ?? []).map(async i => ({ ...i, price: Number(i.price), image_url: await signed(sb, i.image_url) })));
       return json({
         store: {
@@ -69,7 +75,18 @@ Deno.serve(async (req) => {
           address: store.address,
           hours_text: store.hours_text,
           notice: store.notice,
+          hero: {
+            title: store.hero_title || null,
+            highlight: store.hero_highlight || null,
+            subtitle: store.hero_subtitle || null,
+            image: mediaUrl(store.hero_image),
+          },
+          featured_item_ids: ((store.featured_item_ids ?? []) as string[]).filter(id => available.has(id)),
         },
+        promotions: (promos ?? []).map(p => ({
+          id: p.id, title: p.title, subtitle: p.subtitle, image: mediaUrl(p.image),
+          menu_item_id: p.menu_item_id && available.has(p.menu_item_id) ? p.menu_item_id : null,
+        })),
         categories: categories ?? [],
         items: withImages,
       });

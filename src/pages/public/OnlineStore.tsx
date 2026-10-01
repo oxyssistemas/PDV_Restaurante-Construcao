@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  ArrowRight, Beef, Bike, CakeSlice, ChevronDown, Clock, Coffee, CupSoda, Drumstick, Fish, Flame, Home, ImageIcon,
+  ArrowRight, Beef, Bike, Megaphone, CakeSlice, ChevronDown, Clock, Coffee, CupSoda, Drumstick, Fish, Flame, Home, ImageIcon,
   LayoutGrid, Loader2, MapPin, MessageCircle, Minus, Pizza, Plus, Salad, Sandwich, Search, ShoppingBag, Soup, Store,
   UtensilsCrossed, Wallet, Wine,
 } from 'lucide-react';
@@ -196,9 +196,14 @@ export default function OnlineStore() {
 
   const q = norm(query.trim());
   const results = q ? items.filter(i => norm(`${i.name} ${i.description ?? ''}`).includes(q)) : [];
+  const byId = useMemo(() => new Map((data?.items ?? []).map(i => [i.id, i])), [data]);
   const withPhoto = items.filter(i => i.image_url);
-  const hero = withPhoto[0] ?? null;
-  const highlights = (withPhoto.length >= 2 ? withPhoto : items).slice(0, 4);
+  // Banner: foto escolhida pela loja; sem ela, a foto de um prato do cardápio.
+  const heroImage = data?.store.hero.image ?? withPhoto[0]?.image_url ?? null;
+  const heroAlt = data?.store.hero.image ? (data?.store.name ?? '') : (withPhoto[0]?.name ?? '');
+  const highlights = (data?.store.featured_item_ids ?? []).map(id => byId.get(id)).filter((i): i is StoreItem => !!i);
+  const promotions = data?.promotions ?? [];
+  const promoRef = useRef<HTMLElement>(null);
 
   const goTo = (el: HTMLElement | null | undefined) => el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const pickCategory = (id: string) => {
@@ -260,6 +265,7 @@ export default function OnlineStore() {
             {[
               { label: 'Início', on: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
               { label: 'Cardápio', on: () => goTo(menuRef.current) },
+              ...(promotions.length ? [{ label: 'Promoções', on: () => goTo(promoRef.current) }] : []),
               { label: 'Sobre', on: () => goTo(aboutRef.current) },
             ].map(n => (
               <button key={n.label} type="button" onClick={n.on}
@@ -281,21 +287,31 @@ export default function OnlineStore() {
         </div>
       </header>
 
+      {store.notice && (
+        <div className="border-b border-accent/20 bg-gradient-to-r from-primary/15 via-accent/10 to-primary/15">
+          <p className="mx-auto flex max-w-6xl items-center justify-center gap-2 px-4 py-2 text-center text-xs font-semibold sm:text-sm">
+            <Megaphone className="h-4 w-4 shrink-0 text-accent" /> {store.notice}
+          </p>
+        </div>
+      )}
+
       <main className="mx-auto max-w-6xl px-4 lg:px-6">
         {/* ---------- Hero ---------- */}
         <section className="relative mt-4 overflow-hidden rounded-3xl border border-white/[0.06] bg-[#0d0d0d] sm:mt-6">
           <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-primary/30 blur-[110px]" />
           <div className="pointer-events-none absolute -bottom-32 right-1/4 h-72 w-72 rounded-full bg-accent/20 blur-[110px]" />
           <div className="relative grid items-center gap-2 md:grid-cols-[1.05fr_1fr]">
-            <div className={cn('relative z-10 order-2 px-5 pb-6 sm:px-8 sm:pb-8 md:order-1 md:py-12 lg:px-12', !hero?.image_url && 'pt-6 sm:pt-8')}>
+            <div className={cn('relative z-10 order-2 px-5 pb-6 sm:px-8 sm:pb-8 md:order-1 md:py-12 lg:px-12', !heroImage && 'pt-6 sm:pt-8')}>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
                 <Flame className="h-3.5 w-3.5" /> Qualidade que você sente
               </span>
               <h1 className="mt-3 text-[2rem] font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
-                O melhor sabor<br /><span className="text-primary">na sua casa!</span>
+                {store.hero.title || (store.hero.highlight ? '' : 'O melhor sabor')}
+                {(store.hero.title || !store.hero.highlight) && <br />}
+                <span className="text-primary">{store.hero.highlight || (store.hero.title ? '' : 'na sua casa!')}</span>
               </h1>
-              <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground sm:text-base">
-                Peça agora pelo delivery {store.name.match(/^[aeiouáéíóú]/i) ? 'do' : 'de'} {store.name} e receba no conforto da sua casa.
+              <p className="mt-3 max-w-md whitespace-pre-line text-sm leading-relaxed text-muted-foreground sm:text-base">
+                {store.hero.subtitle || `Peça agora pelo delivery ${store.name.match(/^[aeiouáéíóú]/i) ? 'do' : 'de'} ${store.name} e receba no conforto da sua casa.`}
               </p>
               <div className="mt-5 flex flex-wrap gap-x-5 gap-y-3 text-xs">
                 {store.delivery_enabled && (
@@ -307,10 +323,10 @@ export default function OnlineStore() {
                 <span className="flex items-center gap-2"><Wallet className="h-5 w-5 text-primary" /><span><b className="block font-semibold">Pague na entrega</b><span className="text-muted-foreground">{store.payment_methods.map(m => PAYMENT_LABELS[m] ?? m).slice(0, 2).join(' ou ')}</span></span></span>
               </div>
             </div>
-            <div className={cn('relative order-1 h-48 sm:h-64 md:order-2 md:h-full md:min-h-[380px]', !hero?.image_url && 'hidden md:block')}>
-              {hero?.image_url ? (
+            <div className={cn('relative order-1 h-48 sm:h-64 md:order-2 md:h-full md:min-h-[380px]', !heroImage && 'hidden md:block')}>
+              {heroImage ? (
                 <>
-                  <img src={hero.image_url} alt={hero.name} className="absolute inset-0 h-full w-full object-cover md:[mask-image:linear-gradient(to_right,transparent,black_35%)]" />
+                  <img src={heroImage} alt={heroAlt} className="absolute inset-0 h-full w-full object-cover md:[mask-image:linear-gradient(to_right,transparent,black_35%)]" />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d0d] via-[#0d0d0d]/20 to-transparent md:bg-gradient-to-r md:from-[#0d0d0d] md:via-transparent" />
                 </>
               ) : (
@@ -385,31 +401,51 @@ export default function OnlineStore() {
         ) : (
           <>
             {/* ---------- Destaques ---------- */}
-            {items.length > 4 && (
+            {highlights.length > 0 && (
               <section className="mt-8">
-                <SectionTitle icon={Flame} title="Destaques do cardápio" subtitle="Sugestões da casa para você começar" />
+                <SectionTitle icon={Flame} title="Destaques do cardápio" subtitle="Os favoritos da casa" />
                 <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:gap-4 lg:grid-cols-4">
                   {highlights.map(item => <ProductCard key={item.id} item={item} qty={cart[item.id]?.qty ?? 0} disabled={!store.is_open} onAdd={() => add(item.id)} onRemove={() => setQty(item.id, -1)} />)}
                 </div>
               </section>
             )}
 
-            {/* ---------- Recado da loja (aviso configurado pelo restaurante) ---------- */}
-            {store.notice && (
-              <section className="relative mt-8 overflow-hidden rounded-3xl border border-primary/30 bg-gradient-to-br from-[#2a0a0c] via-[#140707] to-[#0b0b0b]">
-                <div className="pointer-events-none absolute -left-16 top-0 h-56 w-56 rounded-full bg-primary/30 blur-[90px]" />
-                <div className="relative grid items-center md:grid-cols-[1.2fr_1fr]">
-                  <div className="p-6 sm:p-8">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">Fique de olho</p>
-                    <p className="mt-2 text-2xl font-extrabold uppercase leading-tight tracking-tight sm:text-3xl">{store.notice}</p>
-                    <button type="button" onClick={() => goTo(menuRef.current)}
-                      className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-black transition-transform hover:scale-[1.03]">
-                      Ver cardápio <ArrowRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                  {withPhoto[1]?.image_url && (
-                    <img src={withPhoto[1].image_url} alt="" className="h-44 w-full object-cover md:h-full md:[mask-image:linear-gradient(to_right,transparent,black_40%)]" />
-                  )}
+            {/* ---------- Promoções (cadastradas pela loja) ---------- */}
+            {promotions.length > 0 && (
+              <section ref={promoRef} className="mt-10 scroll-mt-24">
+                {promotions.length > 1 && <SectionTitle icon={Megaphone} title="Promoções" subtitle="Aproveite enquanto durar" />}
+                <div className={cn('flex gap-4', promotions.length > 1 && '-mx-4 snap-x snap-mandatory overflow-x-auto px-4 pb-2 [scrollbar-width:none] lg:mx-0 lg:px-0 [&::-webkit-scrollbar]:hidden')}>
+                  {promotions.map(p => {
+                    const linked = p.menu_item_id ? byId.get(p.menu_item_id) : undefined;
+                    const photo = p.image ?? linked?.image_url ?? null;
+                    return (
+                      <article key={p.id} className={cn('relative shrink-0 snap-start overflow-hidden rounded-3xl border border-primary/30 bg-gradient-to-br from-[#2a0a0c] via-[#140707] to-[#0b0b0b]',
+                        promotions.length > 1 ? 'w-[88%] sm:w-[70%] lg:w-[calc(50%-0.5rem)]' : 'w-full')}>
+                        <div className="pointer-events-none absolute -left-16 top-0 h-56 w-56 rounded-full bg-primary/30 blur-[90px]" />
+                        <div className={cn('relative grid h-full items-center', promotions.length === 1 && 'md:grid-cols-[1.1fr_1fr]')}>
+                          {photo && (
+                            <img src={photo} alt={p.title} loading="lazy"
+                              className={cn('h-40 w-full object-cover sm:h-48', promotions.length === 1 && 'md:order-2 md:h-full md:min-h-[260px] md:[mask-image:linear-gradient(to_right,transparent,black_35%)]')} />
+                          )}
+                          <div className="relative p-5 sm:p-7">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent">Promoção especial</p>
+                            <h3 className="mt-2 text-2xl font-extrabold uppercase leading-[1.05] tracking-tight sm:text-3xl">{p.title}</h3>
+                            {p.subtitle && <p className="mt-2 text-sm text-muted-foreground">{p.subtitle}</p>}
+                            <div className="mt-4 flex flex-wrap items-end gap-4">
+                              {linked && (
+                                <p><span className="block text-xs font-semibold text-accent">Apenas</span><span className="text-3xl font-extrabold text-primary sm:text-4xl">{brl(linked.price)}</span></p>
+                              )}
+                              <button type="button" disabled={!!linked && !store.is_open}
+                                onClick={() => (linked ? add(linked.id) : goTo(menuRef.current))}
+                                className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-black transition-transform hover:scale-[1.03] active:scale-95 disabled:opacity-50">
+                                {linked ? (cart[linked.id] ? `Na sacola (${cart[linked.id].qty}) · adicionar` : 'Aproveitar agora') : 'Ver cardápio'} <ArrowRight className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
               </section>
             )}

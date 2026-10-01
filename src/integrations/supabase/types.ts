@@ -625,6 +625,60 @@ export type Database = {
           },
         ]
       }
+      delivery_promotions: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          image: string | null
+          menu_item_id: string | null
+          restaurant_id: string
+          sort_order: number
+          subtitle: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          image?: string | null
+          menu_item_id?: string | null
+          restaurant_id: string
+          sort_order?: number
+          subtitle?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          image?: string | null
+          menu_item_id?: string | null
+          restaurant_id?: string
+          sort_order?: number
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_promotions_menu_item_id_fkey"
+            columns: ["menu_item_id"]
+            isOneToOne: false
+            referencedRelation: "menu_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_promotions_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_stores: {
         Row: {
           address: string | null
@@ -633,6 +687,11 @@ export type Database = {
           delivery_enabled: boolean
           enabled: boolean
           eta_minutes: number
+          featured_item_ids: string[]
+          hero_highlight: string | null
+          hero_image: string | null
+          hero_subtitle: string | null
+          hero_title: string | null
           hours_text: string | null
           is_open: boolean
           min_order: number
@@ -653,6 +712,11 @@ export type Database = {
           delivery_enabled?: boolean
           enabled?: boolean
           eta_minutes?: number
+          featured_item_ids?: string[]
+          hero_highlight?: string | null
+          hero_image?: string | null
+          hero_subtitle?: string | null
+          hero_title?: string | null
           hours_text?: string | null
           is_open?: boolean
           min_order?: number
@@ -673,6 +737,11 @@ export type Database = {
           delivery_enabled?: boolean
           enabled?: boolean
           eta_minutes?: number
+          featured_item_ids?: string[]
+          hero_highlight?: string | null
+          hero_image?: string | null
+          hero_subtitle?: string | null
+          hero_title?: string | null
           hours_text?: string | null
           is_open?: boolean
           min_order?: number
@@ -3458,6 +3527,7 @@ export type Database = {
         Returns: boolean
       }
       rotate_printer_token: { Args: { _printer_id: string }; Returns: string }
+      store_media_folder_ok: { Args: { _name: string }; Returns: boolean }
       user_belongs_to_restaurant: {
         Args: { _restaurant_id: string; _user_id: string }
         Returns: boolean

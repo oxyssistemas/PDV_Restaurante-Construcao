@@ -489,6 +489,14 @@ Pedido novo que não foi lançado pela equipe toca um bipe e mostra um aviso na 
 - Preço, taxa e total são calculados no servidor (função `delivery-store` + `create_online_order`), nunca no navegador do cliente.
 - O cliente acompanha o pedido em uma página própria e o cadastro dele entra no CRM pelo telefone.
 
+### Vitrine da loja (portal Delivery → Loja online)
+- **Banner principal:** título, parte em destaque (vermelho), descrição e foto. Sem foto escolhida, a loja usa a foto de um prato.
+- **Destaques do cardápio:** a loja escolhe até 8 pratos e a ordem. Sem destaques, a seção não aparece.
+- **Promoções:** banners com título, texto, foto e o prato da promoção. O preço exibido e o botão "Aproveitar agora" usam o prato do cardápio (o cliente paga exatamente o que vê). Para combo com preço especial, cadastre o combo no cardápio.
+- **Fotos:** a loja envia a própria (vai para `store-media/<id do restaurante>/`, reduzida para até 1440 px) ou escolhe na galeria de **sugestões**.
+
+**Como colocar fotos na galeria de sugestões:** no painel do Supabase → Storage → bucket `store-media` → pasta `sugestoes` → Upload. Aceita JPG, PNG ou WEBP até 5 MB (de preferência horizontais, 1600×900). Subpastas viram grupos na galeria (ex.: `sugestoes/pizzas`, `sugestoes/hamburgueres`). Todas as lojas veem as mesmas sugestões; só a Oxys (painel do Supabase) consegue adicionar ou apagar.
+
 ### Robô de WhatsApp (portal Delivery → WhatsApp)
 Cada restaurante usa o próprio número do WhatsApp Business:
 1. O administrador conecta a conta Meta do restaurante em **Marketing → Conexões** (a mesma do Instagram/Facebook).

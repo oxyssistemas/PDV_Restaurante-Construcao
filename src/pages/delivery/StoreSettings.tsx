@@ -11,21 +11,27 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Download, ExternalLink, Loader2, Plus, Store, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Copy, Download, ExternalLink, Flame, ImageIcon, Loader2, Plus, Sparkles, Store, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { PAYMENT_LABELS, SLUG_RE, slugify, storeUrl, type StoreZone } from '@/lib/deliveryStore';
+import { brl, PAYMENT_LABELS, SLUG_RE, slugify, storeUrl, type StoreZone } from '@/lib/deliveryStore';
+import MenuImage from '@/components/MenuImage';
+import StoreImagePicker from '@/components/delivery/StoreImagePicker';
+import PromotionsManager from '@/components/delivery/PromotionsManager';
 
 type Form = {
   slug: string; enabled: boolean; is_open: boolean; delivery_enabled: boolean; pickup_enabled: boolean;
   min_order: string; default_fee: string; zones: { name: string; fee: string }[];
   eta_minutes: string; pickup_eta_minutes: string; payment_methods: string[];
   whatsapp: string; address: string; hours_text: string; notice: string;
+  hero_title: string; hero_highlight: string; hero_subtitle: string; hero_image: string | null; featured_item_ids: string[];
 };
+const MAX_FEATURED = 8;
 
 const blank = (slug: string): Form => ({
   slug, enabled: false, is_open: true, delivery_enabled: true, pickup_enabled: true,
   min_order: '0', default_fee: '0', zones: [], eta_minutes: '45', pickup_eta_minutes: '20',
   payment_methods: ['cash', 'credit_card', 'debit_card', 'pix'], whatsapp: '', address: '', hours_text: '', notice: '',
+  hero_title: '', hero_highlight: '', hero_subtitle: '', hero_image: null, featured_item_ids: [],
 });
 const num = (v: string) => Number(String(v).replace(',', '.')) || 0;
 
@@ -57,8 +63,35 @@ export default function StoreSettings() {
       eta_minutes: String(store.eta_minutes), pickup_eta_minutes: String(store.pickup_eta_minutes),
       zones: ((store.zones as StoreZone[]) || []).map(z => ({ name: z.name, fee: String(z.fee) })),
       whatsapp: store.whatsapp ?? '', address: store.address ?? '', hours_text: store.hours_text ?? '', notice: store.notice ?? '',
+      hero_title: store.hero_title ?? '', hero_highlight: store.hero_highlight ?? '', hero_subtitle: store.hero_subtitle ?? '',
+      hero_image: store.hero_image ?? null, featured_item_ids: store.featured_item_ids ?? [],
     });
   }, [store, isLoading, form, branding]);
+
+  // Pratos do cardápio (destaques e promoções).
+  const { data: menu } = useQuery({
+    queryKey: ['delivery-store-menu', restaurantId],
+    enabled: !!restaurantId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('menu_items').select('id, name, price, image_url, available')
+        .eq('restaurant_id', restaurantId!).order('name');
+      if (error) throw error;
+      return (data || []).map(m => ({ ...m, price: Number(m.price) }));
+    },
+  });
+  const toggleFeatured = (id: string) => setForm(f => {
+    if (!f) return f;
+    const has = f.featured_item_ids.includes(id);
+    if (!has && f.featured_item_ids.length >= MAX_FEATURED) { toast.error(`Escolha até ${MAX_FEATURED} destaques.`); return f; }
+    return { ...f, featured_item_ids: has ? f.featured_item_ids.filter(x => x !== id) : [...f.featured_item_ids, id] };
+  });
+  const moveFeatured = (i: number, dir: -1 | 1) => setForm(f => {
+    if (!f) return f;
+    const ids = [...f.featured_item_ids];
+    [ids[i], ids[i + dir]] = [ids[i + dir], ids[i]];
+    return { ...f, featured_item_ids: ids };
+  });
+  const firstPhoto = menu?.find(m => m.available && m.image_url)?.image_url ?? null;
 
   const url = store?.slug ? storeUrl(store.slug) : null;
   useEffect(() => {
@@ -79,6 +112,8 @@ export default function StoreSettings() {
         eta_minutes: Math.round(num(f.eta_minutes)) || 45, pickup_eta_minutes: Math.round(num(f.pickup_eta_minutes)) || 20,
         payment_methods: f.payment_methods, whatsapp: f.whatsapp.replace(/\D/g, '') || null,
         address: f.address.trim() || null, hours_text: f.hours_text.trim() || null, notice: f.notice.trim() || null,
+        hero_title: f.hero_title.trim() || null, hero_highlight: f.hero_highlight.trim() || null,
+        hero_subtitle: f.hero_subtitle.trim() || null, hero_image: f.hero_image, featured_item_ids: f.featured_item_ids,
       };
       const { error } = await supabase.from('delivery_stores').upsert(row, { onConflict: 'restaurant_id' });
       if (error) throw new Error(error.code === '23505' ? 'Esse endereço de loja já está em uso. Escolha outro.' : error.message);
@@ -172,6 +207,80 @@ export default function StoreSettings() {
           </div>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base"><Sparkles className="h-4 w-4" /> Banner principal</CardTitle>
+          <CardDescription>O topo da loja: frase de impacto, parte em destaque (vermelho) e a foto.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-5 md:grid-cols-2">
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="st-hero-title">Título</Label>
+              <Input id="st-hero-title" value={form.hero_title} maxLength={60} placeholder="O melhor sabor" onChange={e => set('hero_title', e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="st-hero-hl">Parte em destaque</Label>
+              <Input id="st-hero-hl" value={form.hero_highlight} maxLength={60} placeholder="na sua casa!" onChange={e => set('hero_highlight', e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="st-hero-sub">Descrição</Label>
+              <Textarea id="st-hero-sub" rows={3} maxLength={220} value={form.hero_subtitle}
+                placeholder="Hambúrgueres artesanais, pizzas e muito mais. Peça agora pelo nosso delivery." onChange={e => set('hero_subtitle', e.target.value)} />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Foto do banner</Label>
+            {restaurantId && (
+              <StoreImagePicker restaurantId={restaurantId} value={form.hero_image} onChange={v => set('hero_image', v)}
+                fallbackUrl={null} fallbackLabel="Sem foto: a loja usa a foto de um prato" />
+            )}
+            {!form.hero_image && firstPhoto && <p className="text-[11px] text-muted-foreground">Sem foto escolhida, a loja mostra a foto de um prato do cardápio.</p>}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base"><Flame className="h-4 w-4" /> Destaques do cardápio</CardTitle>
+          <CardDescription>Escolha até {MAX_FEATURED} pratos para aparecer no topo da loja, na ordem abaixo. Sem destaques, a seção não aparece.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {form.featured_item_ids.length > 0 && (
+            <ol className="space-y-2">
+              {form.featured_item_ids.map((id, i) => {
+                const m = menu?.find(x => x.id === id);
+                return (
+                  <li key={id} className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-2">
+                    <span className="w-5 text-center text-xs font-bold text-primary">{i + 1}</span>
+                    <MenuImage path={m?.image_url ?? null} alt={m?.name ?? ''} className="h-10 w-10 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{m?.name ?? 'Prato removido'}{m && !m.available && <span className="text-xs text-muted-foreground"> · indisponível</span>}</span>
+                    <Button size="icon" variant="ghost" aria-label="Subir" disabled={i === 0} onClick={() => moveFeatured(i, -1)}><ArrowUp className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" aria-label="Descer" disabled={i === form.featured_item_ids.length - 1} onClick={() => moveFeatured(i, 1)}><ArrowDown className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" aria-label="Tirar dos destaques" onClick={() => toggleFeatured(id)}><Trash2 className="h-4 w-4" /></Button>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+          <div className="grid max-h-72 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+            {(menu ?? []).filter(m => m.available && !form.featured_item_ids.includes(m.id)).map(m => (
+              <button key={m.id} type="button" onClick={() => toggleFeatured(m.id)}
+                className="flex items-center gap-3 rounded-xl border p-2 text-left transition-colors hover:border-primary/50">
+                <MenuImage path={m.image_url} alt={m.name} className="h-10 w-10 shrink-0" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{m.name}</span>
+                  <span className="text-xs text-muted-foreground">{brl(m.price)}{!m.image_url && ' · sem foto'}</span>
+                </span>
+                <Plus className="h-4 w-4 shrink-0 text-primary" />
+              </button>
+            ))}
+            {!menu?.length && <p className="flex items-center gap-2 text-sm text-muted-foreground"><ImageIcon className="h-4 w-4" /> Cadastre pratos no cardápio primeiro.</p>}
+          </div>
+        </CardContent>
+      </Card>
+
+      {store && restaurantId && <PromotionsManager restaurantId={restaurantId} menu={(menu ?? []).filter(m => m.available)} />}
 
       <Card>
         <CardHeader>

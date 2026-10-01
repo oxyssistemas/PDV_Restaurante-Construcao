@@ -9,9 +9,12 @@ export type PublicStore = {
   delivery_enabled: boolean; pickup_enabled: boolean; min_order: number; default_fee: number; zones: StoreZone[];
   eta_minutes: number; pickup_eta_minutes: number; payment_methods: string[];
   whatsapp: string | null; address: string | null; hours_text: string | null; notice: string | null;
+  hero: { title: string | null; highlight: string | null; subtitle: string | null; image: string | null };
+  featured_item_ids: string[];
 };
+export type StorePromotion = { id: string; title: string; subtitle: string | null; image: string | null; menu_item_id: string | null };
 export type StoreItem = { id: string; name: string; description: string | null; price: number; image_url: string | null; category_id: string | null };
-export type StoreData = { store: PublicStore; categories: { id: string; name: string }[]; items: StoreItem[] };
+export type StoreData = { store: PublicStore; promotions: StorePromotion[]; categories: { id: string; name: string }[]; items: StoreItem[] };
 
 export type TrackedOrder = {
   id: string; code: string; order_type: string; delivery_status: string; total: number; delivery_fee: number;
@@ -29,6 +32,12 @@ export const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency',
 export const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;
 export const slugify = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+
+/** Fotos da vitrine (banner e promoções) ficam no bucket público "store-media". */
+export const STORE_MEDIA = 'store-media';
+export const SUGGESTIONS_FOLDER = 'sugestoes';
+export const storeMediaUrl = (path: string | null | undefined) =>
+  !path ? null : /^https?:\/\//.test(path) ? path : supabase.storage.from(STORE_MEDIA).getPublicUrl(path).data.publicUrl;
 
 export const storeUrl = (slug: string) => `${publicOrigin()}/pedir/${slug}`;
 
