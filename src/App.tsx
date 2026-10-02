@@ -79,6 +79,7 @@ import Privacy from "./pages/legal/Privacy";
 import PrintStation from "./pages/PrintStation";
 import PrintStationRunner from "./components/print/PrintStationRunner";
 import NativeShell from "./components/NativeShell";
+import OfflineBanner from "./components/OfflineBanner";
 import Terms from "./pages/legal/Terms";
 import MarketingPosts from "./pages/marketing/Posts";
 import MarketingCampaigns from "./pages/marketing/Campaigns";
@@ -99,6 +100,7 @@ const App = () => (
           <DocumentTitle />
           <PrintStationRunner />
           <NativeShell />
+          <OfflineBanner />
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/setup" element={<Setup />} />

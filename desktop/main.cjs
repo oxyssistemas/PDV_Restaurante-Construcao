@@ -1,9 +1,12 @@
-// Oxys Restaurante — app para Windows e Mac.
+// Oxys Restaurante — app para Windows, Mac e Linux.
 // Abre o sistema online (sempre atualizado) e acrescenta o que o navegador não faz:
-// impressão direta nas térmicas sem janela, abrir com o computador e atualização automática.
+// impressão direta nas térmicas sem janela, abrir com o computador, atualização automática
+// e a central do modo offline (hub/), que mantém a loja funcionando na rede local sem internet.
 
 const { app, BrowserWindow, ipcMain, shell, Menu, dialog } = require('electron');
 const path = require('node:path');
+const fs = require('node:fs');
+const { Hub, PORT: HUB_PORT } = require('./hub/index.cjs');
 
 const APP_URL = process.env.OXYS_URL || 'https://www.oxysrestaurante.app';
 const APP_ORIGIN = new URL(APP_URL).origin;
@@ -11,6 +14,13 @@ const APP_ORIGIN = new URL(APP_URL).origin;
 const AUTH_HOSTS = ['facebook.com', 'www.facebook.com', 'm.facebook.com', 'www.tiktok.com', 'accounts.google.com', 'supabase.co'];
 
 let win = null;
+let hub = null;
+let printerWin = null;
+const HUB_ORIGIN = `http://localhost:${HUB_PORT}`;
+
+// Telas offline empacotadas no app (copiadas do build do site); em desenvolvimento usa ../dist.
+const offlineUiDir = () => [path.join(__dirname, 'offline-ui'), path.join(__dirname, '..', 'dist')]
+  .find(d => fs.existsSync(path.join(d, 'offline.html'))) || null;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -56,12 +66,15 @@ function createWindow() {
 
   // Sem internet: tela própria com "tentar de novo".
   win.webContents.on('did-fail-load', (_e, code, _desc, url, isMainFrame) => {
-    if (isMainFrame && code !== -3 && isAppUrl(url)) win.loadFile(path.join(__dirname, 'offline.html'));
+    if (!isMainFrame || code === -3 || !isAppUrl(url)) return;
+    // Sem internet: com a central ativa, abre o modo offline; senão a tela de "sem conexão".
+    if (hub?.enabled) win.loadURL(`${HUB_ORIGIN}/`);
+    else win.loadFile(path.join(__dirname, 'offline.html'));
   });
 
   // Fica no sistema e nos logins de terceiros; o resto abre no navegador do computador.
   win.webContents.on('will-navigate', (e, url) => {
-    if (isAppUrl(url) || isAuthUrl(url) || url.startsWith('file://')) return;
+    if (isAppUrl(url) || isAuthUrl(url) || url.startsWith('file://') || url.startsWith(HUB_ORIGIN)) return;
     e.preventDefault();
     shell.openExternal(url);
   });
@@ -87,7 +100,7 @@ function buildMenu() {
 // ---------- recursos nativos (só para o sistema Oxys, nunca para páginas de terceiros) ----------
 function fromApp(event) {
   const url = event.senderFrame?.url ?? '';
-  if (!isAppUrl(url) && !url.startsWith('file://')) throw new Error('Origem não autorizada');
+  if (!isAppUrl(url) && !url.startsWith('file://') && !url.startsWith(`${HUB_ORIGIN}/`)) throw new Error('Origem não autorizada');
 }
 
 ipcMain.handle('app:info', (e) => {
@@ -130,6 +143,36 @@ ipcMain.handle('print:html', async (e, html, options = {}) => {
   }
 });
 
+// ---------- central offline ----------
+// Só o sistema (logado como administrador na nuvem) ativa; a chave vem da função offline-hub.
+function onlyCloud(event) {
+  if (!isAppUrl(event.senderFrame?.url ?? '')) throw new Error('Origem não autorizada');
+}
+
+ipcMain.handle('hub:status', (e) => { fromApp(e); return hub ? hub.status() : { enabled: false }; });
+ipcMain.handle('hub:activate', (e, params) => {
+  onlyCloud(e);
+  hub.activate(params);
+  startPrinterWindow();
+  return hub.status();
+});
+ipcMain.handle('hub:deactivate', (e) => { onlyCloud(e); hub.deactivate(); stopPrinterWindow(); return hub.status(); });
+ipcMain.handle('hub:set-devices', (e, devices) => { onlyCloud(e); hub.setDevices(devices); return true; });
+ipcMain.handle('hub:sync', async (e) => { fromApp(e); await hub.sync(); return hub.status(); });
+
+/** Janela escondida que imprime as vias feitas no modo offline nas impressoras deste computador. */
+function startPrinterWindow() {
+  if (printerWin || !hub?.enabled) return;
+  printerWin = new BrowserWindow({
+    show: false,
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true },
+  });
+  printerWin.loadURL(`${HUB_ORIGIN}/offline.html#/impressora`).catch(() => {});
+  printerWin.webContents.on('did-fail-load', () => setTimeout(() => printerWin?.loadURL(`${HUB_ORIGIN}/offline.html#/impressora`).catch(() => {}), 5000));
+  printerWin.on('closed', () => { printerWin = null; });
+}
+function stopPrinterWindow() { printerWin?.destroy(); printerWin = null; }
+
 // ---------- atualização automática ----------
 function setupUpdates() {
   if (!app.isPackaged) return;
@@ -150,6 +193,8 @@ function setupUpdates() {
 app.whenReady().then(() => {
   app.setAppUserModelId('app.oxysrestaurante.desktop');
   buildMenu();
+  hub = new Hub({ dataDir: app.getPath('userData'), uiDir: offlineUiDir(), version: app.getVersion() });
+  if (hub.enabled) { hub.start(); hub.sync(); startPrinterWindow(); }
   createWindow();
   setupUpdates();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

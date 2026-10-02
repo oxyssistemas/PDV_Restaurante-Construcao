@@ -2459,6 +2459,88 @@ export type Database = {
           },
         ]
       }
+      offline_hubs: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          key_hash: string
+          lan_urls: string[]
+          last_seen_at: string | null
+          last_sync_at: string | null
+          name: string
+          pending_ops: number
+          restaurant_id: string
+          updated_at: string
+          version: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          key_hash: string
+          lan_urls?: string[]
+          last_seen_at?: string | null
+          last_sync_at?: string | null
+          name?: string
+          pending_ops?: number
+          restaurant_id: string
+          updated_at?: string
+          version?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          key_hash?: string
+          lan_urls?: string[]
+          last_seen_at?: string | null
+          last_sync_at?: string | null
+          name?: string
+          pending_ops?: number
+          restaurant_id?: string
+          updated_at?: string
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offline_hubs_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offline_op_log: {
+        Row: {
+          applied_at: string
+          hub_id: string
+          op_id: string
+          op_type: string
+        }
+        Insert: {
+          applied_at?: string
+          hub_id: string
+          op_id: string
+          op_type: string
+        }
+        Update: {
+          applied_at?: string
+          hub_id?: string
+          op_id?: string
+          op_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offline_op_log_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "offline_hubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           created_at: string
@@ -3484,6 +3566,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_offline_ops: {
+        Args: { _hub_id: string; _ops: Json }
+        Returns: Json
+      }
       claim_print_job: {
         Args: { _job_id: string; _station: string }
         Returns: {
@@ -3541,6 +3627,7 @@ export type Database = {
         Returns: boolean
       }
       is_delivery_staff: { Args: { _restaurant_id: string }; Returns: boolean }
+      is_offline_sync: { Args: never; Returns: boolean }
       is_restaurant_active: {
         Args: { _restaurant_id: string }
         Returns: boolean
@@ -3555,6 +3642,7 @@ export type Database = {
         Args: { _edit?: boolean; _module: string; _restaurant_id: string }
         Returns: boolean
       }
+      offline_snapshot: { Args: { _restaurant_id: string }; Returns: Json }
       print_order_header: { Args: { _order_id: string }; Returns: Json }
       print_restaurant_name: {
         Args: { _restaurant_id: string }

@@ -7,4 +7,13 @@ contextBridge.exposeInMainWorld('oxysDesktop', {
   retry: () => ipcRenderer.invoke('app:retry'),
   listPrinters: () => ipcRenderer.invoke('printers:list'),
   printHtml: (html, options) => ipcRenderer.invoke('print:html', String(html), { deviceName: options?.deviceName ?? '' }),
+  // central do modo offline
+  hubStatus: () => ipcRenderer.invoke('hub:status'),
+  hubActivate: (p) => ipcRenderer.invoke('hub:activate', {
+    key: String(p?.key ?? ''), restaurantId: String(p?.restaurantId ?? ''), functionsUrl: String(p?.functionsUrl ?? ''),
+    apikey: String(p?.apikey ?? ''), pin: String(p?.pin ?? ''),
+  }),
+  hubDeactivate: () => ipcRenderer.invoke('hub:deactivate'),
+  hubSetDevices: (devices) => ipcRenderer.invoke('hub:set-devices', JSON.parse(JSON.stringify(devices ?? {}))),
+  hubSync: () => ipcRenderer.invoke('hub:sync'),
 });

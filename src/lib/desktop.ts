@@ -6,6 +6,17 @@ type OxysDesktop = {
   setAutoStart: (enabled: boolean) => Promise<boolean>;
   listPrinters: () => Promise<DesktopPrinter[]>;
   printHtml: (html: string, options?: { deviceName?: string }) => Promise<void>;
+  // central do modo offline (versões novas do app)
+  hubStatus?: () => Promise<HubStatus>;
+  hubActivate?: (p: { key: string; restaurantId: string; functionsUrl: string; apikey: string; pin: string }) => Promise<HubStatus>;
+  hubDeactivate?: () => Promise<HubStatus>;
+  hubSetDevices?: (devices: Record<string, string>) => Promise<boolean>;
+  hubSync?: () => Promise<HubStatus>;
+};
+
+export type HubStatus = {
+  enabled: boolean; online?: boolean; port?: number; lanUrls?: string[]; restaurantId?: string | null;
+  lastSyncAt?: string | null; snapshotAt?: string | null; pendingOps?: number; failedOps?: number; error?: string | null;
 };
 
 declare global {

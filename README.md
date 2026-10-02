@@ -517,6 +517,20 @@ A Meta só deixa mandar mensagem livre até 24 h depois da última mensagem do c
 
 **Configuração única no app da Meta (Oxys):** produto WhatsApp adicionado, webhook `https://ocaruinsqobxbzcnrsiy.supabase.co/functions/v1/whatsapp-webhook` com o token do segredo `WHATSAPP_VERIFY_TOKEN`, campo `messages` assinado, e as permissões `whatsapp_business_messaging` e `whatsapp_business_management` aprovadas na revisão do app.
 
+## 📴 Modo offline (sem internet)
+
+O **app de computador do caixa** vira a *central* da loja (`desktop/hub/`):
+
+- **Ativar:** no app de computador, logado como administrador → **Estação de impressão → Central do modo offline** → criar um PIN (4 a 8 números) → *Ativar este computador*. A chave é gerada pela função `offline-hub` e fica só neste computador.
+- **Com internet:** a central baixa a cada 20 s o cardápio, mesas, pedidos abertos, equipe e impressoras (`offline_snapshot`).
+- **Sem internet:** o sistema mostra uma faixa "Sem internet → Abrir modo offline". Celulares e tablets no mesmo Wi-Fi abrem o endereço da central (ex.: `http://192.168.0.10:8790`, também em QR Code na Estação de impressão), escolhem quem está usando e digitam o PIN. Telas: **Mesas**, **Balcão/Delivery**, **Cozinha** e **Caixa**.
+- **Impressão sem internet:** a via da cozinha e o recibo saem nas impressoras do computador da central (as mesmas escolhidas na Estação de impressão).
+- **Quando a internet volta:** a central envia tudo na ordem em que aconteceu (`apply_offline_ops`, sem duplicar se reenviar). Na nuvem, a via da cozinha e o recibo não são impressos de novo; a **NFC-e é emitida nesse momento**. Os pedidos aparecem com a bolinha "Modo offline".
+- Dados locais: `oxys-central.json` e `oxys-central-config.json` na pasta de dados do app. No Windows, permita o acesso à rede quando o firewall perguntar.
+- Teste sem derrubar a internet: abrir o app com `OXYS_FORCE_OFFLINE=1`.
+
+**NFC-e em contingência:** hoje a nota é emitida assim que a internet volta. A contingência offline oficial da SEFAZ (nota assinada na hora, sem internet) depende do emissor fiscal contratado e do certificado na central.
+
 ## 💻📱 Apps de computador e celular
 
 | Versão | Onde está | Como é feita |

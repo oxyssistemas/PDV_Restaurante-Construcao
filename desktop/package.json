@@ -1,7 +1,7 @@
 {
   "name": "oxys-restaurante-desktop",
   "productName": "Oxys Restaurante",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Oxys Restaurante para Windows, Mac e Linux",
   "author": "Oxys Sistemas <oxyssistemas@gmail.com>",
   "homepage": "https://www.oxysrestaurante.app",
@@ -14,7 +14,8 @@
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
     "release": "electron-builder --publish always",
-    "dist:linux": "electron-builder --linux"
+    "dist:linux": "electron-builder --linux",
+    "offline-ui": "node -e \"const fs=require('fs');fs.rmSync('offline-ui',{recursive:true,force:true});fs.cpSync('../dist','offline-ui',{recursive:true})\""
   },
   "dependencies": {
     "electron-updater": "^6.8.9"
@@ -31,7 +32,9 @@
       "main.cjs",
       "preload.cjs",
       "offline.html",
-      "build/icon.png"
+      "build/icon.png",
+      "hub/**/*",
+      "offline-ui/**/*"
     ],
     "directories": {
       "output": "release",

@@ -62,14 +62,23 @@ Atualizado a cada integração.
 - [~] Publicar na App Store — falta a conta Apple Developer (US$ 99/ano)
 - [~] Assinatura digital dos instaladores (tira avisos do Windows/Mac) — falta o certificado
 
-## 8. Configurações externas pendentes
+## 8. Modo offline
+- [x] Central no computador do caixa (ativação pelo administrador, PIN da equipe)
+- [x] Sem internet: garçons, cozinha e caixa pela rede da loja (celular, tablet ou computador)
+- [x] Lançar pedidos (mesa, balcão e delivery por telefone)
+- [x] Cozinha recebendo e marcando os pedidos; via da cozinha impressa na central
+- [x] Fechar conta e receber (várias formas, troco), recibo impresso e mesa liberada
+- [x] Sincronização ao voltar a internet, na ordem, sem duplicar e sem reimprimir
+- [x] Aviso "Sem internet → Abrir modo offline" em todo o sistema
+- [~] NFC-e: emitida ao voltar a internet; contingência offline oficial (tpEmis 9) depende do emissor fiscal contratado
+
+## 9. Configurações externas pendentes
 - [~] Email próprio (SMTP, ex.: Resend) no Supabase — libera "Esqueci minha senha" dos clientes
 - [~] Ligar a proteção contra senhas vazadas no Supabase (Auth → Password security)
 
 ---
 
 ## Próximas integrações
-- [ ] **Modo offline** (trabalhar sem internet) ← próximo
 - [ ] Pix automático (QR dinâmico + baixa sozinha)
 - [ ] Maquininha integrada (Stone, PagSeguro, Mercado Pago Point)
 - [ ] 99Food, Keeta e Rappi automáticos (dependem de contrato de parceria)

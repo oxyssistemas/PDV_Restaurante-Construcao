@@ -20,6 +20,7 @@ import {
   type JobPurpose, type PrintJob, type Printer,
 } from '@/lib/printQueue';
 import { getStationActivity, type StationActivity } from '@/components/print/PrintStationRunner';
+import OfflineHubCard from '@/components/print/OfflineHubCard';
 
 const DEFAULT_DEVICE = '__padrao__';
 const sameDevices = (a: Record<string, string>, b: Record<string, string>) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
@@ -87,6 +88,7 @@ export default function PrintStation() {
 
   const save = () => {
     saveStation(restaurantId!, selected, devices);
+    desktop?.hubSetDevices?.(devices); // modo offline imprime nas mesmas impressoras
     setSaved(selected);
     setSavedDevices(devices);
     qc.invalidateQueries({ queryKey: ['print-jobs'] });
@@ -171,6 +173,8 @@ export default function PrintStation() {
           {activity.lastError && <p className="text-sm text-destructive">Último erro: {activity.lastError}</p>}
         </CardContent>
       </Card>
+
+      {desktop && <OfflineHubCard />}
 
       {desktop ? (
         <Card>
