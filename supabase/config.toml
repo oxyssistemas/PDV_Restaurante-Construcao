@@ -18,3 +18,6 @@ verify_jwt = false
 
 [functions.whatsapp-bot]
 verify_jwt = false
+
+[functions.offline-hub]
+verify_jwt = false
