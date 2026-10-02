@@ -11,7 +11,7 @@ const ITEM_STATUS = new Set(['pending', 'preparing', 'ready', 'delivered', 'canc
 const METHODS = new Set(['cash', 'credit_card', 'debit_card', 'pix']);
 
 function emptyData() {
-  return { snapshot: null, snapshotAt: null, orders: {}, ops: [], printQueue: [], version: 0, lastSyncAt: null, lastError: null };
+  return { snapshot: null, snapshotAt: null, orders: {}, ops: [], printQueue: [], sessions: {}, version: 0, lastSyncAt: null, lastError: null };
 }
 
 class HubState {

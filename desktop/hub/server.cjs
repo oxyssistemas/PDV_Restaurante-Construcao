@@ -18,7 +18,16 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
 const pinHash = (pin, salt) => crypto.createHash('sha256').update(`${salt}:${pin}`).digest('hex');
 
 function createServer({ state, getConfig, uiDir, getStatus }) {
-  const sessions = new Map(); // token → { user_id, name, role, at }
+  // Acessos lembrados por 30 dias (sobrevivem a reiniciar a central): o aparelho digita o PIN uma vez.
+  const SESSION_MS = 30 * 24 * 3600e3;
+  const sessions = {
+    get: (t) => { const s = state.data.sessions?.[t]; return s && Date.now() - s.at < SESSION_MS ? s : null; },
+    set: (t, s) => {
+      state.data.sessions = Object.fromEntries(Object.entries(state.data.sessions || {}).filter(([, v]) => Date.now() - v.at < SESSION_MS));
+      state.data.sessions[t] = s; state.save();
+    },
+    delete: (t) => { if (state.data.sessions) { delete state.data.sessions[t]; state.save(); } },
+  };
   const clients = new Set();  // respostas SSE abertas
   const attempts = new Map(); // ip → { n, until } (bloqueio contra chute de PIN)
 

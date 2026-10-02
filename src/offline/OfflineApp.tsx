@@ -15,6 +15,34 @@ const HubContext = createContext<Hub | null>(null);
 export const useHub = () => useContext(HubContext)!;
 
 type Tab = 'mesas' | 'balcao' | 'cozinha' | 'caixa';
+
+// ---------- ida e volta automática entre o sistema (nuvem) e o modo offline ----------
+const CLOUD = 'https://www.oxysrestaurante.app';
+const RETURN_KEY = 'oxys.central.voltar';
+const safeReturn = (u: string | null) => {
+  try { const h = new URL(u ?? '').hostname; return /(^|\.)oxysrestaurante\.app$/.test(h) || h === 'localhost' ? u : null; } catch { return null; }
+};
+/** Tela do sistema de onde a pessoa veio (?voltar=...), guardada para voltar quando a internet voltar. */
+function readReturn(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  const v = safeReturn(params.get('voltar'));
+  if (v) {
+    try { localStorage.setItem(RETURN_KEY, v); } catch { /* sem armazenamento */ }
+    window.history.replaceState(null, '', window.location.pathname + window.location.hash);
+    return v;
+  }
+  try { return safeReturn(localStorage.getItem(RETURN_KEY)); } catch { return null; }
+}
+const returnUrl = readReturn();
+/** Aba equivalente à tela em que a pessoa estava. */
+const tabFromReturn = (): Tab | null => {
+  const path = returnUrl ? new URL(returnUrl).pathname : '';
+  if (path.startsWith('/kitchen')) return 'cozinha';
+  if (path.startsWith('/cashier') || path.startsWith('/finance')) return 'caixa';
+  if (path.startsWith('/delivery')) return 'balcao';
+  if (path.startsWith('/waiter')) return 'mesas';
+  return null;
+};
 const TABS: { key: Tab; label: string; icon: typeof UtensilsCrossed; roles: string[] }[] = [
   { key: 'mesas', label: 'Mesas', icon: UtensilsCrossed, roles: ['admin', 'cashier', 'waiter'] },
   { key: 'balcao', label: 'Balcão / Delivery', icon: ShoppingBag, roles: ['admin', 'cashier', 'delivery'] },
@@ -28,6 +56,7 @@ export default function OfflineApp() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Toaster richColors position="top-center" />
+      <BackOnline />
       <Main />
     </div>
   );
@@ -170,7 +199,10 @@ function Login({ hello, onLogged }: { hello: Hello; onLogged: () => void }) {
 function Shell({ onLogout }: { onLogout: () => void }) {
   const { state } = useHub();
   const tabs = TABS.filter(t => t.roles.includes(state.me.role));
-  const [tab, setTab] = useState<Tab>(tabs[0]?.key ?? 'mesas');
+  const [tab, setTab] = useState<Tab>(() => {
+    const wanted = tabFromReturn();
+    return wanted && tabs.some(t => t.key === wanted) ? wanted : tabs[0]?.key ?? 'mesas';
+  });
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -219,5 +251,56 @@ function SyncPill() {
     <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-400">
       <CloudOff className="h-3.5 w-3.5" /> Sem internet{state.pendingOps ? ` · ${state.pendingOps} a enviar` : ''}
     </span>
+  );
+}
+
+/**
+ * Internet voltou e tudo foi enviado → volta sozinho para o sistema (para a tela de onde veio),
+ * com 5 s para cancelar. Quem abriu o modo offline à mão vê só o botão.
+ */
+function BackOnline() {
+  const [ok, setOk] = useState(0); // verificações seguidas com internet e nada pendente
+  const [left, setLeft] = useState<number | null>(null);
+  const [stay, setStay] = useState(false);
+
+  useEffect(() => {
+    // A central tem internet e não há nada pendente, e ESTE aparelho também alcança a nuvem
+    // (senão um aparelho com Wi-Fi ruim ficaria indo e voltando).
+    const cloudOk = () => fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/health`, {
+      headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY }, signal: AbortSignal.timeout(6000), cache: 'no-store',
+    }).then(r => r.ok).catch(() => false);
+    const check = () => Promise.all([api.hello(), cloudOk()])
+      .then(([h, cloud]) => setOk(n => (h.online && h.pendingOps === 0 && cloud ? n + 1 : 0)))
+      .catch(() => setOk(0));
+    check();
+    const t = setInterval(check, 5000);
+    return () => clearInterval(t);
+  }, []);
+
+  const back = ok >= 2; // ~10 s estável
+  const target = returnUrl ?? CLOUD;
+  const go = () => { try { localStorage.removeItem(RETURN_KEY); } catch { /* ok */ } window.location.href = target; };
+
+  useEffect(() => {
+    if (!back || stay || !returnUrl) { setLeft(null); return; }
+    setLeft(5);
+    const t = setInterval(() => setLeft(n => (n === null ? null : n - 1)), 1000);
+    return () => clearInterval(t);
+  }, [back, stay]);
+  useEffect(() => { if (left !== null && left <= 0) go(); });
+
+  if (!back) return null;
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-500/40 bg-[#04170f]/95 px-4 py-3 text-sm backdrop-blur">
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3">
+        <Wifi className="h-5 w-5 shrink-0 text-emerald-400" />
+        <p className="min-w-0 flex-1">
+          <b className="text-emerald-300">A internet voltou</b> e tudo foi enviado para a nuvem.
+          {left !== null && ` Voltando ao sistema em ${left}s.`}
+        </p>
+        <Button size="sm" className="bg-emerald-500 font-bold text-black hover:bg-emerald-400" onClick={go}>Voltar ao sistema</Button>
+        {left !== null && <Button size="sm" variant="ghost" onClick={() => setStay(true)}>Continuar aqui</Button>}
+      </div>
+    </div>
   );
 }

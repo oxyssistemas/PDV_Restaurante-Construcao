@@ -160,6 +160,20 @@ ipcMain.handle('hub:deactivate', (e) => { onlyCloud(e); hub.deactivate(); stopPr
 ipcMain.handle('hub:set-devices', (e, devices) => { onlyCloud(e); hub.setDevices(devices); return true; });
 ipcMain.handle('hub:sync', async (e) => { fromApp(e); await hub.sync(); return hub.status(); });
 
+/**
+ * Troca automática: quando a central confirma que a internet caiu (2 tentativas seguidas), a janela
+ * principal vai sozinha para o modo offline, lembrando a tela em que estava. A volta é feita pelo
+ * próprio modo offline quando a internet voltar e tudo tiver sido enviado.
+ */
+function watchConnection() {
+  setInterval(() => {
+    if (!win || !hub?.enabled || hub.online || hub.offlineFails < 2) return;
+    const url = win.webContents.getURL();
+    if (!isAppUrl(url)) return;
+    win.loadURL(`${HUB_ORIGIN}/?auto=1&voltar=${encodeURIComponent(url)}`);
+  }, 3000);
+}
+
 /** Janela escondida que imprime as vias feitas no modo offline nas impressoras deste computador. */
 function startPrinterWindow() {
   if (printerWin || !hub?.enabled) return;
@@ -196,6 +210,7 @@ app.whenReady().then(() => {
   hub = new Hub({ dataDir: app.getPath('userData'), uiDir: offlineUiDir(), version: app.getVersion() });
   if (hub.enabled) { hub.start(); hub.sync(); startPrinterWindow(); }
   createWindow();
+  watchConnection();
   setupUpdates();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });

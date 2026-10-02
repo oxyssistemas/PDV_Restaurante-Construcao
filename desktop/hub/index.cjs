@@ -9,6 +9,7 @@ const { createServer, pinHash } = require('./server.cjs');
 
 const PORT = Number(process.env.OXYS_HUB_PORT || 8790);
 const SYNC_MS = 20_000;
+const SYNC_OFFLINE_MS = 10_000; // sem internet tenta mais vezes, para voltar logo
 
 function lanUrls(port) {
   const out = [];
@@ -31,6 +32,7 @@ class Hub {
     this.server = null;
     this.timer = null;
     this.syncing = false;
+    this.offlineFails = 0; // tentativas seguidas sem conseguir falar com a nuvem
     // Para testar sem derrubar a internet: OXYS_FORCE_OFFLINE=1
     this.forceOffline = process.env.OXYS_FORCE_OFFLINE === '1';
   }
@@ -81,11 +83,14 @@ class Hub {
       this.server.on('error', e => { this.lastError = `Porta ${PORT}: ${e.message}`; });
       this.server.listen(PORT, '0.0.0.0');
     }
-    if (!this.timer) this.timer = setInterval(() => this.sync(), SYNC_MS);
+    if (!this.timer) {
+      const loop = async () => { await this.sync(); if (this.server) this.timer = setTimeout(loop, this.online ? SYNC_MS : SYNC_OFFLINE_MS); };
+      this.timer = setTimeout(loop, SYNC_MS);
+    }
   }
 
   stop() {
-    if (this.timer) clearInterval(this.timer);
+    if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     if (this.server) this.server.close();
     this.server = null;
@@ -120,9 +125,11 @@ class Hub {
       const { snapshot } = await this.call('snapshot', { lanUrls: lanUrls(PORT), version: this.version, pendingOps: this.state.data.ops.length });
       this.state.applySnapshot(snapshot);
       this.online = true;
+      this.offlineFails = 0;
       this.lastError = null;
     } catch (e) {
       this.online = false;
+      this.offlineFails += 1;
       this.lastError = e.status === 401 ? 'Central desativada no sistema. Ative de novo.' : null;
     } finally {
       this.syncing = false;
