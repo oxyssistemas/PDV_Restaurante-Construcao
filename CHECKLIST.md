@@ -68,6 +68,7 @@ Atualizado a cada integração.
 - [x] Lançar pedidos (mesa, balcão e delivery por telefone)
 - [x] Cozinha recebendo e marcando os pedidos; via da cozinha impressa na central
 - [x] Fechar conta e receber (várias formas, troco), recibo impresso e mesa liberada
+- [x] Central sempre em dia com a nuvem (aviso em tempo real a cada mudança, ~1 s)
 - [x] Sincronização ao voltar a internet, na ordem, sem duplicar e sem reimprimir
 - [x] Troca automática para o modo offline (todos os aparelhos e o computador da central) e volta automática quando a internet voltar
 - [x] Cada pessoa cai na tela certa (cozinha, caixa, mesas); PIN lembrado por 30 dias em cada aparelho

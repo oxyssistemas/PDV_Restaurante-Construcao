@@ -6,6 +6,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { HubState } = require('./state.cjs');
 const { createServer, pinHash } = require('./server.cjs');
+const { createClient } = require('@supabase/supabase-js');
 
 const PORT = Number(process.env.OXYS_HUB_PORT || 8790);
 const SYNC_MS = 20_000;
@@ -33,6 +34,9 @@ class Hub {
     this.timer = null;
     this.syncing = false;
     this.offlineFails = 0; // tentativas seguidas sem conseguir falar com a nuvem
+    this.live = null;      // canal de avisos em tempo real da nuvem
+    this.liveToken = null;
+    this.liveTimer = null;
     // Para testar sem derrubar a internet: OXYS_FORCE_OFFLINE=1
     this.forceOffline = process.env.OXYS_FORCE_OFFLINE === '1';
   }
@@ -66,6 +70,7 @@ class Hub {
   }
 
   deactivate() {
+    this.stopLive();
     this.config = { devices: this.config.devices };
     this.saveConfig();
     this.stop();
@@ -89,7 +94,32 @@ class Hub {
     }
   }
 
+  // ---------- avisos em tempo real ----------
+  /** Assina o canal da loja: cada mudança na nuvem dispara uma sincronização (agrupando rajadas). */
+  startLive(token) {
+    if (!token || this.forceOffline || (this.live && this.liveToken === token)) return;
+    this.stopLive();
+    const url = String(this.config.functionsUrl || '').replace(/\/functions\/v1\/.*$/, '');
+    if (!url || !this.config.apikey) return;
+    this.supabase = this.supabase || createClient(url, this.config.apikey, { auth: { persistSession: false, autoRefreshToken: false } });
+    this.liveToken = token;
+    this.live = this.supabase.channel(`oxys-hub-${token}`, { config: { private: false } })
+      .on('broadcast', { event: 'changed' }, () => {
+        clearTimeout(this.liveTimer);
+        this.liveTimer = setTimeout(() => this.sync(), 400);
+      })
+      .subscribe();
+  }
+
+  stopLive() {
+    clearTimeout(this.liveTimer);
+    if (this.live && this.supabase) this.supabase.removeChannel(this.live).catch(() => {});
+    this.live = null;
+    this.liveToken = null;
+  }
+
   stop() {
+    this.stopLive();
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     if (this.server) this.server.close();
@@ -111,7 +141,8 @@ class Hub {
 
   /** Envia o que foi feito offline (na ordem) e depois baixa o retrato atualizado da loja. */
   async sync() {
-    if (!this.enabled || this.syncing) return;
+    if (!this.enabled) return;
+    if (this.syncing) { this.again = true; return; } // chegou aviso no meio: sincroniza de novo em seguida
     this.syncing = true;
     const wasOnline = this.online;
     try {
@@ -122,8 +153,9 @@ class Hub {
         this.state.afterPush(result);
         if (!(result.applied || []).length) break;
       }
-      const { snapshot } = await this.call('snapshot', { lanUrls: lanUrls(PORT), version: this.version, pendingOps: this.state.data.ops.length });
+      const { snapshot, channelToken } = await this.call('snapshot', { lanUrls: lanUrls(PORT), version: this.version, pendingOps: this.state.data.ops.length });
       this.state.applySnapshot(snapshot);
+      this.startLive(channelToken);
       this.online = true;
       this.offlineFails = 0;
       this.lastError = null;
@@ -134,6 +166,7 @@ class Hub {
     } finally {
       this.syncing = false;
       if (wasOnline !== this.online) this.state.changed();
+      if (this.again) { this.again = false; setTimeout(() => this.sync(), 50); }
     }
   }
 }

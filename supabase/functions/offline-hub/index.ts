@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     // ---------- chamadas da central ----------
     const hubKey = req.headers.get('x-hub-key');
     if (hubKey) {
-      const { data: hub } = await sb.from('offline_hubs').select('id, restaurant_id').eq('key_hash', await sha256(hubKey)).maybeSingle();
+      const { data: hub } = await sb.from('offline_hubs').select('id, restaurant_id, channel_token').eq('key_hash', await sha256(hubKey)).maybeSingle();
       if (!hub) return json({ error: 'Central não reconhecida. Ative de novo pelo sistema.' }, 401);
       const { data: active } = await sb.rpc('is_restaurant_active', { _restaurant_id: hub.restaurant_id });
       if (active === false) return json({ error: 'Restaurante bloqueado.' }, 403);
@@ -46,7 +46,8 @@ Deno.serve(async (req) => {
         }).eq('id', hub.id);
         const { data, error } = await sb.rpc('offline_snapshot', { _restaurant_id: hub.restaurant_id });
         if (error) throw error;
-        return json({ hubId: hub.id, snapshot: data });
+        // canal de avisos em tempo real (broadcast "oxys-hub-<token>")
+        return json({ hubId: hub.id, channelToken: hub.channel_token, snapshot: data });
       }
 
       if (action === 'push') {
@@ -74,6 +75,7 @@ Deno.serve(async (req) => {
       const name = String(body?.name ?? 'Computador do caixa').trim().slice(0, 60) || 'Computador do caixa';
       const { data: hub, error } = await sb.from('offline_hubs').upsert({
         restaurant_id: restaurantId, key_hash: await sha256(key), name, created_by: user.id, lan_urls: [], last_seen_at: null,
+        channel_token: Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, '0')).join(''),
       }, { onConflict: 'restaurant_id' }).select('id').single();
       if (error) throw error;
       return json({ hubId: hub.id, key, restaurantId });

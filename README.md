@@ -522,7 +522,7 @@ A Meta só deixa mandar mensagem livre até 24 h depois da última mensagem do c
 O **app de computador do caixa** vira a *central* da loja (`desktop/hub/`):
 
 - **Ativar:** no app de computador, logado como administrador → **Estação de impressão → Central do modo offline** → criar um PIN (4 a 8 números) → *Ativar este computador*. A chave é gerada pela função `offline-hub` e fica só neste computador.
-- **Com internet:** a central baixa a cada 20 s o cardápio, mesas, pedidos abertos, equipe e impressoras (`offline_snapshot`).
+- **Com internet:** a central fica sempre em dia: cada mudança na nuvem (pedido, item, status da cozinha, pagamento, mesa, cardápio) dispara um aviso em tempo real (broadcast `oxys-hub-<token>`, sem dados) e ela baixa o retrato atualizado em ~1 s (`offline_snapshot`). A cópia a cada 20 s continua como reserva.
 - **Sem internet (automático):** depois de ~30 s sem resposta da nuvem, cada aparelho mostra "Entrando no modo offline em 5s" (com "Ficar aqui" para cancelar) e vai sozinho para a central (`http://IP-da-central:8790`, também em QR Code na Estação de impressão). O computador da central troca sozinho. Cada pessoa cai na tela equivalente (cozinha → Cozinha, caixa → Caixa, garçom → Mesas). Na primeira vez o aparelho escolhe quem está usando e digita o PIN; depois fica lembrado por 30 dias. Telas: **Mesas**, **Balcão/Delivery**, **Cozinha** e **Caixa**.
 - **Volta automática:** quando a central e o próprio aparelho alcançam a nuvem e não há nada pendente de envio, aparece "A internet voltou… voltando ao sistema" e cada um volta para a tela em que estava.
 - **Impressão sem internet:** a via da cozinha e o recibo saem nas impressoras do computador da central (as mesmas escolhidas na Estação de impressão).
