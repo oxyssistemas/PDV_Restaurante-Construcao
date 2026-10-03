@@ -73,7 +73,8 @@ Atualizado a cada integração.
 - [x] Sincronização ao voltar a internet, na ordem, sem duplicar
 - [x] Avisos claros do que depende da internet (NFC-e na hora, iFood, WhatsApp, loja online)
 - [x] Entrar do zero sem internet com email e senha normais (senhas só em hash, num cofre criptografado na central) e voltar para a nuvem já logado
-- [ ] Publicar a nova versão do app de computador (v1.0.4) e testar numa loja real
+- [x] Versão v1.0.4 publicada (app de computador com as mesmas telas offline)
+- [ ] Testar o modo offline numa loja real
 - [~] NFC-e: emitida ao voltar a internet; contingência offline oficial (tpEmis 9) depende do emissor fiscal contratado
 
 ## 10. Servidor dedicado por loja (contratado)
@@ -88,7 +89,8 @@ Atualizado a cada integração.
 - [x] Opção de Supabase próprio e exclusivo da loja (cópia de todos os dados, atualizada a cada mudança)
 - [x] Cópias de segurança diárias (7 últimas) e manual
 - [x] Apagar os dados da loja da nuvem compartilhada depois de conferido
-- [ ] Publicar a versão com o Oxys Servidor (v1.0.4) e instalar numa loja real
+- [x] Versão v1.0.4 publicada com os instaladores do Oxys Servidor (Windows, Linux, Mac)
+- [ ] Instalar o Oxys Servidor numa loja real
 - [ ] Loja online e cardápio QR para lojas com servidor dedicado
 - [ ] Robô de WhatsApp, iFood, emissão de NFC-e, assistente de IA e marketing no servidor dedicado
 - [ ] Fotos (cardápio, vitrine) guardadas no servidor dedicado
