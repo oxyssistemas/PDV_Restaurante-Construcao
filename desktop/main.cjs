@@ -3,7 +3,7 @@
 // impressão direta nas térmicas sem janela, abrir com o computador, atualização automática
 // e a central do modo offline (hub/), que mantém a loja funcionando na rede local sem internet.
 
-const { app, BrowserWindow, ipcMain, shell, Menu, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Menu, dialog, safeStorage } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { Hub, PORT: HUB_PORT } = require('./hub/index.cjs');
@@ -68,7 +68,7 @@ function createWindow() {
   win.webContents.on('did-fail-load', (_e, code, _desc, url, isMainFrame) => {
     if (!isMainFrame || code === -3 || !isAppUrl(url)) return;
     // Sem internet: com a central ativa, abre o modo offline; senão a tela de "sem conexão".
-    if (hub?.enabled) win.loadURL(`${HUB_ORIGIN}/`);
+    if (hub?.enabled) win.loadURL(centralUrl(url));
     else win.loadFile(path.join(__dirname, 'offline.html'));
   });
 
@@ -166,12 +166,20 @@ ipcMain.handle('hub:sync', async (e) => { fromApp(e); await hub.sync(); return h
  * próprio modo offline quando a internet voltar e tudo tiver sido enviado.
  */
 function watchConnection() {
-  setInterval(() => {
+  let switchingAt = 0;
+  setInterval(async () => {
     if (!win || !hub?.enabled || hub.online || hub.offlineFails < 2) return;
     const url = win.webContents.getURL();
-    if (!isAppUrl(url)) return;
-    win.loadURL(`${HUB_ORIGIN}/?auto=1&voltar=${encodeURIComponent(url)}`);
+    if (!isAppUrl(url) || Date.now() - switchingAt < 15_000) return;
+    switchingAt = Date.now();
+    // A própria página troca levando a pessoa logada e a mesma tela; se não der, abre a mesma tela na central.
+    const done = await win.webContents.executeJavaScript(`window.oxysGoCentral ? window.oxysGoCentral(${JSON.stringify(HUB_ORIGIN)}) : false`).catch(() => false);
+    if (!done) win.loadURL(centralUrl(url));
   }, 3000);
+}
+/** Mesmo caminho do sistema, aberto pela central. */
+function centralUrl(url) {
+  try { const u = new URL(url); return `${HUB_ORIGIN}${u.pathname}${u.search}`; } catch { return `${HUB_ORIGIN}/`; }
 }
 
 /** Janela escondida que imprime as vias feitas no modo offline nas impressoras deste computador. */
@@ -207,7 +215,11 @@ function setupUpdates() {
 app.whenReady().then(() => {
   app.setAppUserModelId('app.oxysrestaurante.desktop');
   buildMenu();
-  hub = new Hub({ dataDir: app.getPath('userData'), uiDir: offlineUiDir(), version: app.getVersion() });
+  // cofre de login da central criptografado pelo sistema (Windows DPAPI, Keychain no Mac, chaveiro no Linux)
+  const secure = safeStorage.isEncryptionAvailable()
+    ? { encrypt: (text) => safeStorage.encryptString(text), decrypt: (buf) => safeStorage.decryptString(buf) }
+    : null;
+  hub = new Hub({ dataDir: app.getPath('userData'), uiDir: offlineUiDir(), version: app.getVersion(), secure });
   if (hub.enabled) { hub.start(); hub.sync(); startPrinterWindow(); }
   createWindow();
   watchConnection();

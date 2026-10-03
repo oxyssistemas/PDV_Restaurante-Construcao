@@ -1,3 +1,6 @@
 node_modules/
 release/
 offline-ui/
+release-servidor/
+bin/
+server-env.json

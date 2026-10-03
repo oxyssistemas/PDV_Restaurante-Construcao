@@ -1,0 +1,77 @@
+{
+  "appId": "app.oxysrestaurante.servidor",
+  "productName": "Oxys Servidor",
+  "copyright": "Oxys Sistemas",
+  "extraMetadata": {
+    "main": "server-main.cjs",
+    "name": "oxys-servidor",
+    "productName": "Oxys Servidor",
+    "description": "Servidor dedicado da loja (Oxys Restaurante)",
+    "desktopName": "oxys-servidor.desktop"
+  },
+  "files": [
+    "server-main.cjs",
+    "server-preload.cjs",
+    "servidor.html",
+    "preload.cjs",
+    "server-env.json",
+    "build/icon.png",
+    "hub/**/*",
+    "offline-ui/**/*"
+  ],
+  "extraResources": [
+    { "from": "bin", "to": "bin", "filter": ["**/*"] }
+  ],
+  "directories": {
+    "output": "release-servidor",
+    "buildResources": "build"
+  },
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "oxyssistemas",
+      "repo": "PDV_Restaurante-Construcao",
+      "releaseType": "release",
+      "channel": "servidor"
+    }
+  ],
+  "win": {
+    "target": [{ "target": "nsis", "arch": ["x64"] }],
+    "icon": "build/icon.ico",
+    "artifactName": "Oxys-Servidor-Setup.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": "always",
+    "createStartMenuShortcut": true,
+    "shortcutName": "Oxys Servidor",
+    "language": "1046"
+  },
+  "mac": {
+    "target": [
+      { "target": "dmg", "arch": ["universal"] },
+      { "target": "zip", "arch": ["universal"] }
+    ],
+    "icon": "build/icon.icns",
+    "category": "public.app-category.business",
+    "artifactName": "Oxys-Servidor-Mac.${ext}",
+    "hardenedRuntime": true,
+    "x64ArchFiles": "Contents/Resources/bin/*"
+  },
+  "dmg": { "title": "Oxys Servidor" },
+  "linux": {
+    "target": [
+      { "target": "AppImage", "arch": ["x64"] },
+      { "target": "deb", "arch": ["x64"] }
+    ],
+    "icon": "build/icons",
+    "category": "Office",
+    "maintainer": "Oxys Sistemas <oxyssistemas@gmail.com>",
+    "synopsis": "Servidor dedicado da loja",
+    "artifactName": "Oxys-Servidor-Linux.${ext}",
+    "executableName": "oxys-servidor"
+  },
+  "deb": { "packageName": "oxys-servidor" }
+}

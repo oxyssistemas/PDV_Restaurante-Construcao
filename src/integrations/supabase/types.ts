@@ -658,6 +658,71 @@ export type Database = {
           },
         ]
       }
+      dedicated_servers: {
+        Row: {
+          activation_code_hash: string | null
+          activation_expires_at: string | null
+          cloud_purged_at: string | null
+          created_at: string
+          enabled: boolean
+          key_hash: string | null
+          lan_urls: string[]
+          last_seen_at: string | null
+          migrated_at: string | null
+          migrated_rows: number | null
+          own_supabase_url: string | null
+          public_url: string | null
+          restaurant_id: string
+          status: string
+          updated_at: string
+          version: string | null
+        }
+        Insert: {
+          activation_code_hash?: string | null
+          activation_expires_at?: string | null
+          cloud_purged_at?: string | null
+          created_at?: string
+          enabled?: boolean
+          key_hash?: string | null
+          lan_urls?: string[]
+          last_seen_at?: string | null
+          migrated_at?: string | null
+          migrated_rows?: number | null
+          own_supabase_url?: string | null
+          public_url?: string | null
+          restaurant_id: string
+          status?: string
+          updated_at?: string
+          version?: string | null
+        }
+        Update: {
+          activation_code_hash?: string | null
+          activation_expires_at?: string | null
+          cloud_purged_at?: string | null
+          created_at?: string
+          enabled?: boolean
+          key_hash?: string | null
+          lan_urls?: string[]
+          last_seen_at?: string | null
+          migrated_at?: string | null
+          migrated_rows?: number | null
+          own_supabase_url?: string | null
+          public_url?: string | null
+          restaurant_id?: string
+          status?: string
+          updated_at?: string
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dedicated_servers_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_promotions: {
         Row: {
           active: boolean
@@ -2461,6 +2526,7 @@ export type Database = {
       }
       offline_hubs: {
         Row: {
+          channel_token: string
           created_at: string
           created_by: string
           id: string
@@ -2475,6 +2541,7 @@ export type Database = {
           version: string | null
         }
         Insert: {
+          channel_token?: string
           created_at?: string
           created_by: string
           id?: string
@@ -2489,6 +2556,7 @@ export type Database = {
           version?: string | null
         }
         Update: {
+          channel_token?: string
           created_at?: string
           created_by?: string
           id?: string
@@ -3607,6 +3675,21 @@ export type Database = {
         Args: { _customer_name: string; _items: Json; _qr_token: string }
         Returns: string
       }
+      dedicated_export: {
+        Args: {
+          _limit?: number
+          _offset?: number
+          _restaurant_id: string
+          _table: string
+        }
+        Returns: Json
+      }
+      dedicated_purge_cloud: {
+        Args: { _restaurant_id: string }
+        Returns: number
+      }
+      dedicated_schema: { Args: never; Returns: Json }
+      dedicated_tables: { Args: never; Returns: string[] }
       fiscal_cron_secret: { Args: never; Returns: string }
       fiscal_kick: { Args: { _invoice_id: string }; Returns: undefined }
       get_user_restaurant_id: { Args: { _user_id: string }; Returns: string }
@@ -3642,6 +3725,20 @@ export type Database = {
         Args: { _edit?: boolean; _module: string; _restaurant_id: string }
         Returns: boolean
       }
+      my_dedicated_server: {
+        Args: never
+        Returns: {
+          lan_urls: string[]
+          public_url: string
+          restaurant_id: string
+          status: string
+        }[]
+      }
+      offline_apply_row: {
+        Args: { _op: Json; _restaurant_id: string }
+        Returns: undefined
+      }
+      offline_replica: { Args: { _restaurant_id: string }; Returns: Json }
       offline_snapshot: { Args: { _restaurant_id: string }; Returns: Json }
       print_order_header: { Args: { _order_id: string }; Returns: Json }
       print_restaurant_name: {

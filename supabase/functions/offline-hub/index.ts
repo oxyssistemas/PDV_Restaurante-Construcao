@@ -4,6 +4,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 //   Equipe logada (admin):  { action: 'activate', restaurantId, name? } → gera/troca a chave da central
 //                           { action: 'deactivate', restaurantId }
 //   Central (x-hub-key):    { action: 'snapshot', lanUrls?, version?, pendingOps? } → retrato da loja
+//                           { action: 'replica', ... }                            → espelho das tabelas da operação
 //                           { action: 'push', ops: [...] }                         → aplica o que foi feito sem internet
 
 const cors = {
@@ -35,6 +36,20 @@ Deno.serve(async (req) => {
       if (!hub) return json({ error: 'Central não reconhecida. Ative de novo pelo sistema.' }, 401);
       const { data: active } = await sb.rpc('is_restaurant_active', { _restaurant_id: hub.restaurant_id });
       if (active === false) return json({ error: 'Restaurante bloqueado.' }, 403);
+
+      // espelho completo das tabelas da operação (modo offline com as mesmas telas)
+      if (action === 'replica') {
+        const lanUrls = Array.isArray(body?.lanUrls) ? body.lanUrls.filter((u: unknown) => typeof u === 'string' && /^http:\/\/[\w.-]+(:\d+)?\/?$/.test(u)).slice(0, 6) : undefined;
+        await sb.from('offline_hubs').update({
+          last_seen_at: new Date().toISOString(),
+          ...(lanUrls ? { lan_urls: lanUrls } : {}),
+          ...(typeof body?.version === 'string' ? { version: body.version.slice(0, 20) } : {}),
+          ...(Number.isFinite(body?.pendingOps) ? { pending_ops: Math.max(0, Math.floor(body.pendingOps)) } : {}),
+        }).eq('id', hub.id);
+        const { data, error } = await sb.rpc('offline_replica', { _restaurant_id: hub.restaurant_id });
+        if (error) throw error;
+        return json({ hubId: hub.id, channelToken: hub.channel_token, replica: data });
+      }
 
       if (action === 'snapshot') {
         const lanUrls = Array.isArray(body?.lanUrls) ? body.lanUrls.filter((u: unknown) => typeof u === 'string' && /^http:\/\/[\w.-]+(:\d+)?\/?$/.test(u)).slice(0, 6) : undefined;

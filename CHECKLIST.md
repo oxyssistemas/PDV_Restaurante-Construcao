@@ -63,16 +63,36 @@ Atualizado a cada integração.
 - [~] Assinatura digital dos instaladores (tira avisos do Windows/Mac) — falta o certificado
 
 ## 8. Modo offline
-- [x] Central no computador do caixa (ativação pelo administrador, PIN da equipe)
-- [x] Sem internet: garçons, cozinha e caixa pela rede da loja (celular, tablet ou computador)
-- [x] Lançar pedidos (mesa, balcão e delivery por telefone)
-- [x] Cozinha recebendo e marcando os pedidos; via da cozinha impressa na central
-- [x] Fechar conta e receber (várias formas, troco), recibo impresso e mesa liberada
+- [x] Central no computador do caixa (ativação pelo administrador)
+- [x] Sem internet com as MESMAS telas de sempre (garçom, cozinha, caixa, delivery), pela central na rede da loja
+- [x] Mesmas permissões da nuvem por cargo (regras do banco reproduzidas na central, inclusive no tempo real)
+- [x] Troca automática e imediata para a central e de volta, na mesma tela e sem novo login
+- [x] Atualização em tempo real entre os aparelhos também sem internet
+- [x] Via da cozinha e recibo impressos na central; sem reimprimir na volta
 - [x] Central sempre em dia com a nuvem (aviso em tempo real a cada mudança, ~1 s)
-- [x] Sincronização ao voltar a internet, na ordem, sem duplicar e sem reimprimir
-- [x] Troca automática para o modo offline (todos os aparelhos e o computador da central) e volta automática quando a internet voltar
-- [x] Cada pessoa cai na tela certa (cozinha, caixa, mesas); PIN lembrado por 30 dias em cada aparelho
+- [x] Sincronização ao voltar a internet, na ordem, sem duplicar
+- [x] Avisos claros do que depende da internet (NFC-e na hora, iFood, WhatsApp, loja online)
+- [x] Entrar do zero sem internet com email e senha normais (senhas só em hash, num cofre criptografado na central) e voltar para a nuvem já logado
+- [ ] Publicar a nova versão do app de computador (v1.0.4) e testar numa loja real
 - [~] NFC-e: emitida ao voltar a internet; contingência offline oficial (tpEmis 9) depende do emissor fiscal contratado
+
+## 10. Servidor dedicado por loja (contratado)
+- [x] Super admin escolhe quem tem o recurso (na lista de restaurantes e no cadastro da loja)
+- [x] Código de instalação (24 h, uso único) e acompanhamento: situação, último contato, endereços, migração
+- [x] "Oxys Servidor" instalável (Windows, Linux, Mac): banco próprio da loja (SQLite), abre com o computador, fica na bandeja, imprime as vias
+- [x] Migração de todo o histórico da loja da nuvem para o servidor
+- [x] Equipe entra por oxysrestaurante.app e vai sozinha para o servidor da loja (mesma tela, já logada); login normal também sem internet
+- [x] Mesmas permissões da nuvem lidas direto do banco (tradutor automático das regras) e os mesmos gatilhos (estoque, impressão, reserva)
+- [x] Dados do restaurante e equipe continuam na nuvem, gravados em nome da própria pessoa
+- [x] Acesso pela internet por túnel seguro (automático ou endereço fixo), sem abrir portas
+- [x] Opção de Supabase próprio e exclusivo da loja (cópia de todos os dados, atualizada a cada mudança)
+- [x] Cópias de segurança diárias (7 últimas) e manual
+- [x] Apagar os dados da loja da nuvem compartilhada depois de conferido
+- [ ] Publicar a versão com o Oxys Servidor (v1.0.4) e instalar numa loja real
+- [ ] Loja online e cardápio QR para lojas com servidor dedicado
+- [ ] Robô de WhatsApp, iFood, emissão de NFC-e, assistente de IA e marketing no servidor dedicado
+- [ ] Fotos (cardápio, vitrine) guardadas no servidor dedicado
+- [ ] App de computador da loja lembrar o endereço do servidor quando abrir já sem internet
 
 ## 9. Configurações externas pendentes
 - [~] Email próprio (SMTP, ex.: Resend) no Supabase — libera "Esqueci minha senha" dos clientes
@@ -81,6 +101,7 @@ Atualizado a cada integração.
 ---
 
 ## Próximas integrações
+- [ ] Servidor dedicado: integrações da nuvem (loja online, WhatsApp, iFood, NFC-e, IA, marketing, fotos)
 - [ ] Pix automático (QR dinâmico + baixa sozinha)
 - [ ] Maquininha integrada (Stone, PagSeguro, Mercado Pago Point)
 - [ ] 99Food, Keeta e Rappi automáticos (dependem de contrato de parceria)
@@ -94,6 +115,7 @@ Atualizado a cada integração.
 - [ ] Permitir cadastrar como funcionário um email que já é cliente da loja
 
 ## Decisões em aberto
+- [x] Modo offline: guardar o hash das senhas da equipe na central, criptografado (decidido: sim)
 - [ ] Apagar a venda de teste "TESTE NFCE" (R$ 38) do restaurante Teste?
 - [ ] Manter ou remover a vitrine de demonstração do restaurante Teste?
 - [ ] Repositório do GitHub continua público? (a atualização automática do app de computador depende disso)

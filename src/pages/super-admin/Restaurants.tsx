@@ -13,14 +13,27 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Plus, Loader2, Lock, Unlock, UserPlus } from 'lucide-react';
+import { Plus, Loader2, Lock, Unlock, UserPlus, ServerCog, Cloud } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import DedicatedServerDialog, { DEDICATED_STATUS } from '@/components/super-admin/DedicatedServerDialog';
 import { toast } from '@/hooks/use-toast';
 
 export default function Restaurants() {
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState<string | null>(null);
+  const [serverOpen, setServerOpen] = useState<string | null>(null);
 
+  // servidores dedicados (recurso contratado por loja)
+  const { data: servers } = useQuery({
+    queryKey: ['super-admin-dedicated'],
+    refetchInterval: 15_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dedicated_servers').select('*');
+      if (error) throw error;
+      return Object.fromEntries((data ?? []).map(s => [s.restaurant_id, s]));
+    },
+  });
   const { data: restaurants, isLoading } = useQuery({
     queryKey: ['super-admin-restaurants'],
     queryFn: async () => {
@@ -83,6 +96,7 @@ export default function Restaurants() {
                   <TableHead>Telefone</TableHead>
                   <TableHead>Plano</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Dados</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -97,7 +111,26 @@ export default function Restaurants() {
                         {r.status === 'active' ? 'Ativo' : 'Bloqueado'}
                       </Badge>
                     </TableCell>
+                    <TableCell>
+                      {servers?.[r.id]?.enabled ? (
+                        <Badge variant="outline" className={DEDICATED_STATUS[servers[r.id].status]?.tone}>
+                          <ServerCog className="mr-1 h-3 w-3" /> {DEDICATED_STATUS[servers[r.id].status]?.label}
+                        </Badge>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Cloud className="h-3 w-3" /> Nuvem</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right space-x-2">
+                      <Dialog open={serverOpen === r.id} onOpenChange={(o) => setServerOpen(o ? r.id : null)}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="gap-1">
+                            <ServerCog className="h-3.5 w-3.5" /> Servidor
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+                          <DedicatedServerDialog restaurantId={r.id} restaurantName={r.name} server={servers?.[r.id] ?? null} />
+                        </DialogContent>
+                      </Dialog>
                       <Dialog open={adminOpen === r.id} onOpenChange={(o) => setAdminOpen(o ? r.id : null)}>
                         <DialogTrigger asChild>
                           <Button variant="outline" size="sm" className="gap-1">
@@ -132,7 +165,7 @@ export default function Restaurants() {
                 ))}
                 {restaurants?.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       Nenhum restaurante cadastrado
                     </TableCell>
                   </TableRow>
@@ -150,16 +183,22 @@ function CreateRestaurantForm({ onSuccess }: { onSuccess: () => void }) {
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
+  const [dedicated, setDedicated] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.from('restaurants').insert({ name, address, phone });
+    const { data: created, error } = await supabase.from('restaurants').insert({ name, address, phone }).select('id').single();
     if (error) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
     } else {
-      toast({ title: 'Restaurante criado com sucesso!' });
+      // servidor dedicado contratado: já fica liberado para instalar
+      if (dedicated) {
+        const { data, error: e2 } = await supabase.functions.invoke('dedicated-server', { body: { action: 'enable', restaurantId: created.id, enabled: true } });
+        if (e2 || data?.error) toast({ title: 'Restaurante criado, mas o servidor dedicado não foi liberado', description: data?.error ?? await edgeErrorMessage(e2, 'Libere em "Servidor".'), variant: 'destructive' });
+      }
+      toast({ title: 'Restaurante criado com sucesso!', description: dedicated ? 'Servidor dedicado liberado: gere o código de instalação em "Servidor".' : undefined });
       onSuccess();
     }
     setLoading(false);
@@ -183,6 +222,13 @@ function CreateRestaurantForm({ onSuccess }: { onSuccess: () => void }) {
           <Label>Telefone</Label>
           <Input value={phone} onChange={e => setPhone(e.target.value)} />
         </div>
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3">
+          <Checkbox checked={dedicated} onCheckedChange={(v) => setDedicated(v === true)} className="mt-0.5" />
+          <span>
+            <span className="flex items-center gap-1.5 font-medium"><ServerCog className="h-4 w-4" /> Servidor dedicado (contratado)</span>
+            <span className="text-xs text-muted-foreground">Os dados desta loja ficam num servidor instalado no computador dela, não na nuvem compartilhada.</span>
+          </span>
+        </label>
         <DialogFooter>
           <Button type="submit" disabled={loading} className="gap-2">
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}

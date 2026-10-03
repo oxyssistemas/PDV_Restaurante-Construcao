@@ -521,16 +521,36 @@ A Meta só deixa mandar mensagem livre até 24 h depois da última mensagem do c
 
 O **app de computador do caixa** vira a *central* da loja (`desktop/hub/`):
 
-- **Ativar:** no app de computador, logado como administrador → **Estação de impressão → Central do modo offline** → criar um PIN (4 a 8 números) → *Ativar este computador*. A chave é gerada pela função `offline-hub` e fica só neste computador.
-- **Com internet:** a central fica sempre em dia: cada mudança na nuvem (pedido, item, status da cozinha, pagamento, mesa, cardápio) dispara um aviso em tempo real (broadcast `oxys-hub-<token>`, sem dados) e ela baixa o retrato atualizado em ~1 s (`offline_snapshot`). A cópia a cada 20 s continua como reserva.
-- **Sem internet (automático):** depois de ~30 s sem resposta da nuvem, cada aparelho mostra "Entrando no modo offline em 5s" (com "Ficar aqui" para cancelar) e vai sozinho para a central (`http://IP-da-central:8790`, também em QR Code na Estação de impressão). O computador da central troca sozinho. Cada pessoa cai na tela equivalente (cozinha → Cozinha, caixa → Caixa, garçom → Mesas). Na primeira vez o aparelho escolhe quem está usando e digita o PIN; depois fica lembrado por 30 dias. Telas: **Mesas**, **Balcão/Delivery**, **Cozinha** e **Caixa**.
-- **Volta automática:** quando a central e o próprio aparelho alcançam a nuvem e não há nada pendente de envio, aparece "A internet voltou… voltando ao sistema" e cada um volta para a tela em que estava.
-- **Impressão sem internet:** a via da cozinha e o recibo saem nas impressoras do computador da central (as mesmas escolhidas na Estação de impressão).
-- **Quando a internet volta:** a central envia tudo na ordem em que aconteceu (`apply_offline_ops`, sem duplicar se reenviar). Na nuvem, a via da cozinha e o recibo não são impressos de novo; a **NFC-e é emitida nesse momento**. Os pedidos aparecem com a bolinha "Modo offline".
+- **Ativar:** no app de computador, logado como administrador → **Estação de impressão → Central do modo offline** → *Ativar este computador*. A chave é gerada pela função `offline-hub` e fica só neste computador.
+- **Com internet:** a central fica sempre em dia (aviso em tempo real a cada mudança + cópia a cada 20 s): é um **espelho do banco da loja** (`offline_replica`: pedidos, itens, pagamentos, mesas, cardápio, caixa, reservas, entregadores, impressoras e a equipe com seus papéis).
+- **Sem internet, nada muda na operação:** em ~10 s sem resposta da nuvem cada aparelho passa **na hora, sozinho**, para a central (`http://IP-da-central:8790`), **na mesma tela e com a mesma pessoa logada**. O computador da central também troca sozinho. Um aviso no canto diz "Sem internet" e o que fica para depois.
+  - A central responde como a nuvem: `/rest/v1` (formato PostgREST, `desktop/hub/mirror.cjs` e `postgrest.cjs`), `/auth/v1` (`auth.cjs`) e tempo real `/realtime/v1` (`realtime.cjs`). O app detecta a central pela meta `oxys-central` (`src/lib/central.ts`).
+  - **Mesmas permissões:** as regras de acesso do banco (RLS) estão reproduzidas em `desktop/hub/policies.cjs` — cada pessoa vê e altera exatamente o que veria na nuvem, inclusive nos avisos em tempo real. Ao mudar uma política no banco, atualize esse arquivo.
+  - **Login de sempre:** a sessão da nuvem é levada na troca (a central confere o token com a chave pública da nuvem) e renovada pela central. Quem estava deslogado entra com o email e a senha normais: a central recebe o hash bcrypt das senhas da equipe (nunca a senha) e guarda num cofre separado, criptografado pelo sistema operacional (`desktop/hub/credentials.cjs`). Na volta da internet essa pessoa recebe uma sessão da nuvem e continua logada.
+  - Cada gravação vira uma linha na fila (`row.insert/update/delete`), aplicada na nuvem por `offline_apply_row`. O que depende da internet (NFC-e na hora, iFood, WhatsApp, loja online, envio de arquivos) mostra "disponível quando a internet voltar".
+- **Volta automática:** quando a central já enviou tudo e o aparelho alcança a nuvem, ele volta na hora para a mesma tela na nuvem, logado.
+- **Impressão sem internet:** a via da cozinha e o recibo (as mesmas regras do banco, refeitas na central) saem nas impressoras do computador da central, escolhidas na Estação de impressão.
+- **Quando a internet volta:** a central envia tudo na ordem em que aconteceu (`apply_offline_ops`, sem duplicar se reenviar). Na nuvem, a via da cozinha e o recibo não são impressos de novo; a baixa de estoque e a **NFC-e acontecem nesse momento**.
 - Dados locais: `oxys-central.json` e `oxys-central-config.json` na pasta de dados do app. No Windows, permita o acesso à rede quando o firewall perguntar.
 - Teste sem derrubar a internet: abrir o app com `OXYS_FORCE_OFFLINE=1`.
 
 **NFC-e em contingência:** hoje a nota é emitida assim que a internet volta. A contingência offline oficial da SEFAZ (nota assinada na hora, sem internet) depende do emissor fiscal contratado e do certificado na central.
+
+## 🖥️ Servidor dedicado por loja (recurso contratado)
+
+Para lojas que contratam: os dados da operação daquela loja ficam num **servidor instalado no computador da loja** ("Oxys Servidor"), não na nuvem compartilhada. A nuvem guarda só o controle: restaurante, plano, equipe/login e o endereço do servidor.
+
+- **Liberar (super admin):** Restaurantes → **Servidor** (ou marque "Servidor dedicado" ao cadastrar a loja) → ligar "Recurso contratado" → **Gerar código de instalação** (vale 24 h, uso único).
+- **Instalar:** baixe o *Oxys Servidor* (Windows, Linux ou Mac, na mesma página de Releases do app), abra e digite o código. O servidor copia todo o histórico da loja (`dedicated_export`), avisa a nuvem e passa a atender. Abre sozinho com o computador e fica na bandeja.
+- **Equipe:** entra normalmente por oxysrestaurante.app; depois do login é levada na hora para o servidor da loja, na mesma tela e já logada (`DedicatedGate`). Pode entrar direto no servidor com email e senha de sempre, inclusive sem internet. Sem internet, os aparelhos usam o endereço da rede da loja.
+- **Mesmas regras da nuvem:** as permissões vêm direto do banco (`pg_policies`) e são aplicadas por um tradutor (`desktop/hub/rls.cjs`) — conferido com 5.565 verificações sem diferença. Os gatilhos do banco também (via da cozinha, recibo, baixa de estoque pela ficha técnica, aviso de estoque baixo, reserva de mesa).
+- **O que continua na nuvem:** dados do restaurante, plano e equipe — gravados na nuvem em nome da própria pessoa (com as regras da nuvem), a partir do servidor.
+- **Acesso pela internet:** túnel seguro da Cloudflare (`cloudflared`, vem no instalador), sem abrir portas no roteador: automático (`*.trycloudflare.com`) ou endereço fixo com token do túnel.
+- **Supabase próprio (opcional):** no painel do servidor, informe o endereço e a chave service_role do projeto da loja; o servidor mantém lá uma cópia de todos os dados, atualizada a cada mudança (fila no SQLite). O projeto precisa ter a estrutura do sistema (aplicar `supabase/migrations`).
+- **Cópias de segurança:** uma por dia (guarda 7), mais "Fazer cópia agora" no painel.
+- **Depois de conferir:** super admin → Servidor → **Apagar da nuvem** (digitando o nome da loja) remove os dados da operação da nuvem compartilhada.
+- Arquivos: `desktop/server-main.cjs` (app), `desktop/servidor.html` (painel), `desktop/hub/dedicated.cjs` (servidor), `store.cjs` (SQLite), `tunnel.cjs`, `ownsupabase.cjs`, função `dedicated-server`, migrações `20261004000000_dedicated_servers.sql` e `…000100_dedicated_primary_keys.sql`. Instaladores: `desktop/electron-builder.server.json` (gerados no mesmo workflow do app de computador).
+- **Ainda não no servidor dedicado** (aparece "ainda não disponível no servidor dedicado"): loja online/cardápio QR, robô de WhatsApp, iFood, emissão de NFC-e, assistente de IA, marketing e envio de fotos.
 
 ## 💻📱 Apps de computador e celular
 

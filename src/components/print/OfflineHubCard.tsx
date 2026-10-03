@@ -5,10 +5,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { CloudOff, Loader2, RefreshCw, ServerCog, Wifi } from 'lucide-react';
 import { toast } from 'sonner';
+import { IS_CENTRAL } from '@/lib/central';
 import { desktop, type HubStatus } from '@/lib/desktop';
 
 /**
@@ -19,7 +19,6 @@ export default function OfflineHubCard() {
   const { currentRole } = useAuth();
   const restaurantId = currentRole?.restaurant_id ?? null;
   const isAdmin = currentRole?.role === 'admin' || currentRole?.role === 'super_admin';
-  const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
 
@@ -35,6 +34,8 @@ export default function OfflineHubCard() {
     QRCode.toDataURL(url, { width: 320, margin: 1 }).then(setQr).catch(() => setQr(null));
   }, [url]);
 
+  // aberto pela central ou pelo servidor dedicado da loja: não há central para ativar aqui
+  if (IS_CENTRAL) return null;
   if (!desktop?.hubStatus) {
     return (
       <Card>
@@ -46,17 +47,18 @@ export default function OfflineHubCard() {
   }
 
   const activate = async () => {
-    if (!restaurantId || !/^\d{4,8}$/.test(pin)) { toast.error('Crie um PIN de 4 a 8 números.'); return; }
+    if (!restaurantId) return;
     setBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke('offline-hub', { body: { action: 'activate', restaurantId } });
       if (error || data?.error) throw new Error(data?.error || error?.message);
       await desktop!.hubActivate!({
-        key: data.key, restaurantId, pin,
+        key: data.key, restaurantId,
+        // a equipe entra com o próprio email e senha; o PIN só existe para apps de computador anteriores à v1.0.4
+        pin: String(Math.floor(1e7 + Math.random() * 9e7)),
         functionsUrl: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/offline-hub`,
         apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
       });
-      setPin('');
       toast.success('Este computador agora é a central do modo offline');
       setTimeout(() => refetch(), 3000);
     } catch (e) {
@@ -89,11 +91,9 @@ export default function OfflineHubCard() {
         {!status?.enabled ? (
           isAdmin ? (
             <div className="space-y-3">
-              <p className="text-muted-foreground">Ative no computador que fica sempre ligado no caixa. Crie um PIN: a equipe usa ele para entrar no modo offline.</p>
+              <p className="text-muted-foreground">Ative no computador que fica sempre ligado no caixa. Sem internet, todos continuam no sistema de sempre, com o mesmo login e as mesmas permissões.</p>
               <div className="flex flex-wrap gap-2">
-                <Input value={pin} inputMode="numeric" maxLength={8} placeholder="PIN (4 a 8 números)" className="w-48"
-                  onChange={e => setPin(e.target.value.replace(/\D/g, ''))} />
-                <Button disabled={busy || pin.length < 4} onClick={activate}>
+                <Button disabled={busy} onClick={activate}>
                   {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Ativar este computador
                 </Button>
               </div>

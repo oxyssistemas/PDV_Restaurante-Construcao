@@ -21,3 +21,6 @@ verify_jwt = false
 
 [functions.offline-hub]
 verify_jwt = false
+
+[functions.dedicated-server]
+verify_jwt = false

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oxys Servidor</title>
+<style>
+  :root { --bg:#0b1120; --card:#111a2e; --line:#1f2a44; --text:#e6ebf5; --muted:#8b97b0; --red:#ef4444; --green:#22c55e; --amber:#f59e0b; --blue:#38bdf8; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--text); }
+  header { display:flex; align-items:center; gap:12px; padding:18px 24px; border-bottom:1px solid var(--line); }
+  header h1 { margin:0; font-size:18px; }
+  header .store { color:var(--muted); }
+  .pill { margin-left:auto; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:600; border:1px solid currentColor; }
+  main { padding:20px 24px 40px; display:grid; gap:16px; grid-template-columns:repeat(auto-fill, minmax(420px, 1fr)); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 18px; }
+  .card h2 { margin:0 0 10px; font-size:15px; }
+  .muted { color:var(--muted); font-size:13px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+  input[type=text], input[type=password], select { background:#0b1324; border:1px solid var(--line); color:var(--text); border-radius:8px; padding:8px 10px; font:inherit; min-width:0; flex:1; }
+  button { background:var(--red); color:#fff; border:0; border-radius:8px; padding:8px 14px; font:inherit; font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; border:1px solid var(--line); color:var(--text); }
+  button:disabled { opacity:.5; cursor:default; }
+  .mono { font-family:ui-monospace, Consolas, monospace; word-break:break-all; }
+  .err { color:var(--red); font-size:13px; margin-top:6px; }
+  .ok { color:var(--green); }
+  .bar { height:8px; background:#0b1324; border-radius:99px; overflow:hidden; margin-top:8px; }
+  .bar > i { display:block; height:100%; background:var(--red); width:0; transition:width .3s; }
+  label.opt { display:flex; gap:8px; align-items:flex-start; margin:6px 0; cursor:pointer; }
+  .wide { grid-column:1 / -1; }
+  .code { font-size:22px; letter-spacing:4px; text-transform:uppercase; text-align:center; font-family:ui-monospace, Consolas, monospace; }
+  table { width:100%; border-collapse:collapse; }
+  td { padding:6px 4px; border-top:1px solid var(--line); vertical-align:middle; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Oxys Servidor</h1>
+  <span class="store" id="store"></span>
+  <span class="pill" id="pill">…</span>
+</header>
+<main id="main"></main>
+
+<script>
+const S = window.oxysServer;
+const $ = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') el.className = v; else if (k.startsWith('on')) el.addEventListener(k.slice(2), v); else if (v !== undefined && v !== null && v !== false) el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const k of kids.flat()) if (k !== null && k !== undefined && k !== false) el.append(k instanceof Node ? k : document.createTextNode(String(k)));
+  return el;
+};
+const PURPOSES = { kitchen: 'Via da cozinha', order: 'Comanda', receipt: 'Recibo', nfce: 'Nota fiscal' };
+const when = (iso) => iso ? new Date(iso).toLocaleString('pt-BR') : 'nunca';
+let st = null, printers = null, editing = false, msg = {};
+
+async function act(key, fn) {
+  msg[key] = null; render();
+  try { await fn(); msg[key] = { ok: 'Pronto!' }; } catch (e) { msg[key] = { err: (e && e.message || String(e)).replace(/^Error invoking remote method '[^']+': (Error: )?/, '') }; }
+  await refresh();
+}
+const note = (key) => msg[key] ? (msg[key].err ? $('div', { class: 'err' }, msg[key].err) : $('div', { class: 'ok muted' }, msg[key].ok)) : null;
+
+function activation() {
+  const input = $('input', { type: 'text', class: 'code', placeholder: 'XXXX-XXXX', maxlength: 9, id: 'code' });
+  const m = st.migration;
+  return $('div', { class: 'card wide' },
+    $('h2', {}, 'Ativar este computador como servidor da loja'),
+    $('p', { class: 'muted' }, 'No sistema, o super admin abre Restaurantes → Servidor → "Gerar código de instalação". Digite o código aqui. Os dados da loja serão copiados para este computador.'),
+    m ? $('div', {},
+          $('p', {}, `Copiando os dados da loja… ${m.done} de ${m.total} tabelas (${m.rows} registros)`),
+          $('div', { class: 'bar' }, $('i', { style: `width:${Math.round(100 * m.done / Math.max(1, m.total))}%` })))
+      : $('div', { class: 'row' }, input, $('button', { onclick: () => act('act', () => S.activate(document.getElementById('code').value)) }, 'Ativar')),
+    note('act'));
+}
+
+function overview() {
+  const online = st.online && !st.suspended;
+  return $('div', { class: 'card' },
+    $('h2', {}, 'Situação'),
+    $('p', {}, st.suspended ? 'Servidor desativado pela Oxys. Fale com o suporte.' : online ? 'Funcionando e conectado à nuvem Oxys.' : 'Funcionando sem internet: a equipe da loja continua usando normalmente.'),
+    $('p', { class: 'muted' }, `${st.records} registros guardados neste computador · versão ${st.version}`),
+    st.error ? $('div', { class: 'err' }, st.error) : null,
+    $('div', { class: 'row' }, $('button', { onclick: () => S.openSystem() }, 'Abrir o sistema')),
+    $('label', { class: 'opt' }, $('input', { type: 'checkbox', checked: st.autoStart, onchange: (e) => S.setAutoStart(e.target.checked) }), 'Abrir o servidor junto com o computador'));
+}
+
+function addresses() {
+  return $('div', { class: 'card' },
+    $('h2', {}, 'Endereços do sistema'),
+    $('p', { class: 'muted' }, 'A equipe entra normalmente por oxysrestaurante.app e é levada para este servidor. Sem internet, celulares e tablets da loja usam o endereço da rede:'),
+    ...(st.lanUrls.length ? st.lanUrls.map(u => $('p', { class: 'mono' }, u)) : [$('p', { class: 'muted' }, 'Sem rede local detectada.')]),
+    $('p', { class: 'muted' }, 'Pela internet:'),
+    st.publicUrl ? $('p', { class: 'mono' }, $('a', { href: '#', style: 'color:var(--blue)', onclick: (e) => { e.preventDefault(); S.openUrl(st.publicUrl); } }, st.publicUrl))
+      : $('p', { class: 'muted' }, st.tunnel.mode === 'off' ? 'Desligado.' : 'Conectando…'));
+}
+
+function tunnel() {
+  const t = st.tunnel;
+  const mode = (document.querySelector('input[name=tmode]:checked') || {}).value || t.mode;
+  const radio = (v, title, desc) => $('label', { class: 'opt' }, $('input', { type: 'radio', name: 'tmode', value: v, checked: mode === v, onchange: () => { editing = true; render(); } }),
+    $('span', {}, $('b', {}, title), $('br'), $('span', { class: 'muted' }, desc)));
+  return $('div', { class: 'card' },
+    $('h2', {}, 'Acesso pela internet'),
+    radio('quick', 'Automático', 'Túnel seguro com endereço gerado sozinho. Não precisa configurar nada.'),
+    radio('token', 'Endereço fixo (Cloudflare)', 'Túnel criado na conta Cloudflare, com endereço próprio da loja.'),
+    radio('off', 'Desligado', 'Só a rede da loja. Loja online, iFood e acesso de fora não funcionam.'),
+    mode === 'token' ? $('div', {},
+      $('div', { class: 'row' }, $('input', { type: 'password', id: 'ttoken', placeholder: 'Token do túnel (Cloudflare)' })),
+      $('div', { class: 'row' }, $('input', { type: 'text', id: 'turl', placeholder: 'https://loja.seudominio.com', value: st.publicUrl || '' }))) : null,
+    $('div', { class: 'row' }, $('button', { onclick: () => act('tun', async () => { await S.setTunnel({ mode, token: (document.getElementById('ttoken') || {}).value, publicUrl: (document.getElementById('turl') || {}).value }); editing = false; }) }, 'Salvar')),
+    t.error ? $('div', { class: 'err' }, t.error) : null, note('tun'));
+}
+
+function printing() {
+  if (!printers) { S.printers().then(p => { printers = p; render(); }); return $('div', { class: 'card' }, $('h2', {}, 'Impressoras'), $('p', { class: 'muted' }, 'Carregando…')); }
+  const devices = { ...(st.devices || {}) };
+  return $('div', { class: 'card' },
+    $('h2', {}, 'Impressoras'),
+    $('p', { class: 'muted' }, 'As vias da cozinha e os recibos saem neste computador. Escolha a impressora de cada uma cadastrada no sistema.'),
+    printers.registered.length ? $('table', {}, ...printers.registered.map(p => $('tr', {},
+      $('td', {}, p.name, $('br'), $('span', { class: 'muted' }, (p.purposes || []).map(x => PURPOSES[x] || x).join(', '))),
+      $('td', {}, $('select', { onchange: (e) => { devices[p.id] = e.target.value; S.setDevices(devices); } },
+        $('option', { value: '' }, 'Impressora padrão'),
+        ...printers.system.map(sp => $('option', { value: sp.name, selected: devices[p.id] === sp.name }, sp.displayName || sp.name)))))))
+      : $('p', { class: 'muted' }, 'Nenhuma impressora cadastrada no sistema (Admin → Impressão).'));
+}
+
+function own() {
+  const o = st.ownSupabase || {};
+  return $('div', { class: 'card' },
+    $('h2', {}, 'Supabase próprio da loja'),
+    $('p', { class: 'muted' }, 'Opcional: mantém uma cópia exclusiva de todos os dados da loja num projeto Supabase só dela, atualizada a cada mudança. O projeto precisa ter a estrutura do sistema Oxys.'),
+    $('div', { class: 'row' }, $('input', { type: 'text', id: 'surl', placeholder: 'https://xxxx.supabase.co', value: o.url || '', oninput: () => { editing = true; } })),
+    $('div', { class: 'row' }, $('input', { type: 'password', id: 'skey', placeholder: o.url ? 'Chave service_role (deixe vazio para manter)' : 'Chave service_role', oninput: () => { editing = true; } })),
+    $('div', { class: 'row' },
+      $('button', { onclick: () => act('own', async () => { await S.setOwnSupabase({ url: document.getElementById('surl').value, key: document.getElementById('skey').value }); editing = false; }) }, o.url ? 'Salvar' : 'Conectar'),
+      o.url ? $('button', { class: 'ghost', onclick: () => act('own', async () => { await S.setOwnSupabase({ url: '' }); editing = false; }) }, 'Desconectar') : null),
+    o.url ? $('p', { class: 'muted' }, o.fullSync ? `Copiando tudo… ${o.fullSync.done} de ${o.fullSync.total} tabelas`
+      : `Última atualização: ${when(o.lastPushAt)} · ${o.pending} mudança(s) na fila`) : null,
+    o.error ? $('div', { class: 'err' }, o.error) : null, note('own'));
+}
+
+function backups() {
+  return $('div', { class: 'card' },
+    $('h2', {}, 'Cópias de segurança'),
+    $('p', { class: 'muted' }, `Uma cópia completa por dia, guardando as 7 últimas. Última: ${when(st.lastBackupAt)}.`),
+    $('div', { class: 'row' }, $('button', { onclick: () => act('bk', () => S.backup()) }, 'Fazer cópia agora'), $('button', { class: 'ghost', onclick: () => S.openBackups() }, 'Abrir pasta')),
+    note('bk'));
+}
+
+function render() {
+  if (!st) return;
+  if (editing && document.activeElement && ['INPUT', 'SELECT'].includes(document.activeElement.tagName)) return; // não atrapalha quem está digitando
+  document.getElementById('store').textContent = st.restaurantName ? `· ${st.restaurantName}` : '';
+  const pill = document.getElementById('pill');
+  const [txt, color] = !st.activated ? ['Não ativado', 'var(--muted)'] : st.migration ? ['Copiando dados', 'var(--blue)'] : st.suspended ? ['Desativado', 'var(--red)']
+    : st.online ? ['Online', 'var(--green)'] : ['Sem internet', 'var(--amber)'];
+  pill.textContent = txt; pill.style.color = color;
+  const main = document.getElementById('main');
+  main.replaceChildren(...(!st.activated || st.migration || !st.ready ? [activation()] : [overview(), addresses(), tunnel(), printing(), own(), backups()]));
+}
+
+async function refresh() { try { st = await S.status(); } catch {} render(); }
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>

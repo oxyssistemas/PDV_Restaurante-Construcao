@@ -32,3 +32,11 @@ export const DESKTOP_DOWNLOADS = {
   mac: `${RELEASES}/Oxys-Restaurante-Mac.dmg`,
   linux: `${RELEASES}/Oxys-Restaurante-Linux.deb`,
 };
+
+/** Instaladores do "Oxys Servidor" (servidor dedicado da loja, recurso contratado). */
+export const SERVER_DOWNLOADS = {
+  windows: `${RELEASES}/Oxys-Servidor-Setup.exe`,
+  linux: `${RELEASES}/Oxys-Servidor-Linux.deb`,
+  linuxAppImage: `${RELEASES}/Oxys-Servidor-Linux.AppImage`,
+  mac: `${RELEASES}/Oxys-Servidor-Mac.dmg`,
+};

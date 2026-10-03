@@ -1,4 +1,4 @@
-# App de computador (Windows, Mac e Linux). Para lançar uma versão:
+# App de computador e Oxys Servidor (servidor dedicado da loja), para Windows, Mac e Linux. Para lançar uma versão:
 #   git tag v1.0.1 && git push origin v1.0.1
 # Os instaladores vão para a página Releases do GitHub e os apps já instalados se atualizam sozinhos.
 name: App de computador
@@ -69,6 +69,35 @@ jobs:
         run: |
           [ -z "$CSC_LINK" ] && export CSC_IDENTITY_AUTO_DISCOVERY=false && unset CSC_LINK CSC_KEY_PASSWORD
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then npx electron-builder --publish always; else npx electron-builder --publish never; fi
+      # ---------- Oxys Servidor (servidor dedicado da loja) ----------
+      # cloudflared: túnel seguro para o servidor ser acessado pela internet sem abrir portas no roteador
+      - name: Baixar o cloudflared
+        shell: bash
+        run: |
+          mkdir -p bin
+          base=https://github.com/cloudflare/cloudflared/releases/latest/download
+          case "$RUNNER_OS" in
+            Linux)   curl -fsSL -o bin/cloudflared "$base/cloudflared-linux-amd64" && chmod +x bin/cloudflared ;;
+            Windows) curl -fsSL -o bin/cloudflared.exe "$base/cloudflared-windows-amd64.exe" ;;
+            macOS)   curl -fsSL "$base/cloudflared-darwin-amd64.tgz" | tar -xz -C bin && chmod +x bin/cloudflared ;;
+          esac
+      - name: Endereço da nuvem para o servidor
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: npm run server-env
+      - name: Gerar instaladores do Oxys Servidor
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ matrix.os == 'macos-latest' && secrets.MAC_CERTIFICATE_P12 || matrix.os == 'windows-latest' && secrets.WIN_CERTIFICATE_PFX || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.MAC_CERTIFICATE_PASSWORD || matrix.os == 'windows-latest' && secrets.WIN_CERTIFICATE_PASSWORD || '' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          [ -z "$CSC_LINK" ] && export CSC_IDENTITY_AUTO_DISCOVERY=false && unset CSC_LINK CSC_KEY_PASSWORD
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then npx electron-builder --config electron-builder.server.json --publish always; else npx electron-builder --config electron-builder.server.json --publish never; fi
       - uses: actions/upload-artifact@v5
         with:
           name: instalador-${{ matrix.os }}
@@ -77,4 +106,8 @@ jobs:
             desktop/release/*.dmg
             desktop/release/*.AppImage
             desktop/release/*.deb
+            desktop/release-servidor/*.exe
+            desktop/release-servidor/*.dmg
+            desktop/release-servidor/*.AppImage
+            desktop/release-servidor/*.deb
           if-no-files-found: ignore

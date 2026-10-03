@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { printHtml } from '@/lib/printing';
 import { desktop } from '@/lib/desktop';
+import { IS_CENTRAL } from '@/lib/central';
 import { loadStation, PRINTER_COLUMNS, renderJob, type PrintJob, type Printer, type StationConfig } from '@/lib/printQueue';
 
 /** Trabalhos mais antigos que isso não saem sozinhos (ex.: estação ficou desligada); dá para imprimir pela tela. */
@@ -39,7 +40,8 @@ export default function PrintStationRunner() {
     return () => { window.removeEventListener('oxys:print-station', reload); window.removeEventListener('storage', reload); };
   }, [restaurantId]);
 
-  const active = !!user && !!station && station.printerIds.length > 0;
+  // Pela central, quem imprime é o próprio computador da central (desktop/hub).
+  const active = !IS_CENTRAL && !!user && !!station && station.printerIds.length > 0;
 
   const drain = useCallback(async () => {
     if (!station || !active) return;

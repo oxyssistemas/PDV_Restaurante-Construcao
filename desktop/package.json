@@ -15,11 +15,16 @@
     "dist:mac": "electron-builder --mac",
     "release": "electron-builder --publish always",
     "dist:linux": "electron-builder --linux",
-    "offline-ui": "node -e \"const fs=require('fs');fs.rmSync('offline-ui',{recursive:true,force:true});fs.cpSync('../dist','offline-ui',{recursive:true})\""
+    "offline-ui": "node -e \"const fs=require('fs');fs.rmSync('offline-ui',{recursive:true,force:true});fs.cpSync('../dist','offline-ui',{recursive:true})\"",
+    "server": "electron server-main.cjs",
+    "server-env": "node -e \"require('fs').writeFileSync('server-env.json', JSON.stringify({ cloudUrl: process.env.VITE_SUPABASE_URL, apikey: process.env.VITE_SUPABASE_PUBLISHABLE_KEY }))\"",
+    "dist:server": "electron-builder --config electron-builder.server.json"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
-    "electron-updater": "^6.8.9"
+    "bcryptjs": "^3.0.3",
+    "electron-updater": "^6.8.9",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "electron": "^44.5.1",

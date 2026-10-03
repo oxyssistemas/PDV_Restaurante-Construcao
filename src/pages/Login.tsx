@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, ShieldAlert } from 'lucide-react';
+import { CloudOff, Loader2, ShieldAlert } from 'lucide-react';
+import { IS_CENTRAL } from '@/lib/central';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import oxysLogo from '@/assets/oxys-logo.png';
@@ -140,6 +141,12 @@ export default function Login() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {IS_CENTRAL && (
+              <div className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                <CloudOff className="h-4 w-4 mt-0.5 text-amber-400 shrink-0" />
+                <span><strong>Sem internet.</strong> Entre normalmente com seu email e senha — tudo é enviado para a nuvem quando a internet voltar.</span>
+              </div>
+            )}
             {remaining > 0 && (
               <div className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
                 <ShieldAlert className="h-4 w-4 mt-0.5 text-destructive shrink-0" />

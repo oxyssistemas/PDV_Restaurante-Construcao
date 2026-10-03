@@ -47,9 +47,16 @@ export const api = {
   logout: () => call('/api/logout', { method: 'POST' }).catch(() => null),
   state: () => call<HubState>('/api/state'),
   op: <D = Record<string, unknown>>(type: string, data: D) => call<{ op: { id: string; type: string; data: OpData } }>('/api/op', { method: 'POST', body: JSON.stringify({ type, data }) }),
-  prints: () => call<{ jobs: PrintJobView[]; restaurant: { name: string } | null; printers: HubState['printers']; devices: Record<string, string> }>('/api/prints'),
+  prints: () => call<{
+    jobs: PrintJobView[]; restaurant: { name: string } | null; printers: HubState['printers']; devices: Record<string, string>;
+    // vias das telas completas (mesmo formato da nuvem)
+    mirrorJobs?: MirrorPrintJob[]; mirrorPrinters?: MirrorPrinter[];
+  }>('/api/prints'),
   printed: (id: string, error?: string) => call(`/api/prints/${id}`, { method: 'POST', body: JSON.stringify(error ? { error } : {}) }),
 };
+
+export type { PrintJob as MirrorPrintJob, Printer as MirrorPrinter } from '@/lib/printQueue';
+import type { PrintJob as MirrorPrintJob, Printer as MirrorPrinter } from '@/lib/printQueue';
 
 export type PrintJobView = { id: string; kind: 'kitchen' | 'receipt'; order: Order; items: Item[]; table: Table | null; created_at: string };
 

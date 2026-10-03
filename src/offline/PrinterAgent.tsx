@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { renderOrderTicket, renderReceipt, type PrinterConfig } from '@/lib/printing';
+import { renderJob } from '@/lib/printQueue';
 import { api, subscribe, type HubState, type PrintJobView } from './api';
 
 type Printer = HubState['printers'][number];
@@ -24,7 +25,22 @@ export default function PrinterAgent() {
       if (busy.current) return;
       busy.current = true;
       try {
-        const { jobs, restaurant, printers, devices } = await api.prints();
+        const { jobs, restaurant, printers, devices, mirrorJobs = [], mirrorPrinters = [] } = await api.prints();
+        // vias das telas completas: cada uma já sabe a impressora (igual à estação de impressão online)
+        for (const job of mirrorJobs) {
+          try {
+            if (!desktop) throw new Error('Impressão disponível só no app de computador');
+            const printer = mirrorPrinters.find(p => p.id === job.printer_id);
+            if (!printer) throw new Error('Impressora não encontrada');
+            await desktop.printHtml(await renderJob(job.document, printer), { deviceName: devices[printer.id] });
+            await api.printed(job.id);
+            setLog(l => [`${new Date().toLocaleTimeString('pt-BR')} ${job.purpose} ok`, ...l].slice(0, 30));
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : 'falhou';
+            await api.printed(job.id, msg);
+            setLog(l => [`${new Date().toLocaleTimeString('pt-BR')} ${job.purpose} erro: ${msg}`, ...l].slice(0, 30));
+          }
+        }
         for (const job of jobs) {
           try {
             if (!desktop) throw new Error('Impressão disponível só no app de computador');
