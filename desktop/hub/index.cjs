@@ -197,13 +197,27 @@ class Hub {
       this.offlineFails = 0;
       this.lastError = null;
     } catch (e) {
-      this.online = false;
-      this.offlineFails += 1;
-      this.lastError = e.status === 401 ? 'Central desativada no sistema. Ative de novo.' : null;
+      if (e.status) {
+        // A nuvem respondeu: há internet. Só falta de resposta conta como "sem internet".
+        this.online = true;
+        this.offlineFails = 0;
+        if (e.status === 401) {
+          // central apagada/desativada no sistema: desliga aqui também (senão a loja ficaria presa nela)
+          this.lastError = 'Central desativada no sistema. Ative de novo para usar o modo offline.';
+          this.revoked = true;
+        } else {
+          this.lastError = e.message;
+        }
+      } else {
+        this.online = false;
+        this.offlineFails += 1;
+        this.lastError = null;
+      }
     } finally {
       this.syncing = false;
       if (wasOnline !== this.online) this.state.changed();
       if (this.again) { this.again = false; setTimeout(() => this.sync(), 50); }
+      if (this.revoked) { this.revoked = false; this.deactivate(); }
     }
   }
 }

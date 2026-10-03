@@ -168,8 +168,15 @@ ipcMain.handle('hub:sync', async (e) => { fromApp(e); await hub.sync(); return h
 function watchConnection() {
   let switchingAt = 0;
   setInterval(async () => {
-    if (!win || !hub?.enabled || hub.online || hub.offlineFails < 2) return;
+    if (!hub?.enabled && printerWin) stopPrinterWindow(); // central desligada: sem janela de impressão
+    if (!win) return;
     const url = win.webContents.getURL();
+    // aberto pela central, mas ela foi desligada (desativada no sistema): volta para o sistema online, na mesma tela
+    if (url.startsWith(`${HUB_ORIGIN}/`) && !hub?.enabled) {
+      try { const u = new URL(url); win.loadURL(`${APP_ORIGIN}${u.pathname}${u.search}`); } catch { win.loadURL(APP_URL); }
+      return;
+    }
+    if (!hub?.enabled || hub.online || hub.offlineFails < 2) return;
     if (!isAppUrl(url) || Date.now() - switchingAt < 15_000) return;
     switchingAt = Date.now();
     // A própria página troca levando a pessoa logada e a mesma tela; se não der, abre a mesma tela na central.
