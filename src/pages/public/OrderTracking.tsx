@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Bike, Check, ChefHat, Loader2, MessageCircle, ReceiptText, ShoppingBag, XCircle } from 'lucide-react';
+import { Bike, Check, ChefHat, Loader2, MessageCircle, ReceiptText, ShoppingBag, Star, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { brl, callStore, PAYMENT_LABELS, waLink, type TrackData } from '@/lib/deliveryStore';
 
@@ -23,7 +23,7 @@ export default function OrderTracking() {
     queryKey: ['order-tracking', orderId, token],
     retry: false,
     refetchInterval: q => (['delivered', 'cancelled'].includes(q.state.data?.order.delivery_status ?? '') ? false : 15_000),
-    queryFn: () => callStore<TrackData>({ action: 'status', orderId, token }),
+    queryFn: () => callStore<TrackData>({ action: 'status', slug, orderId, token }),
   });
 
   if (isLoading) return <div className="flex min-h-screen items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -86,6 +86,12 @@ export default function OrderTracking() {
             <a href={waLink(store.whatsapp, `Olá! Quero acompanhar o pedido #${order.code}`)} target="_blank" rel="noreferrer">
               <MessageCircle className="h-5 w-5" /> Receber avisos pelo WhatsApp
             </a>
+          </Button>
+        )}
+
+        {order.delivery_status === 'delivered' && (
+          <Button asChild size="lg" className="h-12 w-full gap-2 rounded-2xl font-bold">
+            <Link to={`/avaliar/${token}${data.review_ref ? `?r=${data.review_ref}` : ''}`}><Star className="h-5 w-5" /> Avaliar este pedido</Link>
           </Button>
         )}
 

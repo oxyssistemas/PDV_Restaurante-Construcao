@@ -16,4 +16,8 @@ contextBridge.exposeInMainWorld('oxysDesktop', {
   hubDeactivate: () => ipcRenderer.invoke('hub:deactivate'),
   hubSetDevices: (devices) => ipcRenderer.invoke('hub:set-devices', JSON.parse(JSON.stringify(devices ?? {}))),
   hubSync: () => ipcRenderer.invoke('hub:sync'),
+  // servidor dedicado da loja: o app guarda o endereço para abrir pela rede da loja sem internet
+  rememberServer: (info) => ipcRenderer.invoke('server:remember', {
+    publicUrl: String(info?.publicUrl ?? ''), lanUrls: Array.isArray(info?.lanUrls) ? info.lanUrls.map(String) : [],
+  }),
 });

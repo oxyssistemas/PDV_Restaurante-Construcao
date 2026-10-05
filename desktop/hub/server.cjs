@@ -12,7 +12,8 @@ const path = require('node:path');
 const { handleRest } = require('./postgrest.cjs');
 const { attachRealtime } = require('./realtime.cjs');
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.json': 'application/json', '.woff2': 'font/woff2' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.ico': 'image/x-icon', '.json': 'application/json', '.woff2': 'font/woff2' };
+const MEDIA_BUCKETS = new Set(['menu-images', 'store-media']);
 
 // No servidor dedicado, funções da nuvem que continuam lá (equipe e login).
 const CLOUD_FUNCTIONS = new Set(['create-user', 'manage-user', 'bootstrap-admin']);
@@ -21,7 +22,11 @@ const CLOUD_FUNCTIONS = new Set(['create-user', 'manage-user', 'bootstrap-admin'
  * mode: 'central' (offline) ou 'dedicated' (servidor dedicado da loja)
  * cloudProxy: { url, apikey, afterWrite } — servidor dedicado: o que continua na nuvem vai para lá em nome da pessoa
  */
-function createServer({ state, getConfig, uiDir, getStatus, mirror, auth, mode = 'central', isSuspended = () => false, cloudProxy = null }) {
+/**
+ * publicFns: funções públicas respondidas aqui (publicfn.cjs)
+ * media: { dir, sign(bucket, path) → endereço temporário na nuvem } — fotos guardadas no computador
+ */
+function createServer({ state, getConfig, uiDir, getStatus, mirror, auth, mode = 'central', isSuspended = () => false, cloudProxy = null, publicFns = null, media = null }) {
   const clients = new Set();  // respostas SSE abertas
 
   state.onChange(version => {
@@ -89,6 +94,60 @@ function createServer({ state, getConfig, uiDir, getStatus, mirror, auth, mode =
     }
   }
 
+  const readRaw = (req, limit = 1e6) => new Promise((resolve, reject) => {
+    const chunks = []; let size = 0;
+    req.on('data', c => { size += c.length; if (size > limit) { reject(new Error('Muito grande')); req.destroy(); } else chunks.push(c); });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+  });
+
+  // ---------- fotos (cardápio, logo, vitrine): baixadas da nuvem uma vez e guardadas aqui ----------
+  const mediaPath = (bucket, p) => {
+    const rid = mirror.restaurantId;
+    if (!media || !MEDIA_BUCKETS.has(bucket) || !p || p.includes('..')) return null;
+    if (!(rid && p.startsWith(`${rid}/`)) && !(bucket === 'store-media' && p.startsWith('sugestoes/'))) return null;
+    return path.join(media.dir, bucket, ...p.split('/'));
+  };
+  async function serveMedia(res, bucket, p) {
+    const file = mediaPath(bucket, p);
+    if (!file) { res.writeHead(404); return res.end(); }
+    if (!fs.existsSync(file)) {
+      try {
+        const src = await media.sign(bucket, p);
+        if (!src) throw new Error('sem endereço');
+        const r = await fetch(src, { signal: AbortSignal.timeout(20_000) });
+        if (!r.ok) throw new Error(String(r.status));
+        const buf = Buffer.from(await r.arrayBuffer());
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(`${file}.tmp`, buf);
+        fs.renameSync(`${file}.tmp`, file);
+      } catch {
+        res.writeHead(404, { 'Cache-Control': 'no-store' }); return res.end();
+      }
+    }
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'public, max-age=86400', 'Access-Control-Allow-Origin': '*' });
+    fs.createReadStream(file).pipe(res);
+  }
+  /** Envio de foto (servidor dedicado): vai para a nuvem em nome da pessoa e já fica guardado aqui. */
+  async function uploadMedia(req, res, url, bucket, p) {
+    const token = cloudProxy ? await auth.cloudToken(bearer(req)) : null;
+    if (!token) return send(res, 503, { error: 'Enviar fotos precisa de internet.', message: 'Enviar fotos precisa de internet.' });
+    const body = await readRaw(req, 15e6);
+    const headers = { apikey: cloudProxy.apikey, Authorization: `Bearer ${token}` };
+    for (const h of ['content-type', 'x-upsert', 'cache-control']) if (req.headers[h]) headers[h] = req.headers[h];
+    try {
+      const r = await fetch(`${cloudProxy.url}${url.pathname}${url.search}`, { method: req.method, headers, body, signal: AbortSignal.timeout(60_000) });
+      const text = await r.text();
+      if (r.ok) {
+        const file = mediaPath(bucket, p);
+        if (file) { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, body); }
+      }
+      res.writeHead(r.status, { 'Content-Type': r.headers.get('content-type') || 'application/json' });
+      res.end(text);
+    } catch {
+      send(res, 503, { error: 'Sem internet no servidor.', message: 'Enviar fotos precisa de internet.' });
+    }
+  }
+
   const bearer = (req) => (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -111,9 +170,34 @@ function createServer({ state, getConfig, uiDir, getStatus, mirror, auth, mode =
         if (url.pathname.startsWith('/functions/v1/')) {
           const name = url.pathname.split('/')[3];
           if (mode === 'dedicated' && CLOUD_FUNCTIONS.has(name)) return await toCloud(req, res, url, true);
+          // totem, avaliação, cardápio QR e loja online: respondidos aqui
+          if (publicFns && req.method === 'POST') {
+            const raw = (await readRaw(req)).toString('utf8');
+            try {
+              const out = publicFns.handle(name, raw, req.headers);
+              if (out !== null) return send(res, 200, out);
+            } catch (e) {
+              return send(res, e.status || 500, { error: e.message || 'Erro' });
+            }
+          }
           return send(res, 503, { error: mode === 'dedicated' ? 'Este recurso ainda não está disponível no servidor dedicado.' : 'Disponível quando a internet voltar.' });
         }
-        if (url.pathname.startsWith('/storage/v1/')) { res.writeHead(404); return res.end(); }
+        if (url.pathname.startsWith('/storage/v1/')) {
+          // endereço "assinado" da foto: aponta para cá (a foto vem da nuvem uma vez e fica guardada)
+          const sign = url.pathname.match(/^\/storage\/v1\/object\/sign\/([\w-]+)\/?(.*)$/);
+          if (sign && req.method === 'POST') {
+            const [, bucket, p] = sign;
+            const one = (x) => ({ path: x, error: mediaPath(bucket, x) ? null : 'Not found', signedURL: `/object/sign/${bucket}/${x.split('/').map(encodeURIComponent).join('/')}?token=local` });
+            if (p) return send(res, 200, { signedURL: one(decodeURIComponent(p)).signedURL });
+            const { paths = [] } = await readBody(req);
+            return send(res, 200, (Array.isArray(paths) ? paths : []).map(x => one(String(x))));
+          }
+          const get = url.pathname.match(/^\/storage\/v1\/object\/(?:sign|public|authenticated)\/([\w-]+)\/(.+)$/);
+          if (get && (req.method === 'GET' || req.method === 'HEAD')) return await serveMedia(res, get[1], decodeURIComponent(get[2]));
+          const up = url.pathname.match(/^\/storage\/v1\/object\/([\w-]+)\/(.+)$/);
+          if (up && ['POST', 'PUT'].includes(req.method) && mode === 'dedicated') return await uploadMedia(req, res, url, up[1], decodeURIComponent(up[2]));
+          return send(res, mode === 'dedicated' ? 404 : 503, { error: mode === 'dedicated' ? 'Não encontrado' : 'Disponível quando a internet voltar.' });
+        }
         if (url.pathname.startsWith('/rest/v1/')) {
           const who = auth.verify(bearer(req));
           // tela de login (antes de entrar): só as funções de bloqueio de tentativas
@@ -128,6 +212,8 @@ function createServer({ state, getConfig, uiDir, getStatus, mirror, auth, mode =
         }
         return send(res, 404, { error: 'Não encontrado' });
       }
+      const mm = url.pathname.match(/^\/media\/([\w-]+)\/(.+)$/);
+      if (mm && (req.method === 'GET' || req.method === 'HEAD')) return await serveMedia(res, mm[1], decodeURIComponent(mm[2]));
       if (!url.pathname.startsWith('/api/')) { serveStatic(res, url.pathname); return; }
 
       if (url.pathname === '/api/hello' && req.method === 'GET') {

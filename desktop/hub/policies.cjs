@@ -9,11 +9,16 @@ function helpers(mirror, uid) {
   const person = mirror.staff.find(s => s.user_id === uid);
   // papéis da pessoa em todos os restaurantes (has_role olha todos)
   const roles = person?.roles || mirror.rows('user_roles').filter(r => r.user_id === uid);
-  const has = (role) => roles.some(r => r.role === role);
-  const any = (...list) => list.some(has);
   const belongs = (rid) => roles.some(r => r.restaurant_id === rid);                    // user_belongs_to_restaurant
-  const home = [...roles].filter(r => r.role !== 'super_admin' && r.restaurant_id)       // get_user_restaurant_id
-    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || String(a.id).localeCompare(String(b.id)))[0]?.restaurant_id ?? null;
+  // get_user_restaurant_id: a loja desta central, se a pessoa tem cargo nela; senão a primeira
+  const home = (mirror.restaurantId && roles.some(r => r.restaurant_id === mirror.restaurantId && r.role !== 'super_admin'))
+    ? mirror.restaurantId
+    : [...roles].filter(r => r.role !== 'super_admin' && r.restaurant_id)
+      .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || String(a.id).localeCompare(String(b.id)))[0]?.restaurant_id ?? null;
+  // has_role: cargo na loja ativa; gerente e supervisor valem como admin
+  const has = (role) => roles.some(r => (r.role === role || (role === 'admin' && (r.role === 'manager' || r.role === 'supervisor')))
+    && (r.role === 'super_admin' || r.restaurant_id === home));
+  const any = (...list) => list.some(has);
   const active = (rid) => mirror.rows('restaurants').some(r => r.id === rid && r.status === 'active'); // is_restaurant_active
   const mine = (rid) => rid != null && rid === home && active(rid);   // restaurant_id = get_user_restaurant_id(uid) AND ativo
   const order = (id) => mirror.rows('orders').find(o => o.id === id);

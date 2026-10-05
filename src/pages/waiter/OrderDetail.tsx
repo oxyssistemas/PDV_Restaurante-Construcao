@@ -23,6 +23,7 @@ import { authorLabel } from '@/lib/orders';
 import { printOrderTicket } from '@/lib/printing';
 import { usePrinterSettings } from '@/hooks/usePrinterSettings';
 import { logAudit } from '@/lib/audit';
+import { percentLabel, serviceFeeOf, useServiceSettings } from '@/lib/serviceCharge';
 import { brl, elapsedSince } from '@/lib/waiter';
 
 interface CartItem { key: string; menu_item_id: string; name: string; price: number; quantity: number; notes: string; }
@@ -48,6 +49,7 @@ export default function OrderDetail() {
   const { currentRole, user } = useAuth();
   const restaurantId = currentRole?.restaurant_id;
   const { getConfig } = usePrinterSettings(restaurantId);
+  const { data: service } = useServiceSettings(restaurantId);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -254,6 +256,8 @@ export default function OrderDetail() {
         notes: i.notes,
       }));
     if (!list.length) { toast.error('Nenhum item para imprimir.'); return; }
+    const subtotal = list.reduce((s, i) => s + i.quantity * i.unit_price, 0);
+    const serviceFee = kind === 'kitchen' ? 0 : serviceFeeOf(subtotal, service);
     printOrderTicket({
       restaurantName: restaurant?.name || 'Oxys Restaurante',
       title: kind === 'kitchen' ? 'Via da cozinha' : 'Pedido detalhado',
@@ -263,7 +267,9 @@ export default function OrderDetail() {
         created_at: (order as any).created_at,
         customer_name: (order as any).customer_name,
         table_number: table?.number ?? null,
-        total: kind === 'kitchen' ? undefined : Number((order as any).total || 0),
+        total: kind === 'kitchen' ? undefined : subtotal + serviceFee,
+        service_fee: serviceFee,
+        service_label: service?.service_enabled ? `Servico ${percentLabel(service.service_percent)} (opcional)` : null,
         created_by_name: (order as any).created_by_name,
         created_by_role: (order as any).created_by_role,
       },

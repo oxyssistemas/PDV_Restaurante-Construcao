@@ -1,9 +1,10 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { dedicatedFor, relay, type DedicatedTarget } from '../_shared/relay.ts';
 
 // Loja online do restaurante (sem login): www.oxysrestaurante.app/pedir/<slug>
 //   { action: 'store', slug }                       → dados da loja e cardápio
 //   { action: 'order', slug, order }                → cria o pedido (preço e taxa calculados no banco)
-//   { action: 'status', orderId, token }            → acompanhamento do pedido
+//   { action: 'status', slug?, orderId, token }     → acompanhamento do pedido
 //   { action: 'signup', slug, name, phone, email, password } → cria a conta do cliente (já confirmada)
 //   { action: 'me', slug, profile? }                → conta do cliente logado: dados, ficha no CRM e "Meus pedidos"
 // "order" e "me" exigem o cliente logado (token da sessão da loja no Authorization).
@@ -45,6 +46,25 @@ async function currentUser(sb: DB, req: Request) {
   return data.user ?? null;
 }
 
+/** Saldo de cashback do cliente na loja (para usar no pedido). */
+async function cashbackFor(sb: DB, restaurantId: string, phone: string | null | undefined) {
+  if (!phone) return null;
+  const { data: p } = await sb.from('loyalty_programs').select('enabled, mode, cashback_percent').eq('restaurant_id', restaurantId).maybeSingle();
+  if (!p?.enabled || p.mode !== 'cashback') return null;
+  const { data: on } = await sb.rpc('restaurant_has_feature', { _restaurant_id: restaurantId, _feature: 'loyalty' });
+  if (on === false) return null;
+  const { data: acc } = await sb.from('loyalty_accounts').select('cashback_balance').eq('restaurant_id', restaurantId).eq('customer_phone', phone).maybeSingle();
+  return { balance: Number(acc?.cashback_balance ?? 0), percent: Number(p.cashback_percent) };
+}
+
+/** Loja com servidor dedicado: a nuvem só confirma o cliente e repassa para o servidor da loja. */
+async function dedicatedStore(sb: DB, slug: string): Promise<DedicatedTarget | 'offline' | null> {
+  if (!SLUG.test(slug)) return null;
+  const { data } = await sb.from('delivery_stores').select('restaurant_id').eq('slug', slug).maybeSingle();
+  if (data) return await dedicatedFor(sb as any, { restaurantId: data.restaurant_id });
+  return await dedicatedFor(sb as any, { slug });
+}
+
 async function storeBySlug(sb: DB, slug: string) {
   const { data } = await sb.from('delivery_stores').select('*, restaurants!inner(id, name, status)').eq('slug', slug).maybeSingle();
   const r = (data as any)?.restaurants;
@@ -58,6 +78,69 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action ?? 'store');
     const sb = db();
+
+    // ---------- loja com servidor dedicado ----------
+    const dedicated = await dedicatedStore(sb, String(body?.slug ?? '').toLowerCase());
+    if (dedicated) {
+      if (action === 'store' || action === 'status') return relay(dedicated, 'delivery-store', body);
+      const user = await currentUser(sb, req);
+      if (action === 'signup') {
+        // conta do cliente fica na nuvem; a ficha dele no CRM fica no servidor da loja
+        const name = String(body?.name ?? '').trim().slice(0, 80);
+        const phone = phone55(body?.phone);
+        const email = String(body?.email ?? '').trim().toLowerCase();
+        const password = String(body?.password ?? '');
+        if (name.length < 2) return json({ error: 'Informe seu nome.' }, 400);
+        if (!/^\d{12,13}$/.test(phone)) return json({ error: 'Informe um WhatsApp com DDD.' }, 400);
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 120) return json({ error: 'Informe um email válido.' }, 400);
+        if (password.length < 6 || password.length > 72) return json({ error: 'A senha precisa ter pelo menos 6 caracteres.' }, 400);
+        const { data: created, error } = await sb.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { name, phone, kind: 'store_customer' } });
+        if (error || !created.user) {
+          const exists = /already|registered|exists/i.test(error?.message ?? '');
+          return json({ error: exists ? 'Este email já tem conta. Entre com sua senha.' : 'Não foi possível criar a conta.' }, exists ? 409 : 400);
+        }
+        await sb.from('customer_profiles').upsert({ user_id: created.user.id, name, phone });
+        await relay(dedicated, 'delivery-store', { action: 'link', slug: body.slug }, { user: { id: created.user.id, email }, profile: { name, phone, address: null, complement: null } });
+        return json({ ok: true });
+      }
+      if (!user) return json({ error: action === 'order' ? 'Entre na sua conta para fazer o pedido.' : 'Entre na sua conta.' }, 401);
+      let { data: profile } = await sb.from('customer_profiles').select('name, phone, address, complement').eq('user_id', user.id).maybeSingle();
+      if (action === 'me') {
+        const p = body?.profile;
+        if (p || !profile) {
+          const name = String(p?.name ?? profile?.name ?? user.user_metadata?.name ?? '').trim().slice(0, 80);
+          const phone = phone55(p?.phone ?? profile?.phone ?? user.user_metadata?.phone);
+          if (name.length >= 2 && /^\d{12,13}$/.test(phone)) {
+            const row = { user_id: user.id, name, phone, ...(p ? { address: String(p.address ?? '').trim().slice(0, 200) || null, complement: String(p.complement ?? '').trim().slice(0, 90) || null } : {}) };
+            const { data } = await sb.from('customer_profiles').upsert(row).select('name, phone, address, complement').single();
+            profile = data;
+          } else if (p) {
+            return json({ error: 'Informe nome e WhatsApp com DDD.' }, 400);
+          }
+        }
+        const res = await relay(dedicated, 'delivery-store', { action: 'me', slug: body.slug }, { user: { id: user.id, email: user.email }, profile });
+        const out = await res.json().catch(() => ({}));
+        if (!res.ok) return json(out, res.status);
+        return json({ email: user.email, profile, orders: out.orders ?? [], cashback: out.cashback ?? null });
+      }
+      if (action === 'order') {
+        const o = body?.order ?? {};
+        const res = await relay(dedicated, 'delivery-store', { action: 'order', slug: body.slug, order: o }, { user: { id: user.id, email: user.email }, profile });
+        if (res.ok) {
+          // mesma conta do cliente na nuvem: guarda o último telefone e endereço (como no pedido da nuvem)
+          const name = String(o.name ?? '').trim().slice(0, 80);
+          const phone = phone55(o.phone);
+          if (name.length >= 2 && /^\d{12,13}$/.test(phone)) {
+            await sb.from('customer_profiles').upsert({
+              user_id: user.id, name, phone,
+              ...(o.mode !== 'pickup' ? { address: String(o.address_line ?? '').trim().slice(0, 200) || null, complement: String(o.complement ?? '').trim().slice(0, 90) || null } : {}),
+            });
+          }
+        }
+        return res;
+      }
+      return json({ error: 'Ação inválida.' }, 400);
+    }
 
     if (action === 'store') {
       const slug = String(body?.slug ?? '').toLowerCase();
@@ -163,6 +246,7 @@ Deno.serve(async (req) => {
         email: user.email,
         profile,
         orders: (orders ?? []).map(o => ({ ...o, code: o.id.slice(0, 8).toUpperCase() })),
+        cashback: await cashbackFor(sb, store.restaurant_id, profile?.phone),
       });
     }
 
@@ -184,6 +268,7 @@ Deno.serve(async (req) => {
         payment: String(o.payment ?? '').slice(0, 20), change_for: o.change_for ? String(o.change_for).slice(0, 12) : '',
         notes: String(o.notes ?? '').slice(0, 500), items,
         address_line: String(o.address_line ?? '').slice(0, 200), complement: String(o.complement ?? '').slice(0, 90),
+        use_cashback: o.use_cashback === true,
       };
       const { data, error } = await sb.rpc('create_online_order', { _slug: slug, _order: payload, _user_id: user.id });
       if (error) return json({ error: error.message }, 400);

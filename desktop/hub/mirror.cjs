@@ -15,7 +15,10 @@ const SYNCED = {
   restaurant_tables: ['update'], reservations: ['insert', 'update'], cash_registers: ['insert', 'update'],
   cash_movements: ['insert', 'update', 'delete'], kitchen_sessions: ['insert', 'update'], couriers: ['update'],
   audit_logs: ['insert'], notifications: ['update'],
+  stock_counts: ['insert', 'update'], stock_count_items: ['insert', 'update'],
 };
+// Gravações feitas pelo próprio sistema (balanço) que, na central, também precisam ir para a nuvem.
+const SYS_SYNCED = new Set(['stock_counts', 'stock_count_items']);
 // Só na central (nunca vai para a nuvem): fila de impressão da loja.
 const LOCAL = new Set(['print_jobs']);
 // No servidor dedicado: tabelas de controle, que continuam na nuvem (equipe e login dependem delas).
@@ -298,6 +301,7 @@ class Mirror {
       rows: (t) => this.rows(t),
       roles: (uid) => this.staff.find(s => s.user_id === uid)?.roles || this.rows('user_roles').filter(r => r.user_id === uid),
       restaurant: (id) => this.rows('restaurants').find(r => r.id === id),
+      active: () => this.restaurantId, // quem usa este servidor/central está nesta loja
       plan: (code) => this.rows('plans').find(p => p.code === code),
     };
     return rls.authorizer(this.compiled, db, userId);
@@ -497,6 +501,8 @@ class Mirror {
       if (row[pk] == null) throw new OfflineError(`Falta ${pk}`, 400, '23502');
       if (this.rows(table).some(r => r[pk] === row[pk])) throw new OfflineError('duplicate key value violates unique constraint', 409, '23505');
       this.beforeInsert(table, row);
+      this.stockRules(table, row, obj, ctx);
+      if (table === 'payments' && row.method === 'cashback') this.cashbackPayment(row, ctx);
       this.setRows(table, [...this.rows(table), row]);
       this.saveRow(table, row);
       const sent = { ...obj, id: row.id };
@@ -530,11 +536,16 @@ class Mirror {
     // a linha alterada também precisa passar nas regras (WITH CHECK), antes de mexer em qualquer uma
     if (ctx.authz && rows.some(r => !ctx.authz.checkUpdate(table, { ...r, ...patch }))) throw rlsError(table);
     this.checkWrite(table, 'update');
+    // guard_stock_count_item: na contagem só mudam a quantidade contada, o motivo e a justificativa
+    if (table === 'stock_count_items' && Object.keys(patch).some(k => !['counted_quantity', 'reason', 'justification', 'counted_by', 'counted_at'].includes(k))) {
+      throw new OfflineError('Na contagem só é possível alterar a quantidade contada, o motivo e a justificativa.', 400, 'P0001');
+    }
     const out = [];
     for (const row of rows) {
       const old = clone(row);
       Object.assign(row, clone(patch));
       if ('updated_at' in row && !('updated_at' in patch)) row.updated_at = new Date().toISOString();
+      this.stockRules(table, row, patch, ctx);
       this.saveRow(table, row);
       this.remember(table, row.id, row);
       this.queue('update', table, row.id, patch, ctx);
@@ -571,11 +582,14 @@ class Mirror {
     const o = this.rows('orders').find(x => x.id === orderId);
     if (!o) return null;
     const t = o.table_id ? this.rows('restaurant_tables').find(x => x.id === o.table_id) : null;
+    const svc = this.rows('service_settings').find(x => x.restaurant_id === o.restaurant_id);
     return {
       id: o.id, created_at: o.created_at, order_type: o.order_type, table_number: t?.number ?? null,
       customer_name: o.customer_name, customer_phone: o.customer_phone, customer_address: o.customer_address,
-      notes: o.notes, delivery_fee: o.delivery_fee, total: o.total, created_by_name: o.created_by_name,
-      created_by_role: o.created_by_role, source: o.source,
+      notes: o.notes, delivery_fee: o.delivery_fee, total: o.total,
+      service_fee: o.service_fee ?? null, couvert_total: o.couvert_total ?? null, people_count: o.people_count ?? null,
+      service_percent: svc?.service_percent ?? null, couvert_label: svc?.couvert_label ?? null,
+      created_by_name: o.created_by_name, created_by_role: o.created_by_role, source: o.source,
     };
   }
   printers(purpose) {
@@ -626,22 +640,24 @@ class Mirror {
   }
 
   /** Gravação feita pelo próprio banco (gatilho): sem regras de acesso, com disco e aviso às telas. */
-  sysInsert(table, data, who) {
+  sysInsert(table, data, who, { sync = true } = {}) {
     const row = {};
     for (const [col, expr] of Object.entries(this.db.defaults?.[table] || {})) row[col] = evalDefault(expr, who);
     Object.assign(row, data);
     if (!row.id) row.id = crypto.randomUUID();
     this.setRows(table, [...this.rows(table), row]);
     this.saveRow(table, row);
+    if (sync && !this.dedicated && SYS_SYNCED.has(table)) { this.remember(table, row.id, row); this.queue('insert', table, row.id, row, { who }); }
     this.emit({ table, type: 'INSERT', record: row, old_record: null });
     this.afterInsert(table, row, { who, txid: null });
     return row;
   }
-  sysUpdate(table, row, patch, who) {
+  sysUpdate(table, row, patch, who, { sync = true } = {}) {
     const old = clone(row);
     Object.assign(row, patch);
     if ('updated_at' in row) row.updated_at = new Date().toISOString();
     this.saveRow(table, row);
+    if (sync && !this.dedicated && SYS_SYNCED.has(table)) { this.remember(table, row.id, row); this.queue('update', table, row.id, patch, { who }); }
     this.emit({ table, type: 'UPDATE', record: row, old_record: old });
     this.afterUpdate(table, row, old, { who });
   }
@@ -714,7 +730,8 @@ class Mirror {
       const pays = this.rows('payments').filter(p => p.order_id === order.id);
       const itemsTotal = items.reduce((s, i) => s + Number(i.quantity) * Number(i.unit_price), 0);
       const paid = pays.reduce((s, p) => s + Number(p.amount), 0);
-      if (paid + 0.009 < Math.max(itemsTotal + Number(order.delivery_fee || 0), Number(order.total || 0))) return;
+      const extras = Number(order.delivery_fee || 0) + Number(order.service_fee || 0) + Number(order.couvert_total || 0);
+      if (paid + 0.009 < Math.max(itemsTotal + extras, Number(order.total || 0))) return;
       const sorted = [...pays].sort((a, b) => compare(a.created_at, b.created_at));
       for (const p of this.printers('receipt')) {
         if (this.prints.some(j => j.printer_id === p.id && j.order_id === order.id && j.purpose === 'receipt')) continue;
@@ -725,14 +742,261 @@ class Mirror {
           })),
           payments: sorted.map(x => ({ method: x.method, amount: x.amount })),
           change: round2(sorted.reduce((s, x) => s + Number(x.change_amount || 0), 0)),
+          review_url: this.reviewUrlFor?.(order) ?? null,
         }, ctx);
       }
+      if (this.dedicated) this.loyaltyAward(order, ctx);
     }
+  }
+
+  // ---------- fidelidade e cashback (as mesmas regras das funções do banco) ----------
+  static normPhone(v) {
+    const d = String(v ?? '').replace(/\D/g, '');
+    if (d.length < 10) return null;
+    return d.length <= 11 ? `55${d}` : d;
+  }
+  hasFeature(feature) {
+    const r = this.rows('restaurants').find(x => x.id === this.restaurantId);
+    const plan = r && this.rows('plans').find(p => p.code === r.plan_code);
+    const v = plan?.features?.[feature];
+    return v === undefined || v === null ? true : v === true || v === 'true';
+  }
+  loyaltyAccount(phone) { return this.rows('loyalty_accounts').find(a => a.restaurant_id === this.restaurantId && a.customer_phone === phone); }
+
+  /** loyalty_cashback_payment: pagar com o saldo de cashback do cliente. */
+  cashbackPayment(row, ctx) {
+    if (!this.dedicated) throw new OfflineError('Usar cashback precisa de internet (o saldo do cliente fica na nuvem).', 503, 'OXYS_OFFLINE');
+    const order = this.rows('orders').find(o => o.id === row.order_id);
+    const phone = Mirror.normPhone(order?.customer_phone);
+    if (!phone) throw new OfflineError('Informe o telefone do cliente para usar o cashback.', 400, 'P0001');
+    const acc = this.loyaltyAccount(phone);
+    if (!acc || Number(acc.cashback_balance) + 0.009 < Number(row.amount)) {
+      throw new OfflineError(`Saldo de cashback insuficiente (disponível: R$ ${Number(acc?.cashback_balance ?? 0).toFixed(2).replace('.', ',')}).`, 400, 'P0001');
+    }
+    this.sysUpdate('loyalty_accounts', acc, {
+      cashback_balance: round2(Number(acc.cashback_balance) - Number(row.amount)), total_redeemed: round2(Number(acc.total_redeemed || 0) + Number(row.amount)),
+    }, ctx.who);
+    this.sysInsert('loyalty_transactions', {
+      restaurant_id: this.restaurantId, account_id: acc.id, order_id: row.order_id, type: 'redeem', amount: Number(row.amount),
+      description: 'Cashback usado no pagamento', user_id: row.user_id ?? null,
+    }, ctx.who);
+  }
+
+  /** loyalty_award_order: pontos, cashback ou selo quando a conta fica paga. */
+  loyaltyAward(order, ctx) {
+    if (order.loyalty_awarded_at) return;
+    const phone = Mirror.normPhone(order.customer_phone);
+    if (!phone || !this.hasFeature('loyalty')) return;
+    const p = this.rows('loyalty_programs').find(x => x.restaurant_id === order.restaurant_id && x.enabled);
+    if (!p) return;
+    const channels = p.channels || [];
+    const type = order.order_type || 'dine_in';
+    if (!(channels.includes(type) || (type === 'takeaway' && channels.includes('counter')))) return;
+    let base = this.rows('order_items').filter(i => i.order_id === order.id && i.status !== 'cancelled')
+      .reduce((s, i) => s + Number(i.quantity) * Number(i.unit_price), 0);
+    base -= this.rows('payments').filter(x => x.order_id === order.id && x.method === 'cashback').reduce((s, x) => s + Number(x.amount), 0);
+    if (base <= 0 || base < Number(p.min_order_value || 0)) return;
+    const dow = new Date(`${this.localNow().date}T12:00:00Z`).getUTCDay();
+    const mult = Number(p.weekday_multipliers?.[String(dow)]) || 1;
+    const money = (v) => v.toFixed(2).replace('.', ',');
+    let points = 0, cash = 0, stamps = 0, desc;
+    if (p.mode === 'cashback') { cash = round2(base * Number(p.cashback_percent) / 100 * mult); desc = `Cashback de ${Number(p.cashback_percent)}% sobre R$ ${money(base)}`; }
+    else if (p.mode === 'stamps') { stamps = 1; desc = 'Selo do cartão fidelidade'; }
+    else { points = Math.floor(base * Number(p.points_per_currency) * mult); desc = `${points} pontos sobre R$ ${money(base)}`; }
+    if (cash <= 0 && points <= 0 && stamps <= 0) return;
+    let acc = this.loyaltyAccount(phone);
+    if (!acc) {
+      const customer = this.rows('customers').find(c => c.restaurant_id === order.restaurant_id && Mirror.normPhone(c.phone) === phone);
+      acc = this.sysInsert('loyalty_accounts', {
+        restaurant_id: order.restaurant_id, customer_id: customer?.id ?? null, customer_name: (order.customer_name || '').trim() || 'Cliente',
+        customer_phone: phone, points_balance: 0, cashback_balance: 0, stamps: 0, total_earned: 0, total_redeemed: 0,
+      }, ctx.who);
+    }
+    this.sysUpdate('loyalty_accounts', acc, {
+      points_balance: Number(acc.points_balance || 0) + points, cashback_balance: round2(Number(acc.cashback_balance || 0) + cash),
+      stamps: Number(acc.stamps || 0) + stamps, total_earned: round2(Number(acc.total_earned || 0) + (cash > 0 ? cash : points)),
+      customer_name: (order.customer_name || '').trim() || acc.customer_name,
+    }, ctx.who);
+    this.sysInsert('loyalty_transactions', {
+      restaurant_id: order.restaurant_id, account_id: acc.id, order_id: order.id, type: 'earn', points: points + stamps, amount: cash, description: desc,
+    }, ctx.who);
+    this.sysUpdate('orders', order, { loyalty_awarded_at: new Date().toISOString() }, ctx.who);
+  }
+
+  loyaltyLookup(phoneRaw) {
+    const p = this.rows('loyalty_programs').find(x => x.restaurant_id === this.restaurantId);
+    const enabled = !!p?.enabled && this.hasFeature('loyalty');
+    const phone = Mirror.normPhone(phoneRaw);
+    if (!phone) return { found: false, enabled, mode: p?.mode ?? null };
+    const a = this.loyaltyAccount(phone);
+    return {
+      found: !!a, enabled, mode: p?.mode ?? null, phone, name: a?.customer_name ?? null,
+      cashback: Number(a?.cashback_balance ?? 0), points: Number(a?.points_balance ?? 0), stamps: Number(a?.stamps ?? 0),
+      stamps_required: p?.stamps_required ?? null, cashback_percent: p?.cashback_percent ?? null,
+    };
+  }
+
+  // ---------- balanço de estoque (as mesmas regras das funções do banco) ----------
+  today() { return this.localNow().date; }
+  static nextCountDate(freq, weekday, monthDay, after) {
+    if (!freq || freq === 'none') return null;
+    const d = new Date(`${after}T12:00:00Z`);
+    if (freq === 'monthly') {
+      let t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), monthDay, 12));
+      if (t <= d) t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, monthDay, 12));
+      return t.toISOString().slice(0, 10);
+    }
+    d.setUTCDate(d.getUTCDate() + 1);
+    while (d.getUTCDay() !== Number(weekday)) d.setUTCDate(d.getUTCDate() + 1);
+    if (freq === 'biweekly') d.setUTCDate(d.getUTCDate() + 7);
+    return d.toISOString().slice(0, 10);
+  }
+  /** Gatilhos de stock_count_settings (próxima data) e stock_count_items (quem contou e quando). */
+  stockRules(table, row, patch, ctx) {
+    if (table === 'stock_count_settings' && ['frequency', 'weekday', 'month_day'].some(k => k in patch)) {
+      const yesterday = new Date(Date.parse(`${this.today()}T12:00:00Z`) - 864e5).toISOString().slice(0, 10);
+      row.next_due_date = Mirror.nextCountDate(row.frequency, row.weekday, row.month_day, yesterday);
+    }
+    if (table === 'stock_count_items' && 'counted_quantity' in patch) {
+      if (row.counted_quantity != null && Number(row.counted_quantity) < 0) throw new OfflineError('Quantidade contada não pode ser negativa.', 400, 'P0001');
+      row.counted_by = ctx.who?.id ?? null;
+      row.counted_at = new Date().toISOString();
+      // central: quem contou e quando também vão para a nuvem
+      patch.counted_by = row.counted_by; patch.counted_at = row.counted_at;
+    }
+  }
+  /** Quem pode fazer balanço nesta loja: admin/gerente/supervisor ou financeiro (mesma regra do banco). */
+  canCount(ctx) { return !ctx.authz || ctx.authz.canInsert('stock_counts', { restaurant_id: this.restaurantId, status: 'scheduled' }); }
+
+  startStockCount(countId, ctx) {
+    if (!this.canCount(ctx)) throw new OfflineError('Sem permissão para fazer balanço nesta loja.', 403, '42501');
+    const rid = this.restaurantId;
+    const blind = this.rows('stock_count_settings').find(s => s.restaurant_id === rid)?.blind_count ?? true;
+    let count;
+    if (!countId) {
+      if (this.rows('stock_counts').some(c => c.restaurant_id === rid && c.status === 'counting')) throw new OfflineError('Já existe um balanço em andamento nesta loja.', 400, 'P0001');
+      count = this.rows('stock_counts').find(c => c.restaurant_id === rid && c.status === 'scheduled')
+        || this.sysInsert('stock_counts', { restaurant_id: rid, status: 'scheduled', kind: 'manual', due_date: this.today(), blind_count: blind }, ctx.who);
+    } else {
+      count = this.rows('stock_counts').find(c => c.id === countId && c.restaurant_id === rid);
+      if (!count) throw new OfflineError('Balanço não encontrado nesta loja.', 400, 'P0001');
+      if (count.status !== 'scheduled') throw new OfflineError('Este balanço já foi iniciado.', 400, 'P0001');
+    }
+    const have = new Set(this.rows('stock_count_items').filter(i => i.count_id === count.id).map(i => i.inventory_id));
+    for (const inv of this.rows('inventory').filter(i => i.restaurant_id === rid && !have.has(i.id))) {
+      this.sysInsert('stock_count_items', {
+        count_id: count.id, restaurant_id: rid, inventory_id: inv.id, name: inv.name, unit: inv.unit,
+        system_quantity: Number(inv.quantity), cost_per_unit: Number(inv.cost_per_unit || 0),
+      }, ctx.who);
+    }
+    this.sysUpdate('stock_counts', count, {
+      status: 'counting', started_at: new Date().toISOString(), started_by: ctx.who?.id ?? null, blind_count: blind,
+      items_total: this.rows('stock_count_items').filter(i => i.count_id === count.id).length,
+    }, ctx.who);
+    this.state.changed();
+    return count.id;
+  }
+
+  closeStockCount(a, ctx) {
+    if (!this.canCount(ctx)) throw new OfflineError('Sem permissão para concluir o balanço.', 403, '42501');
+    const rid = this.restaurantId;
+    const count = this.rows('stock_counts').find(c => c.id === a._count_id && c.restaurant_id === rid);
+    const fail = (m) => { throw new OfflineError(m, 400, 'P0001'); };
+    if (!count) fail('Balanço não encontrado nesta loja.');
+    if (count.status !== 'counting') fail('Este balanço não está em andamento.');
+    if (String(a._responsible_name || '').trim().length < 3) fail('Informe o nome do responsável.');
+    if (String(a._signature || '').trim().length < 3) fail('Assine o relatório digitando seu nome completo.');
+    const items = this.rows('stock_count_items').filter(i => i.count_id === count.id);
+    const pending = items.filter(i => i.counted_quantity == null).length;
+    if (pending) fail(`Ainda faltam ${pending} item(ns) para contar.`);
+    const diff = items.filter(i => Number(i.counted_quantity) !== Number(i.system_quantity));
+    const missing = diff.filter(i => !i.reason || String(i.justification || '').trim().length < 3).length;
+    if (missing) fail(`Informe o motivo e a justificativa de ${missing} item(ns) com diferença.`);
+    const central = !this.dedicated;
+    if (central) {
+      // central offline: a nuvem conclui com o mesmo cálculo quando a internet voltar (ajuste do estoque e avisos)
+      this.state.data.ops.push({
+        id: crypto.randomUUID(), type: 'stock.close', at: new Date().toISOString(), user_id: ctx.who?.id || null,
+        data: {
+          count_id: count.id, responsible_name: String(a._responsible_name).trim(), responsible_role: a._responsible_role ?? null,
+          general_notes: a._general_notes ?? null, signature: String(a._signature).trim(), adjust: !!a._adjust,
+        },
+      });
+    }
+    if (a._adjust && !central) {
+      for (const it of diff.filter(i => i.inventory_id)) {
+        const delta = Number(it.counted_quantity) - Number(it.system_quantity);
+        const inv = this.rows('inventory').find(x => x.id === it.inventory_id);
+        if (inv) this.sysUpdate('inventory', inv, { quantity: Math.max(Number(inv.quantity) + delta, 0) }, ctx.who);
+        this.sysInsert('inventory_movements', {
+          inventory_id: it.inventory_id, restaurant_id: rid, type: delta > 0 ? 'entry' : 'exit', quantity: Math.abs(delta),
+          reason: 'Ajuste de balanço de estoque', user_id: ctx.who?.id ?? null,
+        }, ctx.who);
+      }
+    }
+    const vsys = items.reduce((t, i) => t + Number(i.system_quantity) * Number(i.cost_per_unit), 0);
+    const vcnt = items.reduce((t, i) => t + Number(i.counted_quantity) * Number(i.cost_per_unit), 0);
+    const nn = (v) => { const t = String(v ?? '').trim(); return t || null; };
+    this.sysUpdate('stock_counts', count, {
+      status: 'closed', closed_at: new Date().toISOString(), closed_by: ctx.who?.id ?? null, stock_adjusted: !!a._adjust,
+      responsible_name: String(a._responsible_name).trim(), responsible_role: nn(a._responsible_role), general_notes: nn(a._general_notes),
+      signature: String(a._signature).trim(), items_total: items.length, items_divergent: diff.length,
+      value_system: vsys, value_counted: vcnt, value_difference: vcnt - vsys,
+    }, ctx.who, { sync: false });
+    if (central) {
+      this.remember('stock_counts', count.id, count); // fica concluído na tela até a nuvem confirmar
+      this.state.changed();
+      return { items: items.length, divergent: diff.length, difference: vcnt - vsys, pending_sync: true };
+    }
+    const store = this.rows('restaurants').find(r => r.id === rid);
+    const money = (vcnt - vsys).toFixed(2).replace('.', ',');
+    this.sysInsert('notifications', {
+      restaurant_id: rid, title: 'Balanço de estoque concluído',
+      message: `${store?.name ?? 'Loja'}: ${diff.length} item(ns) com diferença (R$ ${money}). Responsável: ${String(a._responsible_name).trim()}.`,
+      type: 'stock_count', target_roles: ['admin', 'finance'],
+    }, ctx.who);
+    this.state.changed();
+    return { items: items.length, divergent: diff.length, difference: vcnt - vsys };
+  }
+
+  /** Agenda do balanço (o servidor dedicado roda isto sozinho; na nuvem quem roda é o pg_cron). */
+  runStockScheduler() {
+    if (!this.dedicated || !this.ready) return 0;
+    const today = this.today();
+    let n = 0;
+    for (const st of this.rows('stock_count_settings')) {
+      if (st.frequency === 'none' || !st.next_due_date || st.next_due_date > today) continue;
+      if (!this.rows('stock_counts').some(c => c.restaurant_id === st.restaurant_id && ['scheduled', 'counting'].includes(c.status))) {
+        this.sysInsert('stock_counts', { restaurant_id: st.restaurant_id, status: 'scheduled', kind: 'scheduled', due_date: st.next_due_date, blind_count: st.blind_count }, null);
+        this.sysInsert('notifications', {
+          restaurant_id: st.restaurant_id, title: 'Balanço de estoque de hoje',
+          message: 'O balanço de estoque está agendado para hoje. Abra Estoque → Balanço para começar.', type: 'stock_count', target_roles: ['admin', 'finance'],
+        }, null);
+        n++;
+      }
+      this.sysUpdate('stock_count_settings', st, { next_due_date: Mirror.nextCountDate(st.frequency, st.weekday, st.month_day, today) }, null);
+    }
+    if (n) this.state.changed();
+    return n;
   }
 
   // ---------- funções (rpc) ----------
   rpc(name, args, ctx) {
     switch (name) {
+      case 'loyalty_lookup':
+        if (!this.dedicated) throw new OfflineError(NEEDS_INTERNET, 503);
+        return this.loyaltyLookup(args._phone);
+      case 'start_stock_count': return this.startStockCount(args._count_id || null, ctx);
+      case 'close_stock_count': return this.closeStockCount(args, ctx);
+      case 'cancel_stock_count': {
+        const c = this.rows('stock_counts').find(x => x.id === args._count_id && x.restaurant_id === this.restaurantId && ['scheduled', 'counting'].includes(x.status));
+        if (!c || (ctx.authz && !ctx.authz.canInsert('stock_count_settings', { restaurant_id: this.restaurantId }))) {
+          throw new OfflineError(c ? 'Só o admin/gerente cancela um balanço.' : 'Balanço não encontrado ou já concluído.', c ? 403 : 400, c ? '42501' : 'P0001');
+        }
+        this.sysUpdate('stock_counts', c, { status: 'cancelled', closed_at: new Date().toISOString(), closed_by: ctx.who?.id ?? null }, ctx.who);
+        this.state.changed();
+        return null;
+      }
       case 'claim_print_job': {
         const job = this.prints.find(j => j.id === args._job_id
           && (j.status === 'queued' || (j.status === 'printing' && Date.parse(j.claimed_at) < Date.now() - 120_000)));

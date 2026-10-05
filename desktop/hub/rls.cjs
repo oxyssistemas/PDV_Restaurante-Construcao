@@ -218,11 +218,22 @@ function runSelect(q, ctx, scopes, limit = Infinity) {
 // ---------- funções de permissão do banco ----------
 function helpers(ctx) {
   const roles = (uid) => ctx.db.roles(uid);
-  const hasRole = (uid, role) => roles(uid).some(r => r.role === role);
+  // loja ativa (get_user_restaurant_id): a loja deste servidor/central, se a pessoa tem cargo nela; senão a primeira
+  const home = (uid) => {
+    const list = roles(uid);
+    const active = ctx.db.active?.(uid);
+    if (active && list.some(r => r.restaurant_id === active && r.role !== 'super_admin')) return active;
+    return [...list].filter(r => r.role !== 'super_admin' && r.restaurant_id)
+      .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || String(a.id).localeCompare(String(b.id)))[0]?.restaurant_id ?? null;
+  };
+  // has_role: cargo na loja ativa; gerente e supervisor valem como admin
+  const hasRole = (uid, role) => {
+    const h = home(uid);
+    return roles(uid).some(r => (r.role === role || (role === 'admin' && (r.role === 'manager' || r.role === 'supervisor')))
+      && (r.role === 'super_admin' || r.restaurant_id === h));
+  };
   const belongs = (uid, rid) => rid != null && roles(uid).some(r => r.restaurant_id === rid);
   const active = (rid) => ctx.db.restaurant(rid)?.status === 'active';
-  const home = (uid) => [...roles(uid)].filter(r => r.role !== 'super_admin' && r.restaurant_id)
-    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || String(a.id).localeCompare(String(b.id)))[0]?.restaurant_id ?? null;
   const feature = (rid, f) => {
     const r = ctx.db.restaurant(rid);
     const plan = r ? ctx.db.plan(r.plan_code) : null;

@@ -90,11 +90,51 @@ Atualizado a cada integração.
 - [x] Cópias de segurança diárias (7 últimas) e manual
 - [x] Apagar os dados da loja da nuvem compartilhada depois de conferido
 - [x] Versão v1.0.4 publicada com os instaladores do Oxys Servidor (Windows, Linux, Mac)
+- [x] Versão v1.0.6: app lembra o servidor da loja; servidor com loja online, QR, totem, avaliação, cashback e fotos; central com balanço e totem offline
 - [ ] Instalar o Oxys Servidor numa loja real
-- [ ] Loja online e cardápio QR para lojas com servidor dedicado
+- [x] Loja online e cardápio QR para lojas com servidor dedicado (mesmo endereço de sempre; a nuvem repassa para o servidor da loja com assinatura)
 - [ ] Robô de WhatsApp, iFood, emissão de NFC-e, assistente de IA e marketing no servidor dedicado
-- [ ] Fotos (cardápio, vitrine) guardadas no servidor dedicado
-- [ ] App de computador da loja lembrar o endereço do servidor quando abrir já sem internet
+- [x] Fotos (cardápio, logo, vitrine) guardadas no servidor dedicado e na central: baixadas da nuvem uma vez e servidas sem internet
+- [x] App de computador lembra o endereço do servidor da loja e, sem internet, abre direto pela rede da loja (antes ainda abria o servidor no navegador externo)
+- [x] Totem, avaliação (NPS) e cashback na loja online funcionando no servidor dedicado
+
+## 11. Filiais (plano Enterprise)
+- [x] Dono (admin da matriz) cria filiais pelo sistema, até o limite definido pelo super admin para cada loja
+- [x] Cada filial com cardápio próprio (começa como cópia do da matriz), equipe, caixa, estoque e relatórios separados
+- [x] Cargos Gerente (administra uma filial) e Supervisor (administra as filiais ligadas a ele)
+- [x] Gerente não vê outras lojas, não muda plano, não cria gerentes, supervisores nem filiais
+- [x] Dono e supervisor trocam de loja pelo seletor do painel; o dono entra automaticamente como admin de cada filial
+- [x] "Chamar gerente" e avisos do admin chegam também ao gerente e ao supervisor
+- [x] Segurança: plano, situação, matriz e limite de filiais só mudam pelo super admin (antes o admin conseguia trocar o próprio plano pela API)
+- [x] Painel da rede: faturamento, pedidos, ticket médio, caixas abertos, gráfico por dia por loja, mais vendidos e formas de pagamento, somando todas as lojas (dono e supervisores)
+- [x] Enviar o cardápio da matriz para as filiais com um clique (itens novos, nomes/fotos/fiscal, preços e disponibilidade — o que escolher)
+
+## 12. Balanço de estoque
+- [x] Balanço a qualquer hora ou agendado (toda semana, a cada 2 semanas ou todo mês); no dia ele é criado sozinho e os responsáveis recebem aviso
+- [x] Foto do estoque do sistema no início; contagem item a item com busca, filtros e progresso, salva a cada campo (pode parar e continuar depois)
+- [x] Contagem às cegas (opcional): quem conta não vê o número do sistema
+- [x] Toda diferença exige motivo (perda, vencimento, erro de lançamento, consumo interno, furto, entrada não registrada, outro) e justificativa
+- [x] Relatório do responsável: nome, cargo, observações e assinatura; opção de ajustar o estoque para o contado (vira movimentação "Ajuste de balanço")
+- [x] Na filial o balanço fica com o gerente e o supervisor da loja e o resultado vai para a matriz (aviso + histórico com a visão "Toda a rede")
+- [x] Relatório para baixar em PDF e em planilha (Excel), também no portal Financeiro
+- [x] Funciona no servidor dedicado (mesmas regras e a agenda roda no próprio servidor)
+- [x] Balanço na central offline: iniciar, contar e concluir sem internet; a nuvem conclui com o mesmo cálculo (ajuste do estoque e avisos) ao sincronizar
+- [ ] Alterar o Estoque (entradas, saídas, cadastro) na central offline — hoje só consulta
+
+## 13. Vendas e gestão (pacote de outubro)
+- [x] Custo do prato (CMV): custo pela ficha técnica × custo do estoque, CMV %, margem, CMV realizado e lucro bruto do período, planilha (Cardápio → Custo e margem e Financeiro → CMV); custo ao vivo ao editar o item
+- [x] Taxa de serviço (%) e couvert por pessoa: configuráveis, o caixa pode retirar a taxa na hora, valores gravados na comanda, no recibo (navegador e impressoras) e na NFC-e (outras despesas); funcionam na central offline
+- [x] Fidelidade de verdade: pontos, cashback ou selos acumulam quando a conta é paga com o telefone do cliente (antes só havia a configuração); extrato por cliente
+- [x] Cashback como forma de pagamento no caixa (valida o saldo; estorno devolve), também no servidor dedicado
+- [x] Avaliação pós-pedido (NPS): QR Code no recibo e botão no acompanhamento online; notas 0–10 + estrelas de comida/atendimento/tempo; painel com NPS, distribuição e comentários; resposta da loja; aviso na hora para nota baixa
+- [x] Pacote do contador: ZIP do mês com XMLs das NFC-e, notas, resumo, vendas por dia/forma de pagamento, produtos com NCM/CFOP, despesas e folha; link de 7 dias para WhatsApp/email; XML de cada nota guardado no sistema
+- [x] Autoatendimento (totem/tablet): tela de toque com senha do dia, comer aqui ou levar, celular para fidelidade; pedido vai para a cozinha e para Delivery → Pedidos (pagamento no caixa)
+- [x] Funcionário com email que já é cliente: usa a mesma conta e a mesma senha; ao sair da equipe a conta de cliente continua (também para gerente/supervisor de filiais)
+- [~] 99Food, Keeta e Rappi: recebimento automático pronto (endereço por loja, códigos dos produtos, cancelamento, aviso de item sem vínculo) — falta o contrato de parceria e validar o formato do pedido de cada app; aceitar/recusar e status de volta para o app dependem da API de cada um
+- [x] Totem funcionando na central offline e no servidor dedicado (senha do dia, cozinha e envio para a nuvem depois)
+- [x] Avaliação: no servidor dedicado responde o servidor da loja; na central offline o link do recibo vale assim que o pedido sincroniza
+- [x] Usar o cashback na loja online (abate do total; o caixa cobra só o restante)
+- [ ] Pagar no próprio totem (depende do Pix automático / maquininha)
 
 ## 9. Configurações externas pendentes
 - [~] Email próprio (SMTP, ex.: Resend) no Supabase — libera "Esqueci minha senha" dos clientes
@@ -103,18 +143,11 @@ Atualizado a cada integração.
 ---
 
 ## Próximas integrações
-- [ ] Servidor dedicado: integrações da nuvem (loja online, WhatsApp, iFood, NFC-e, IA, marketing, fotos)
+- [ ] Servidor dedicado: WhatsApp, iFood, NFC-e, assistente de IA e marketing (precisam de uma ponte de dados entre a nuvem e o servidor)
 - [ ] Pix automático (QR dinâmico + baixa sozinha)
 - [ ] Maquininha integrada (Stone, PagSeguro, Mercado Pago Point)
-- [ ] 99Food, Keeta e Rappi automáticos (dependem de contrato de parceria)
-- [ ] Ficha técnica e custo do prato (CMV)
-- [ ] Taxa de serviço (10%) e couvert
-- [ ] Várias lojas / franquias com painel único
+- [~] 99Food, Keeta e Rappi automáticos (estrutura pronta; falta contrato de parceria com cada app)
 - [ ] Recuperação de senha do cliente da loja (depois do SMTP)
-- [ ] Autoatendimento (totem/tablet no balcão)
-- [ ] Avaliação pós-pedido (NPS) e cashback
-- [ ] Pacote para o contador (XMLs e relatórios fiscais)
-- [ ] Permitir cadastrar como funcionário um email que já é cliente da loja
 
 ## Decisões em aberto
 - [x] Modo offline: guardar o hash das senhas da equipe na central, criptografado (decidido: sim)

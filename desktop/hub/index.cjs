@@ -10,6 +10,7 @@ const { Mirror } = require('./mirror.cjs');
 const { HubAuth } = require('./auth.cjs');
 const { Credentials } = require('./credentials.cjs');
 const { createClient } = require('@supabase/supabase-js');
+const { createPublicFunctions } = require('./publicfn.cjs');
 
 const PORT = Number(process.env.OXYS_HUB_PORT || 8790);
 const SYNC_MS = 20_000;
@@ -43,6 +44,13 @@ class Hub {
     });
     this.uiDir = uiDir;
     this.version = version;
+    this.dataDir = dataDir;
+    // totem e cardápio do QR da mesa funcionando sem internet; o link da avaliação impresso aponta para a nuvem
+    this.publicFns = createPublicFunctions({
+      mirror: this.mirror,
+      cloudReviewUrl: (order) => `https://www.oxysrestaurante.app/avaliar/${order.public_token}`,
+    });
+    this.mirror.reviewUrlFor = (order) => this.publicFns.reviewUrl(order);
     this.online = false;
     this.lastError = null;
     this.server = null;
@@ -103,6 +111,15 @@ class Hub {
     if (!this.server) {
       const { server, publish } = createServer({
         state: this.state, getConfig: () => this.config, uiDir: this.uiDir, getStatus: () => this.status(), mirror: this.mirror, auth: this.auth,
+        publicFns: this.publicFns,
+        media: {
+          dir: path.join(this.dataDir, 'media'),
+          sign: async (bucket, p) => {
+            const base = String(this.config.functionsUrl || '').replace(/\/functions\/v1\/.*$/, '');
+            if (bucket === 'store-media') return `${base}/storage/v1/object/public/store-media/${p.split('/').map(encodeURIComponent).join('/')}`;
+            return (await this.call('media', { bucket, path: p })).url;
+          },
+        },
       });
       this.server = server;
       this.publish = publish;

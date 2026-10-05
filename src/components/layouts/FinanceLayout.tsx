@@ -2,8 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
-  LineChart, LogOut, Menu, FileBarChart, Package, Building2, History, Briefcase, PieChart, Gift,
-} from 'lucide-react';
+  LineChart, LogOut, Menu, FileBarChart, Package, Building2, History, Briefcase, PieChart, Gift, ClipboardCheck, Calculator, MessageSquareHeart, FileArchive } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
 import { useState } from 'react';
@@ -20,6 +19,10 @@ const navItems: { to: string; icon: typeof LineChart; label: string; end: boolea
   { to: '/finance/loyalty', icon: Gift, label: 'Fidelidade', end: false, module: 'loyalty' },
   { to: '/finance/reports', icon: FileBarChart, label: 'Relatórios', end: false, financeOnly: true },
   { to: '/finance/inventory', icon: Package, label: 'Estoque', end: false, financeOnly: true },
+  { to: '/finance/stock-counts', icon: ClipboardCheck, label: 'Balanço de estoque', end: false, financeOnly: true },
+  { to: '/finance/cmv', icon: Calculator, label: 'Custo do prato (CMV)', end: false, financeOnly: true },
+  { to: '/finance/reviews', icon: MessageSquareHeart, label: 'Avaliações (NPS)', end: false, financeOnly: true },
+  { to: '/finance/accountant', icon: FileArchive, label: 'Pacote do contador', end: false, financeOnly: true },
   { to: '/finance/history', icon: History, label: 'Histórico', end: false, financeOnly: true },
 ];
 

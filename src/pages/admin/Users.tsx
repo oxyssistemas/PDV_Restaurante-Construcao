@@ -19,18 +19,9 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ROLE_LABELS, isAdminLike } from '@/lib/roles';
 
-const roleLabels: Record<string, string> = {
-  admin: 'Admin',
-  waiter: 'Garçom',
-  kitchen: 'Cozinha',
-  cashier: 'Caixa',
-  finance: 'Financeiro',
-  delivery: 'Delivery',
-  courier: 'Entregador',
-  hr: 'RH',
-  marketing: 'Marketing',
-};
+const roleLabels = ROLE_LABELS;
 
 const creatableRoles = ['waiter', 'kitchen', 'cashier', 'finance', 'delivery', 'courier', 'hr', 'marketing'] as const;
 
@@ -78,7 +69,7 @@ export default function UsersPage() {
   const deleteUser = useMutation({
     mutationFn: async (userId: string) => {
       const { data, error } = await supabase.functions.invoke('manage-user', {
-        body: { action: 'delete', user_id: userId },
+        body: { action: 'delete', user_id: userId, restaurant_id: restaurantId },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -126,7 +117,7 @@ export default function UsersPage() {
               <TableBody>
                 {users?.map(u => {
                   const isSelf = u.user_id === user?.id;
-                  const isAdminRole = u.role === 'admin' || u.role === 'super_admin';
+                  const isAdminRole = isAdminLike(u.role) || u.role === 'super_admin';
                   return (
                     <TableRow key={u.id}>
                       <TableCell className="font-mono text-xs">{u.user_id.slice(0, 8)}...</TableCell>
@@ -244,6 +235,9 @@ function CreateUserForm({ restaurantId, onSuccess }: { restaurantId: string; onS
       toast.error(await edgeErrorMessage(error, 'Erro ao criar usuário.'));
     } else if (data?.error) {
       toast.error(data.error);
+    } else if (data?.existing) {
+      toast.success('Adicionado à equipe!', { description: data.message, duration: 9000 });
+      onSuccess();
     } else {
       toast.success('Usuário criado com sucesso!');
       onSuccess();

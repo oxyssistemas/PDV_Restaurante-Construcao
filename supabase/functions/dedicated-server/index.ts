@@ -9,7 +9,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 //   Servidor (x-server-key): { action: 'schema' }                             → tabelas, ligações, padrões e regras de acesso
 //                            { action: 'export', table, offset, limit }       → dados da loja para a migração
 //                            { action: 'migrated', rows }                     → migração concluída
-//                            { action: 'control', publicUrl?, lanUrls?, version?, ownSupabaseUrl? } → equipe, login, plano e situação
+//                            { action: 'control', publicUrl?, lanUrls?, version?, ownSupabaseUrl?, storeSlug? } → equipe, login, plano e situação
+//                            { action: 'media', bucket, path }                → endereço temporário de uma foto da loja
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -68,7 +69,7 @@ Deno.serve(async (req) => {
     const serverKey = req.headers.get('x-server-key');
     if (serverKey) {
       const { data: srv } = await sb.from('dedicated_servers')
-        .select('restaurant_id, enabled, status, migrated_at, cloud_purged_at').eq('key_hash', await sha256(serverKey)).maybeSingle();
+        .select('restaurant_id, enabled, status, migrated_at, cloud_purged_at, relay_secret').eq('key_hash', await sha256(serverKey)).maybeSingle();
       if (!srv) return json({ error: 'Servidor não reconhecido. Ative de novo com um código novo.' }, 401);
       const rid = srv.restaurant_id;
 
@@ -78,17 +79,34 @@ Deno.serve(async (req) => {
         if (Array.isArray(body?.lanUrls)) patch.lan_urls = body.lanUrls.filter(URL_OK).slice(0, 6);
         if (typeof body?.version === 'string') patch.version = body.version.slice(0, 20);
         if (body?.ownSupabaseUrl === null || URL_OK(body?.ownSupabaseUrl)) patch.own_supabase_url = body.ownSupabaseUrl;
+        // loja online da loja (a nuvem repassa os pedidos para o servidor) e segredo do repasse assinado
+        const relaySecret = srv.relay_secret || randomHex(32);
+        if (!srv.relay_secret) patch.relay_secret = relaySecret;
         await sb.from('dedicated_servers').update(patch).eq('restaurant_id', rid);
+        // separado: um endereço repetido de outra loja não pode travar o controle
+        if (body?.storeSlug === null || (typeof body?.storeSlug === 'string' && /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(body.storeSlug))) {
+          await sb.from('dedicated_servers').update({ store_slug: body.storeSlug }).eq('restaurant_id', rid);
+        }
         // equipe, papéis, login (hash das senhas, como na central offline), restaurante e plano
         const { data: rep, error } = await sb.rpc('offline_replica', { _restaurant_id: rid });
         if (error) throw error;
         return json({
           restaurantId: rid, enabled: srv.enabled, status: srv.status,
           restaurants: rep.rows.restaurants, plans: rep.rows.plans, user_roles: rep.rows.user_roles,
-          staff: rep.staff, generated_at: rep.generated_at,
+          staff: rep.staff, generated_at: rep.generated_at, relaySecret,
         });
       }
       if (!srv.enabled) return json({ error: 'Servidor dedicado desativado para esta loja.' }, 403);
+
+      // foto do cardápio / logo da própria loja: endereço temporário para baixar e guardar no computador
+      if (action === 'media') {
+        const bucket = String(body?.bucket ?? '');
+        const path = String(body?.path ?? '');
+        if (bucket !== 'menu-images' || !path.startsWith(`${rid}/`) || path.includes('..')) return json({ error: 'Arquivo inválido.' }, 400);
+        const { data, error } = await sb.storage.from(bucket).createSignedUrl(path, 300);
+        if (error || !data) return json({ error: 'Arquivo não encontrado.' }, 404);
+        return json({ url: data.signedUrl });
+      }
 
       if (action === 'schema') {
         const { data, error } = await sb.rpc('dedicated_schema');

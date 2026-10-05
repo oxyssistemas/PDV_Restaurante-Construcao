@@ -19,7 +19,7 @@ export const PRINTER_COLUMNS =
 
 export type PrintDocument =
   | { kind: 'kitchen' | 'order'; restaurant_name: string; order: PrintOrder; items: PrintItem[] }
-  | { kind: 'receipt'; restaurant_name: string; order: PrintOrder; items: PrintItem[]; payments: PrintPayment[]; change?: number }
+  | { kind: 'receipt'; restaurant_name: string; order: PrintOrder; items: PrintItem[]; payments: PrintPayment[]; change?: number; review_url?: string | null }
   | ({ kind: 'nfce' } & NfceDocument)
   | { kind: 'test'; restaurant_name: string; printer_name: string };
 
@@ -88,7 +88,7 @@ export async function renderJob(doc: PrintDocument, printer: Printer): Promise<s
     case 'order':
       return renderOrderTicket({ restaurantName: doc.restaurant_name, order: doc.order, items: doc.items, config });
     case 'receipt':
-      return renderReceipt({ restaurantName: doc.restaurant_name, order: doc.order, items: doc.items, payments: doc.payments, change: doc.change, config });
+      return renderReceipt({ restaurantName: doc.restaurant_name, order: doc.order, items: doc.items, payments: doc.payments, change: doc.change, config, reviewUrl: doc.review_url });
     case 'nfce':
       return renderNfce(doc, config);
     case 'test':

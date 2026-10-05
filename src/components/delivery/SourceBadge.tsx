@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { CloudOff, Globe, Headset, MessageCircle, QrCode, Smartphone } from 'lucide-react';
+import { CloudOff, Globe, Headset, MessageCircle, MonitorSmartphone, QrCode, Smartphone } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +18,7 @@ export const ORDER_SOURCES: Record<string, Source> = {
   internal: { label: 'Equipe / telefone', bg: '#475569', fg: '#fff', icon: Headset },
   pos: { label: 'Balcão', bg: '#475569', fg: '#fff', icon: Headset },
   offline: { label: 'Modo offline', bg: '#b45309', fg: '#fff', icon: CloudOff },
+  kiosk: { label: 'Totem', bg: '#0d9488', fg: '#fff', icon: MonitorSmartphone },
 };
 
 /** Origens que a equipe escolhe ao lançar um pedido à mão (apps sem integração automática). */

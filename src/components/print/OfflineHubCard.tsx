@@ -10,6 +10,7 @@ import { CloudOff, Loader2, RefreshCw, ServerCog, Wifi } from 'lucide-react';
 import { toast } from 'sonner';
 import { IS_CENTRAL } from '@/lib/central';
 import { desktop, type HubStatus } from '@/lib/desktop';
+import { isAdminLike } from '@/lib/roles';
 
 /**
  * Central do modo offline: este computador guarda a loja e, sem internet, atende garçons, cozinha e caixa
@@ -18,7 +19,7 @@ import { desktop, type HubStatus } from '@/lib/desktop';
 export default function OfflineHubCard() {
   const { currentRole } = useAuth();
   const restaurantId = currentRole?.restaurant_id ?? null;
-  const isAdmin = currentRole?.role === 'admin' || currentRole?.role === 'super_admin';
+  const isAdmin = isAdminLike(currentRole?.role) || currentRole?.role === 'super_admin';
   const [busy, setBusy] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
 

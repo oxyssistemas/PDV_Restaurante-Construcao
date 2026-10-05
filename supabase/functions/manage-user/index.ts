@@ -34,11 +34,12 @@ serve(async (req) => {
       .select("role, restaurant_id")
       .eq("user_id", caller.id);
 
+    // Admin, gerente e supervisor administram a equipe das lojas em que têm esse cargo (filiais: cada uma a sua).
+    const ADMIN_LIKE = ["admin", "manager", "supervisor"];
     const isSuperAdmin = callerRoles?.some(r => r.role === "super_admin");
-    const isAdmin = callerRoles?.some(r => r.role === "admin");
-    const callerRestaurantId = callerRoles?.find(r => r.role === "admin")?.restaurant_id;
+    const adminOf = new Set((callerRoles ?? []).filter(r => ADMIN_LIKE.includes(r.role)).map(r => r.restaurant_id));
 
-    if (!isSuperAdmin && !isAdmin) {
+    if (!isSuperAdmin && !adminOf.size) {
       return new Response(JSON.stringify({ error: "Sem permissão" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -52,22 +53,27 @@ serve(async (req) => {
       });
     }
 
-    // Verify target user belongs to caller's restaurant
-    if (isAdmin && !isSuperAdmin) {
-      const { data: targetRoles } = await supabaseAdmin
-        .from("user_roles")
-        .select("restaurant_id, role")
-        .eq("user_id", user_id);
+    // loja em que a alteração acontece: a informada, ou (telas antigas) a única que o admin administra
+    const targetRestaurantId: string | null = restaurant_id || (adminOf.size === 1 ? [...adminOf][0] : null);
+    const { data: targetRoles } = await supabaseAdmin
+      .from("user_roles")
+      .select("restaurant_id, role")
+      .eq("user_id", user_id);
 
-      const belongsToRestaurant = targetRoles?.some(r => r.restaurant_id === callerRestaurantId);
+    if (!isSuperAdmin) {
+      if (!targetRestaurantId || !adminOf.has(targetRestaurantId)) {
+        return new Response(JSON.stringify({ error: "Informe a loja da alteração" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const belongsToRestaurant = targetRoles?.some(r => r.restaurant_id === targetRestaurantId);
       if (!belongsToRestaurant) {
         return new Response(JSON.stringify({ error: "Usuário não pertence ao seu restaurante" }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-
-      // Can't edit admins or super_admins
-      const isTargetAdmin = targetRoles?.some(r => r.role === "admin" || r.role === "super_admin");
+      // admins, gerentes e supervisores não são editados aqui (o dono cuida deles em Filiais)
+      const isTargetAdmin = targetRoles?.some(r => ["admin", "super_admin", "manager", "supervisor"].includes(r.role));
       if (isTargetAdmin) {
         return new Response(JSON.stringify({ error: "Sem permissão para editar este usuário" }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -89,13 +95,11 @@ serve(async (req) => {
         });
       }
 
-      if (isAdmin && !isSuperAdmin && (role === "admin" || role === "super_admin")) {
+      if (!isSuperAdmin && ["admin", "super_admin", "manager", "supervisor"].includes(role)) {
         return new Response(JSON.stringify({ error: "Sem permissão para atribuir esta função" }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-
-      const targetRestaurantId = restaurant_id || callerRestaurantId;
 
       const { error } = await supabaseAdmin
         .from("user_roles")
@@ -115,11 +119,23 @@ serve(async (req) => {
     }
 
     if (action === "delete") {
-      // Delete role first, then user
-      await supabaseAdmin
-        .from("user_roles")
-        .delete()
-        .eq("user_id", user_id);
+      // Tira a pessoa desta loja; a conta só é apagada se ela não trabalhar em outra loja da rede.
+      if (!isSuperAdmin || targetRestaurantId) {
+        await supabaseAdmin.from("user_roles").delete().eq("user_id", user_id).eq("restaurant_id", targetRestaurantId);
+        await supabaseAdmin.from("user_active_restaurant").delete().eq("user_id", user_id).eq("restaurant_id", targetRestaurantId);
+        const stillWorks = (targetRoles ?? []).some(r => r.restaurant_id !== targetRestaurantId);
+        // quem também é cliente de alguma loja continua com a conta (só sai da equipe)
+        const { data: who } = await supabaseAdmin.auth.admin.getUserById(user_id);
+        const { data: found } = who?.user?.email ? await supabaseAdmin.rpc("auth_user_by_email", { _email: who.user.email }) : { data: null };
+        const isCustomer = Array.isArray(found) && found[0]?.is_customer;
+        if (stillWorks || isCustomer) {
+          return new Response(JSON.stringify({ success: true }), {
+            status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } else {
+        await supabaseAdmin.from("user_roles").delete().eq("user_id", user_id);
+      }
 
       const { error } = await supabaseAdmin.auth.admin.deleteUser(user_id);
 

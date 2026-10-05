@@ -18,6 +18,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Loader2, Pencil, Trash2, Upload, Boxes, ReceiptText } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import MenuImage, { useMenuImageUrl } from '@/components/MenuImage';
+import CmvPanel from '@/components/CmvPanel';
+import { cmvPercent, cmvTone, useCostData } from '@/lib/cmv';
+import { cn } from '@/lib/utils';
 import {
   csosnOptions, cstOptions, isSimples, ncmSuggestions, originOptions, unitOptions, type TaxRegime,
 } from '@/lib/fiscal';
@@ -61,7 +64,7 @@ export default function MenuPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from('inventory')
-        .select('id, name, unit, quantity')
+        .select('id, name, unit, quantity, cost_per_unit')
         .eq('restaurant_id', restaurantId!)
         .order('name');
       return data || [];
@@ -86,6 +89,7 @@ export default function MenuPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['menu-items'] });
+      queryClient.invalidateQueries({ queryKey: ['cmv-data'] });
       toast({ title: 'Item removido' });
     },
   });
@@ -111,7 +115,12 @@ export default function MenuPage() {
           <TabsList className="mb-4">
             <TabsTrigger value="items">Itens ({items?.length || 0})</TabsTrigger>
             <TabsTrigger value="categories">Categorias ({categories?.length || 0})</TabsTrigger>
+            <TabsTrigger value="cmv">Custo e margem (CMV)</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="cmv">
+            {restaurantId && <CmvPanel restaurantId={restaurantId} />}
+          </TabsContent>
 
           <TabsContent value="items">
             <div className="flex justify-end mb-4">
@@ -340,6 +349,21 @@ function ItemDialog({
     setUploading(false);
   };
 
+  // custo do prato pela ficha técnica (atualiza enquanto edita)
+  const { data: costData } = useCostData(open ? restaurantId : null);
+  const recipeCost = isCombo
+    ? components.reduce((sum, c) => sum + (costData?.costs.get(c.component_item_id)?.cost ?? 0) * (Number(c.quantity) || 0), 0)
+    : ingredients.reduce((sum, r) => sum + Number(inventory.find(i => i.id === r.inventory_id)?.cost_per_unit ?? 0) * (Number(r.quantity) || 0), 0);
+  const hasRecipe = isCombo ? components.some(c => c.component_item_id) : ingredients.some(r => r.inventory_id);
+  const recipePct = cmvPercent(recipeCost, Number(price) || 0);
+  const recipeSummary = hasRecipe && (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md bg-muted/40 px-3 py-2 text-xs">
+      <span>Custo do prato: <b>R$ {recipeCost.toFixed(2)}</b></span>
+      <span>CMV: <b className={cn(cmvTone(recipePct))}>{recipePct == null ? '—' : `${recipePct.toFixed(1)}%`}</b></span>
+      <span>Margem: <b className={cn((Number(price) || 0) - recipeCost < 0 && 'text-destructive')}>R$ {((Number(price) || 0) - recipeCost).toFixed(2)}</b></span>
+    </div>
+  );
+
   const comboPrice = components.reduce((sum, c) => {
     const it = allItems.find(i => i.id === c.component_item_id);
     return sum + (it ? Number(it.price) * (Number(c.quantity) || 0) : 0);
@@ -402,6 +426,7 @@ function ItemDialog({
     }
 
     queryClient.invalidateQueries({ queryKey: ['menu-items'] });
+    queryClient.invalidateQueries({ queryKey: ['cmv-data'] });
     queryClient.invalidateQueries({ queryKey: ['item-composition'] });
     queryClient.invalidateQueries({ queryKey: ['fiscal-items-missing-ncm'] });
     toast({ title: editItem ? 'Item atualizado' : 'Item criado' });
@@ -537,6 +562,7 @@ function ItemDialog({
                 onClick={() => setIngredients(prev => [...prev, { inventory_id: '', quantity: '1' }])}>
                 <Plus className="h-4 w-4" /> Adicionar ingrediente
               </Button>
+              {recipeSummary}
             </div>
           ) : (
             <div className="space-y-2 rounded-lg border p-3">
@@ -574,6 +600,7 @@ function ItemDialog({
                 onClick={() => setComponents(prev => [...prev, { component_item_id: '', quantity: '1' }])}>
                 <Plus className="h-4 w-4" /> Adicionar item ao combo
               </Button>
+              {recipeSummary}
             </div>
           )}
 

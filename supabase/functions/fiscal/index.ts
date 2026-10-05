@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { buildNfce } from './build.ts';
+import { archiveXml, buildAccountantPackage, packageLink } from './accountant.ts';
 import { currentProvider, FiscalRejection, type Account, type Environment, type ProviderContext } from './providers.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -108,6 +109,8 @@ async function processInvoice(db: SupabaseClient, invoiceId: string) {
     };
     await db.from('fiscal_invoices').update(update).eq('id', invoice.id);
     await enqueueDanfe(db, { ...invoice, ...update }, true);
+    // guarda o XML autorizado (não atrapalha a emissão se falhar; o pacote do contador tenta de novo)
+    if (provider.fetchXml) await archiveXml(db, { ...invoice, ...update }, (inv) => provider.fetchXml!(inv, ctx)).catch(() => null);
     return 'issued';
   } catch (e) {
     const final = e instanceof FiscalRejection || attempts >= MAX_ATTEMPTS;
@@ -237,6 +240,33 @@ Deno.serve(async (req) => {
         const inv = await invoiceOf(db, rid, body.invoiceId);
         if (inv.status !== 'issued') throw new HttpError(409, 'Só notas autorizadas têm DANFE');
         return json({ printers: await enqueueDanfe(db, inv, false) });
+      }
+      case 'accountant_package': {
+        const { db, user } = await authorize(req, rid, ['admin', 'finance', 'manager', 'supervisor']);
+        const ctx = await providerContext(db, rid);
+        const fetchXml = async (inv: any) => (provider.fetchXml ? provider.fetchXml(inv, ctx) : null);
+        try {
+          return json(await buildAccountantPackage(db, rid, String(body.month ?? ''), user.id, fetchXml));
+        } catch (e) {
+          throw new HttpError(400, errMsg(e));
+        }
+      }
+      case 'accountant_link': {
+        const { db } = await authorize(req, rid, ['admin', 'finance', 'manager', 'supervisor']);
+        const { data: row } = await db.from('accountant_exports').select('file_path').eq('id', String(body.exportId ?? '')).eq('restaurant_id', rid).maybeSingle();
+        if (!row) throw new HttpError(404, 'Pacote não encontrado');
+        return json({ url: await packageLink(db, row.file_path) });
+      }
+      case 'accountant_contact': {
+        const { db } = await authorize(req, rid, ['admin', 'finance', 'manager', 'supervisor']);
+        const clean = (v: unknown, n: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : null);
+        const email = clean(body.email, 120);
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, 'Email do contador inválido');
+        const { error } = await db.from('fiscal_profiles').upsert({
+          restaurant_id: rid, accountant_name: clean(body.name, 80), accountant_email: email, accountant_phone: clean(body.phone, 20),
+        }, { onConflict: 'restaurant_id' });
+        if (error) throw new HttpError(400, error.message);
+        return json({ ok: true });
       }
       case 'sync_company': {
         const { db } = await authorize(req, rid, ['admin']);

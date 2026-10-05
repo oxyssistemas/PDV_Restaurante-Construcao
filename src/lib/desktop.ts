@@ -12,6 +12,8 @@ type OxysDesktop = {
   hubDeactivate?: () => Promise<HubStatus>;
   hubSetDevices?: (devices: Record<string, string>) => Promise<boolean>;
   hubSync?: () => Promise<HubStatus>;
+  // servidor dedicado da loja: endereço guardado para abrir pela rede da loja sem internet
+  rememberServer?: (info: { publicUrl?: string | null; lanUrls?: string[] }) => Promise<boolean>;
 };
 
 export type HubStatus = {

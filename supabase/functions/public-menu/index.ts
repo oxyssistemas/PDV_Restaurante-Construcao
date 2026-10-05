@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { dedicatedFor, relay } from '../_shared/relay.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,6 +30,12 @@ Deno.serve(async (req) => {
     if (!UUID.test(token)) return json({ error: 'QR Code inválido.' }, 400);
 
     const db = admin();
+
+    // loja com servidor dedicado (o QR leva ?r=<loja>): o servidor da loja responde
+    if (typeof body?.r === 'string' && UUID.test(body.r)) {
+      const target = await dedicatedFor(db as any, { restaurantId: body.r });
+      if (target) return relay(target, 'public-menu', body);
+    }
 
     const { data: table } = await db
       .from('restaurant_tables')

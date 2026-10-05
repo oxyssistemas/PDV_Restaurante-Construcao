@@ -3,8 +3,9 @@ import { useLocation } from 'react-router-dom';
 import { Loader2, ServerCog } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { IS_CENTRAL } from '@/lib/central';
+import { IS_CENTRAL, IS_DEDICATED } from '@/lib/central';
 import { switchTo } from '@/components/OfflineBanner';
+import { desktop } from '@/lib/desktop';
 
 type DedicatedServer = { restaurant_id: string; status: 'migrating' | 'active'; public_url: string | null; lan_urls: string[] };
 
@@ -16,7 +17,19 @@ const LAN_KEY = 'oxys.server.lan';
  * Depois do login na nuvem, a pessoa é levada na hora para o servidor da loja (mesma tela, já logada);
  * enquanto a migração dos dados acontece, as telas ficam em espera para nada ser gravado no lugar errado.
  */
+/** Aberto pelo próprio servidor dedicado: mantém o app de computador com os endereços atuais dele. */
+function useRememberThisServer() {
+  useEffect(() => {
+    if (!IS_DEDICATED || !desktop?.rememberServer) return;
+    fetch('/api/hello').then(r => r.json()).then((h: { lanUrls?: string[] }) => {
+      const here = window.location.origin;
+      desktop?.rememberServer?.({ publicUrl: here.startsWith('https:') ? here : null, lanUrls: h.lanUrls?.length ? h.lanUrls : [here] }).catch(() => {});
+    }).catch(() => {});
+  }, []);
+}
+
 export default function DedicatedGate({ children }: { children: ReactNode }) {
+  useRememberThisServer();
   const { user, currentRole } = useAuth();
   const { pathname } = useLocation();
   const [server, setServer] = useState<DedicatedServer | null | undefined>(undefined);
@@ -31,6 +44,8 @@ export default function DedicatedGate({ children }: { children: ReactNode }) {
       if (stop) return;
       const row = !error && data?.length ? (data[0] as DedicatedServer) : null;
       setServer(row);
+      // app de computador: guarda (ou esquece) o endereço do servidor da loja
+      if (!error) desktop?.rememberServer?.({ publicUrl: row?.status === 'active' ? row.public_url : null, lanUrls: row?.status === 'active' ? row.lan_urls ?? [] : [] }).catch(() => {});
       if (row?.lan_urls?.length) { try { localStorage.setItem('oxys.hub.urls', JSON.stringify(row.lan_urls)); localStorage.setItem(LAN_KEY, JSON.stringify(row.lan_urls)); } catch { /* sem armazenamento */ } }
       if (row?.status === 'migrating') setTimeout(load, 5000);
     };

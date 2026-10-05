@@ -15,6 +15,7 @@ const { Credentials } = require('./credentials.cjs');
 const { createServer } = require('./server.cjs');
 const { Tunnel } = require('./tunnel.cjs');
 const { OwnSupabase } = require('./ownsupabase.cjs');
+const { createPublicFunctions } = require('./publicfn.cjs');
 
 const PORT = Number(process.env.OXYS_SERVER_PORT || 8790);
 const CONTROL_MS = 60_000;            // equipe / plano / situação
@@ -59,6 +60,14 @@ class DedicatedServer {
     });
     this.tunnel = new Tunnel({ binDir, port: PORT, onUrl: () => this.control().catch(() => {}) });
     this.own = new OwnSupabase({ store: this.store, mirror: this.mirror, getSecret: () => this.ownSecret(), setStatus: () => this.state.changed() });
+    // loja online, cardápio QR, totem e avaliação respondidos aqui (a nuvem repassa os acessos da internet)
+    this.publicFns = createPublicFunctions({
+      mirror: this.mirror, dedicated: true,
+      publicBase: () => this.tunnel.url || this.config.tunnel?.publicUrl || null,
+      getRelaySecret: () => this.unseal(this.config.relaySecret || '') || null,
+      cloudReviewUrl: (order) => `https://www.oxysrestaurante.app/avaliar/${order.public_token}?r=${this.config.restaurantId}`,
+    });
+    this.mirror.reviewUrlFor = (order) => this.publicFns.reviewUrl(order);
 
     this.online = false;          // alcança a nuvem principal?
     this.suspended = false;       // super admin desativou o recurso
@@ -165,7 +174,12 @@ class DedicatedServer {
       const ctl = await this.call('control', {
         publicUrl: this.tunnel.url || this.config.tunnel?.publicUrl || null, lanUrls: lanUrls(PORT), version: this.version,
         ownSupabaseUrl: this.config.ownSupabase?.url || null,
+        storeSlug: this.mirror.ready ? this.mirror.rows('delivery_stores')[0]?.slug ?? null : undefined,
       });
+      if (ctl.relaySecret && this.unseal(this.config.relaySecret || '') !== ctl.relaySecret) {
+        this.config.relaySecret = this.seal(ctl.relaySecret);
+        this.saveConfig();
+      }
       this.credentials.takeFrom(ctl.staff); // hash das senhas vai para o cofre criptografado
       this.mirror.applyControl(ctl);
       this.suspended = !ctl.enabled;
@@ -194,6 +208,13 @@ class DedicatedServer {
       const { server, publish } = createServer({
         state: this.state, getConfig: () => this.config, uiDir: this.uiDir, getStatus: () => this.status(),
         mirror: this.mirror, auth: this.auth, mode: 'dedicated', isSuspended: () => this.suspended,
+        publicFns: this.publicFns,
+        media: {
+          dir: path.join(this.dataDir, 'media'),
+          sign: async (bucket, p) => (bucket === 'store-media'
+            ? `${this.cloudUrl}/storage/v1/object/public/store-media/${p.split('/').map(encodeURIComponent).join('/')}`
+            : (await this.call('media', { bucket, path: p }, { timeout: 15_000 })).url),
+        },
         cloudProxy: { url: this.cloudUrl, apikey: this.apikey, afterWrite: () => setTimeout(() => this.control(), 300) },
       });
       this.server = server;
@@ -207,8 +228,10 @@ class DedicatedServer {
     const every = (ms, fn) => { const t = setInterval(fn, ms); t.unref?.(); this.timers.push(t); };
     every(CONTROL_MS, () => this.control());
     every(3600e3, () => this.dailyBackup());
+    every(3600e3, () => this.mirror.runStockScheduler()); // agenda do balanço de estoque
     this.control();
     this.dailyBackup();
+    this.mirror.runStockScheduler();
   }
 
   stop() {

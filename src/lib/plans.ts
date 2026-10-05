@@ -1,7 +1,7 @@
 export type FeatureKey =
   | 'orders' | 'tables' | 'menu' | 'kitchen' | 'cashier' | 'inventory'
   | 'reports' | 'hr' | 'dre' | 'loyalty' | 'marketing' | 'branding'
-  | 'ai' | 'delivery' | 'fiscal' | 'crm';
+  | 'ai' | 'delivery' | 'fiscal' | 'crm' | 'branches';
 
 export const featureLabels: Record<FeatureKey, string> = {
   orders: 'Pedidos e comandas',
@@ -20,6 +20,7 @@ export const featureLabels: Record<FeatureKey, string> = {
   delivery: 'Delivery e entregadores',
   fiscal: 'Emissão fiscal',
   crm: 'CRM',
+  branches: 'Filiais (várias lojas)',
 };
 
 export const featureKeys = Object.keys(featureLabels) as FeatureKey[];

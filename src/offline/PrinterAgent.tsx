@@ -83,6 +83,6 @@ async function printJob(desktop: Desktop, job: PrintJobView, restaurantName: str
           payments: job.order.payments.map(x => ({ method: x.method, amount: Number(x.amount) })),
           change: job.order.payments.reduce((s, x) => s + Number(x.change_amount || 0), 0),
         });
-    await desktop.printHtml(html, { deviceName: p ? devices[p.id] : undefined });
+    await desktop.printHtml(await html, { deviceName: p ? devices[p.id] : undefined });
   }
 }

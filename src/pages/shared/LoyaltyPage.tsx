@@ -141,7 +141,7 @@ function ProgramTab({ restaurantId }: { restaurantId: string }) {
         <div className="flex items-center justify-between rounded-lg border p-4">
           <div>
             <p className="font-medium">Programa ativo</p>
-            <p className="text-sm text-muted-foreground">Quando desligado, nenhum ponto é acumulado.</p>
+            <p className="text-sm text-muted-foreground">O cliente acumula quando a conta é paga com o telefone dele informado no caixa (ou no pedido online). O cashback pode ser usado como forma de pagamento no caixa.</p>
           </div>
           <Switch checked={form.enabled} onCheckedChange={v => setForm({ ...form, enabled: v })} />
         </div>
@@ -331,6 +331,17 @@ function RewardsTab({ restaurantId }: { restaurantId: string }) {
 
 function AccountsTab({ restaurantId }: { restaurantId: string }) {
   const [q, setQ] = useState('');
+  const [statement, setStatement] = useState<{ id: string; name: string } | null>(null);
+  const { data: txs, isLoading: txLoading } = useQuery({
+    queryKey: ['loyalty-statement', statement?.id],
+    enabled: !!statement,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('loyalty_transactions').select('id, type, points, amount, description, created_at')
+        .eq('account_id', statement!.id).order('created_at', { ascending: false }).limit(100);
+      if (error) throw error;
+      return data || [];
+    },
+  });
   const { data: accounts, isLoading } = useQuery({
     queryKey: ['loyalty-accounts', restaurantId],
     queryFn: async () => {
@@ -358,7 +369,7 @@ function AccountsTab({ restaurantId }: { restaurantId: string }) {
       ) : (
         <div className="space-y-2">
           {list.map(a => (
-            <Card key={a.id}>
+            <Card key={a.id} className="cursor-pointer transition-colors hover:border-primary/40" onClick={() => setStatement({ id: a.id, name: a.customer_name })}>
               <CardContent className="flex flex-wrap items-center gap-3 p-3">
                 <div className="min-w-[160px] flex-1">
                   <p className="font-medium">{a.customer_name}</p>
@@ -372,6 +383,29 @@ function AccountsTab({ restaurantId }: { restaurantId: string }) {
           ))}
         </div>
       )}
+
+      <Dialog open={!!statement} onOpenChange={o => !o && setStatement(null)}>
+        <DialogContent className="max-h-[85vh] overflow-auto">
+          <DialogHeader><DialogTitle>Extrato · {statement?.name}</DialogTitle></DialogHeader>
+          {txLoading ? <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" /> : !txs?.length ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">Sem movimentações.</p>
+          ) : (
+            <ul className="space-y-2">
+              {txs.map(t => (
+                <li key={t.id} className="flex items-start justify-between gap-3 rounded-lg border p-2.5 text-sm">
+                  <div>
+                    <div className="font-medium">{t.type === 'earn' ? 'Ganhou' : t.type === 'redeem' ? 'Usou' : 'Ajuste'}</div>
+                    <div className="text-xs text-muted-foreground">{t.description} · {new Date(t.created_at).toLocaleString('pt-BR')}</div>
+                  </div>
+                  <span className={t.type === 'redeem' ? 'font-semibold text-destructive' : 'font-semibold text-[hsl(var(--success))]'}>
+                    {t.type === 'redeem' ? '−' : '+'}{Number(t.amount) > 0 ? brl(Number(t.amount)) : `${Number(t.points)} ${Number(t.points) === 1 ? 'selo/pt' : 'pts'}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

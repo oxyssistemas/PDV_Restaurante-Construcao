@@ -8,6 +8,7 @@ import { Bell, PackageX } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { notificationFor } from '@/lib/roles';
 
 export default function NotificationsBell() {
   const { currentRole } = useAuth();
@@ -26,7 +27,7 @@ export default function NotificationsBell() {
         .eq('restaurant_id', restaurantId!)
         .order('created_at', { ascending: false })
         .limit(30);
-      return (data || []).filter(n => !role || n.target_roles.includes(role));
+      return (data || []).filter(n => notificationFor(n.target_roles, role));
     },
   });
 
@@ -39,7 +40,7 @@ export default function NotificationsBell() {
         { event: 'INSERT', schema: 'public', table: 'notifications', filter: `restaurant_id=eq.${restaurantId}` },
         (payload: any) => {
           const n = payload.new;
-          if (role && !n.target_roles?.includes(role)) return;
+          if (!notificationFor(n.target_roles, role)) return;
           toast.warning(n.title, { description: n.message, duration: 8000 });
           queryClient.invalidateQueries({ queryKey: ['notifications'] });
         }

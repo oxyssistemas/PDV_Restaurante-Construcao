@@ -10,6 +10,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import PrintersCard from '@/components/admin/PrintersCard';
 import FiscalSettingsCard from '@/components/admin/FiscalSettingsCard';
+import ServiceChargeCard from '@/components/admin/ServiceChargeCard';
 
 export default function SettingsPage() {
   const { currentRole } = useAuth();
@@ -90,6 +91,8 @@ export default function SettingsPage() {
           </form>
         </CardContent>
       </Card>
+
+      {restaurantId && <ServiceChargeCard restaurantId={restaurantId} />}
 
       {restaurantId && (
         <FiscalSettingsCard restaurantId={restaurantId} role={currentRole?.role} />

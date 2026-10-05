@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
 export default function Index() {
-  const { user, loading, roles, isSuperAdmin } = useAuth();
+  const { user, loading, roles, isSuperAdmin, currentRole } = useAuth();
 
   if (loading) {
     return (
@@ -17,11 +17,13 @@ export default function Index() {
 
   if (isSuperAdmin) return <Navigate to="/super-admin" replace />;
 
-  // Route based on primary role
-  const role = roles.find(r => r.role !== 'super_admin');
+  // Rota pelo cargo na loja em que a pessoa está (dono/supervisor podem ter várias)
+  const role = currentRole && currentRole.role !== 'super_admin' ? currentRole : roles.find(r => r.role !== 'super_admin');
   if (role) {
     switch (role.role) {
-      case 'admin': return <Navigate to="/admin" replace />;
+      case 'admin':
+      case 'manager':
+      case 'supervisor': return <Navigate to="/admin" replace />;
       case 'waiter': return <Navigate to="/waiter" replace />;
       case 'kitchen': return <Navigate to="/kitchen" replace />;
       case 'cashier': return <Navigate to="/cashier" replace />;

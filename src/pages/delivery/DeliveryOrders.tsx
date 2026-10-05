@@ -87,7 +87,15 @@ export default function DeliveryOrders() {
       return data || [];
     },
   });
-  const paidOrderIds = new Set((payments || []).map(p => p.order_id));
+  // valor já pago por pedido (o cliente pode ter usado cashback na loja online)
+  const paidByOrder = new Map<string, number>();
+  (payments || []).forEach(p => paidByOrder.set(p.order_id, (paidByOrder.get(p.order_id) ?? 0) + Number(p.amount)));
+  const dueOf = (o: { id: string; total: number | string; delivery_fee?: number | string | null }) =>
+    Math.max(0, Math.round((Number(o.total) + Number(o.delivery_fee || 0) - (paidByOrder.get(o.id) ?? 0)) * 100) / 100);
+  const paidOrderIds = new Set((payments || []).map(p => p.order_id).filter(id => {
+    const o = (orders || []).find(x => x.id === id);
+    return !o || dueOf(o) < 0.01;
+  }));
 
   // Avisa quando entra pedido novo que a equipe não lançou (loja online, WhatsApp, iFood...).
   const seen = useRef<Set<string> | null>(null);
@@ -112,7 +120,7 @@ export default function DeliveryOrders() {
         order_id: order.id,
         restaurant_id: restaurantId!,
         method: method as any,
-        amount: Number(order.total) + Number(order.delivery_fee || 0),
+        amount: dueOf(order),
         user_id: auth.user.id,
       });
       if (error) throw error;
@@ -224,6 +232,9 @@ export default function DeliveryOrders() {
                           <span className="flex items-start gap-2 font-semibold">
                             <SourceBadge source={(o as any).source} className="shrink-0" />
                             <span>{o.customer_name || 'Cliente'}</span>
+                            {(o as any).ticket_number != null && (
+                              <span className="rounded-md bg-teal-500/15 px-1.5 py-0.5 text-xs font-bold text-teal-500">Senha {(o as any).ticket_number}</span>
+                            )}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(o.created_at), { addSuffix: true, locale: ptBR })}
@@ -236,7 +247,7 @@ export default function DeliveryOrders() {
                         )}
                         {pickup && (
                           <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                            <ShoppingBag className="h-3 w-3" /> Retirada no local
+                            <ShoppingBag className="h-3 w-3" /> {(o as any).source === 'kiosk' ? `Totem · ${o.notes ?? 'Retirada'}` : 'Retirada no local'}
                           </div>
                         )}
                         {o.customer_address && (
@@ -285,6 +296,11 @@ export default function DeliveryOrders() {
                             ))}
                           </SelectContent>
                         </Select>}
+                        {!paidOrderIds.has(o.id) && (paidByOrder.get(o.id) ?? 0) > 0 && (
+                          <div className="mt-2 text-[11px] text-[hsl(var(--success))]">
+                            Já pago {brl(paidByOrder.get(o.id) ?? 0)} (cashback) · falta {brl(dueOf(o))}
+                          </div>
+                        )}
                         {paidOrderIds.has(o.id) ? (
                           <div className="mt-2 rounded-lg border border-[hsl(var(--success))]/40 bg-[hsl(var(--success))]/10 px-2 py-1 text-[11px] text-[hsl(var(--success))]">
                             Pago · contabilizado no financeiro

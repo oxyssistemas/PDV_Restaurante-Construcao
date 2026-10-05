@@ -6,6 +6,7 @@ export const paymentMethodLabel: Record<string, string> = {
   credit_card: 'Cartão de Crédito',
   debit_card: 'Cartão de Débito',
   pix: 'PIX',
+  cashback: 'Cashback',
 };
 
 export function downloadCsv(filename: string, rows: (string | number)[][]) {

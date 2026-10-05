@@ -3,7 +3,7 @@
 // impressão direta nas térmicas sem janela, abrir com o computador, atualização automática
 // e a central do modo offline (hub/), que mantém a loja funcionando na rede local sem internet.
 
-const { app, BrowserWindow, ipcMain, shell, Menu, dialog, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Menu, dialog, safeStorage, net } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { Hub, PORT: HUB_PORT } = require('./hub/index.cjs');
@@ -32,8 +32,31 @@ if (!app.requestSingleInstanceLock()) {
   });
 }
 
+// ---------- servidor dedicado da loja ----------
+// O sistema avisa o endereço do servidor da loja (internet e rede local); o app guarda em disco para
+// abrir direto pela rede da loja quando o computador ligar já sem internet.
+const serverFile = () => path.join(app.getPath('userData'), 'oxys-servidor-da-loja.json');
+let storeServer = null; // { publicUrl, lanUrls: [], savedAt }
+function loadStoreServer() {
+  try { storeServer = JSON.parse(fs.readFileSync(serverFile(), 'utf8')); } catch { storeServer = null; }
+}
+const originOf = (u) => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.origin : null; } catch { return null; } };
+const serverOrigins = () => storeServer ? [storeServer.publicUrl, ...(storeServer.lanUrls || [])].map(originOf).filter(Boolean) : [];
+const isServerUrl = (url) => { const o = originOf(url); return !!o && serverOrigins().includes(o); };
+
+/** Primeiro endereço da rede da loja que responde (o servidor está ligado). */
+async function reachableLan() {
+  for (const lan of storeServer?.lanUrls || []) {
+    try {
+      const r = await net.fetch(`${originOf(lan)}/api/hello`, { signal: AbortSignal.timeout(2500) });
+      if (r.ok) return originOf(lan);
+    } catch { /* próximo */ }
+  }
+  return null;
+}
+
 const isAppUrl = (url) => {
-  try { return new URL(url).origin === APP_ORIGIN; } catch { return false; }
+  try { return new URL(url).origin === APP_ORIGIN || isServerUrl(url); } catch { return false; }
 };
 const isAuthUrl = (url) => {
   try {
@@ -65,8 +88,13 @@ function createWindow() {
   win.loadURL(APP_URL);
 
   // Sem internet: tela própria com "tentar de novo".
-  win.webContents.on('did-fail-load', (_e, code, _desc, url, isMainFrame) => {
+  win.webContents.on('did-fail-load', async (_e, code, _desc, url, isMainFrame) => {
     if (!isMainFrame || code === -3 || !isAppUrl(url)) return;
+    // Loja com servidor dedicado: sem internet, abre a mesma tela pelo servidor na rede da loja.
+    const lan = await reachableLan();
+    if (lan && !url.startsWith(lan)) {
+      try { const u = new URL(url); return win.loadURL(`${lan}${u.pathname}${u.search}`); } catch { return win.loadURL(lan); }
+    }
     // Sem internet: com a central ativa, abre o modo offline; senão a tela de "sem conexão".
     if (hub?.enabled) win.loadURL(centralUrl(url));
     else win.loadFile(path.join(__dirname, 'offline.html'));
@@ -114,9 +142,24 @@ ipcMain.handle('app:set-autostart', (e, enabled) => {
   return app.getLoginItemSettings().openAtLogin;
 });
 
-ipcMain.handle('app:retry', (e) => {
+ipcMain.handle('app:retry', async (e) => {
   fromApp(e);
-  win?.loadURL(APP_URL);
+  const lan = await reachableLan();
+  win?.loadURL(lan || APP_URL);
+});
+
+ipcMain.handle('server:remember', (e, info) => {
+  fromApp(e);
+  const lanUrls = (Array.isArray(info?.lanUrls) ? info.lanUrls : []).map(originOf).filter(Boolean).slice(0, 8);
+  const publicUrl = originOf(info?.publicUrl);
+  if (!lanUrls.length && !publicUrl) {
+    storeServer = null;
+    try { fs.rmSync(serverFile(), { force: true }); } catch { /* nada salvo */ }
+    return false;
+  }
+  storeServer = { publicUrl, lanUrls, savedAt: new Date().toISOString() };
+  fs.writeFileSync(serverFile(), JSON.stringify(storeServer, null, 2));
+  return true;
 });
 
 ipcMain.handle('printers:list', async (e) => {
@@ -146,7 +189,7 @@ ipcMain.handle('print:html', async (e, html, options = {}) => {
 // ---------- central offline ----------
 // Só o sistema (logado como administrador na nuvem) ativa; a chave vem da função offline-hub.
 function onlyCloud(event) {
-  if (!isAppUrl(event.senderFrame?.url ?? '')) throw new Error('Origem não autorizada');
+  if (originOf(event.senderFrame?.url ?? '') !== APP_ORIGIN) throw new Error('Origem não autorizada');
 }
 
 ipcMain.handle('hub:status', (e) => { fromApp(e); return hub ? hub.status() : { enabled: false }; });
@@ -226,6 +269,7 @@ app.whenReady().then(() => {
   const secure = safeStorage.isEncryptionAvailable()
     ? { encrypt: (text) => safeStorage.encryptString(text), decrypt: (buf) => safeStorage.decryptString(buf) }
     : null;
+  loadStoreServer();
   hub = new Hub({ dataDir: app.getPath('userData'), uiDir: offlineUiDir(), version: app.getVersion(), secure });
   if (hub.enabled) { hub.start(); hub.sync(); startPrinterWindow(); }
   createWindow();

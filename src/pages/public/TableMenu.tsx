@@ -25,6 +25,9 @@ interface MenuData {
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 async function callPublic<T>(body: Record<string, unknown>): Promise<T> {
+  // loja com servidor dedicado: o link traz ?r=<loja> e a nuvem repassa para o servidor dela
+  const r = new URLSearchParams(window.location.search).get('r');
+  if (r) body = { ...body, r };
   const { data, error } = await supabase.functions.invoke('public-menu', { body });
   if (error) {
     const ctx = (error as { context?: Response }).context;

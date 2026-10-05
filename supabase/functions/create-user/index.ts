@@ -35,11 +35,12 @@ serve(async (req) => {
       .select("role, restaurant_id")
       .eq("user_id", caller.id);
 
+    // Admin, gerente e supervisor administram a equipe das lojas em que têm esse cargo (filiais: cada uma a sua).
+    const ADMIN_LIKE = ["admin", "manager", "supervisor"];
     const isSuperAdmin = callerRoles?.some(r => r.role === "super_admin");
-    const isAdmin = callerRoles?.some(r => r.role === "admin");
-    const callerRestaurantId = callerRoles?.find(r => r.role === "admin")?.restaurant_id;
+    const adminOf = new Set((callerRoles ?? []).filter(r => ADMIN_LIKE.includes(r.role)).map(r => r.restaurant_id));
 
-    if (!isSuperAdmin && !isAdmin) {
+    if (!isSuperAdmin && !adminOf.size) {
       return new Response(JSON.stringify({ error: "Apenas super admins e admins podem criar usuários" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -53,14 +54,14 @@ serve(async (req) => {
       });
     }
 
-    // Admins can only create non-admin/non-super_admin roles for their own restaurant
-    if (isAdmin && !isSuperAdmin) {
-      if (role === "super_admin" || role === "admin") {
-        return new Response(JSON.stringify({ error: "Admins não podem criar outros admins ou super admins" }), {
+    if (!isSuperAdmin) {
+      // admins/gerentes/supervisores não criam admins, gerentes nem supervisores (isso é do dono, em Filiais)
+      if (["super_admin", "admin", "manager", "supervisor"].includes(role)) {
+        return new Response(JSON.stringify({ error: "Admins não podem criar outros admins, gerentes ou supervisores" }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (restaurant_id !== callerRestaurantId) {
+      if (!restaurant_id || !adminOf.has(restaurant_id)) {
         return new Response(JSON.stringify({ error: "Você só pode criar usuários para o seu restaurante" }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -74,15 +75,41 @@ serve(async (req) => {
       email_confirm: true,
     });
 
+    let userId = newUser?.user?.id as string | undefined;
+    let existing = false;
     if (createError) {
-      return new Response(JSON.stringify({ error: createError.message }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Email que já tem conta (cliente da loja online ou funcionário de outra loja): usa a mesma conta.
+      // A senha não muda — a pessoa entra com a senha que já usa (ou "Esqueci minha senha").
+      const { data: found } = await supabaseAdmin.rpc("auth_user_by_email", { _email: email });
+      const acc = Array.isArray(found) ? found[0] : null;
+      if (!acc || !/already|registered|exists/i.test(createError.message)) {
+        return new Response(JSON.stringify({ error: createError.message }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (acc.is_super) {
+        return new Response(JSON.stringify({ error: "Este email não pode ser usado na equipe." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // conta de outra empresa não é puxada (só clientes ou alguém da própria rede)
+      if (!isSuperAdmin && (acc.roles ?? []).some((r: string) => !adminOf.has(r.split(":")[1]))) {
+        return new Response(JSON.stringify({ error: "Este email já pertence à equipe de outra loja. Use outro email." }), {
+          status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if ((acc.roles ?? []).some((r: string) => r.endsWith(`:${restaurant_id ?? ""}`))) {
+        return new Response(JSON.stringify({ error: "Esta pessoa já faz parte da equipe desta loja." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      userId = acc.id;
+      existing = true;
     }
 
     // Assign role
     const { error: roleError } = await supabaseAdmin.from("user_roles").insert({
-      user_id: newUser.user.id,
+      user_id: userId,
       role,
       restaurant_id: restaurant_id || null,
     });
@@ -91,6 +118,13 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: roleError.message }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (existing) {
+      return new Response(JSON.stringify({
+        user: { id: userId, email }, existing: true,
+        message: "Este email já tinha conta (cliente ou outra loja). A pessoa entra com a senha que já usa; a senha digitada aqui não foi aplicada.",
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({ user: newUser.user }), {

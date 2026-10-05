@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { Loader2, RefreshCw, Check, X, Store, UploadCloud } from 'lucide-react';
 import { ifoodCatalogSync, ifoodOrderAction, ifoodStoreStatus, ifoodSync } from '@/lib/ifood';
+import { isAdminLike } from '@/lib/roles';
 
 const decisionLabels: Record<string, string> = {
   pending: 'Aguardando decisão',
@@ -23,7 +24,7 @@ const decisionLabels: Record<string, string> = {
 export default function IfoodPage() {
   const { currentRole } = useAuth();
   const restaurantId = currentRole?.restaurant_id ?? null;
-  const isAdmin = currentRole?.role === 'admin' || currentRole?.role === 'super_admin';
+  const isAdmin = isAdminLike(currentRole?.role) || currentRole?.role === 'super_admin';
   const qc = useQueryClient();
   const [merchantId, setMerchantId] = useState('');
 

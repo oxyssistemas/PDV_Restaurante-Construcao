@@ -37,6 +37,8 @@ A plataforma busca simplificar a operação diária do restaurante, reduzindo pr
 * Cancelamento de itens e pedidos
 * Controle de caixa
 * Histórico de vendas
+* Autoatendimento (totem/tablet no balcão) com senha do pedido
+* Pedidos do iFood, 99Food, Keeta e Rappi no mesmo painel
 
 ### 🪑 Gestão de Mesas
 
@@ -76,9 +78,15 @@ Sistema desenvolvido para facilitar o atendimento diretamente no salão.
 * Histórico de movimentações
 * Controle de ingredientes
 * Alertas de estoque baixo
+* Balanço de estoque periódico (contagem às cegas, motivos das diferenças, relatório assinado em PDF/planilha e envio para a matriz)
+* Custo do prato (CMV) e margem pela ficha técnica
 
 ### 💰 Financeiro
 
+* Taxa de serviço e couvert na conta
+* Fidelidade com pontos, selos ou cashback (cashback como forma de pagamento)
+* Avaliação pós-pedido (NPS) com QR Code no recibo
+* Pacote mensal para o contador (XMLs das NFC-e e planilhas)
 * Controle de entradas
 * Controle de saídas
 * Fluxo de caixa
@@ -535,6 +543,16 @@ O **app de computador do caixa** vira a *central* da loja (`desktop/hub/`):
 - Teste sem derrubar a internet: abrir o app com `OXYS_FORCE_OFFLINE=1`.
 
 **NFC-e em contingência:** hoje a nota é emitida assim que a internet volta. A contingência offline oficial da SEFAZ (nota assinada na hora, sem internet) depende do emissor fiscal contratado e do certificado na central.
+
+## 🏢 Filiais (plano Enterprise)
+
+- **Liberar (super admin):** em Restaurantes, numa loja Enterprise, defina "Filiais: X de **N**" (limite). O recurso `branches` está ligado só no plano Enterprise.
+- **Criar (dono):** Admin → **Filiais** → *Nova filial* (nome, endereço, telefone; opção de começar com uma cópia do cardápio da matriz). Cada filial é um restaurante próprio (`restaurants.parent_id` = matriz), com cardápio, equipe, caixa, estoque e relatórios separados. O dono entra como admin de cada filial automaticamente.
+- **Cargos:** *Gerente* (`manager`) administra uma filial, como o admin; *Supervisor* (`supervisor`) administra as filiais a que for ligado (mesmo email em várias). Ligados/desligados pelo dono na tela Filiais (função `branches`). Gerentes e supervisores criam a equipe da própria loja em Usuários, mas não criam admins, gerentes, supervisores nem filiais.
+- **Trocar de loja:** dono e supervisor usam o seletor no topo do painel (`set_active_restaurant`). As regras de acesso olham a loja ativa (`get_user_restaurant_id`), e o cargo que vale é o cargo nessa loja (`has_role`); gerente e supervisor contam como admin nas lojas deles.
+- **Painel da rede** (Admin → Painel da rede, para quem tem mais de uma loja): faturamento, pedidos, ticket médio, caixas abertos, faturamento por dia de cada loja, mais vendidos e formas de pagamento, somando as lojas que a pessoa administra (`network_summary`).
+- **Enviar cardápio:** em Filiais → *Enviar cardápio*, a matriz atualiza as filiais escolhidas com o que for marcado (itens novos; nomes, descrições, fotos, categorias e dados fiscais; preços; disponibilidade). Cada cópia lembra o item de origem (`source_id`); itens criados só na filial, a ficha técnica e o iFood de cada loja não são mexidos.
+- Migrações: `20261004010000_branch_roles.sql`, `20261004010100_branches.sql` e `20261004020000_network_panel_menu_sync.sql` (inclui a proteção de plano/situação/limite, que só o super admin altera).
 
 ## 🖥️ Servidor dedicado por loja (recurso contratado)
 

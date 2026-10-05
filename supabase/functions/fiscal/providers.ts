@@ -41,6 +41,8 @@ export interface FiscalProvider {
   needsCompanySync: boolean;
   emit(input: NfceInput, ctx: ProviderContext): Promise<EmitResult>;
   consult?(ref: string, environment: Environment, ctx: ProviderContext): Promise<EmitResult>;
+  /** XML autorizado da nota (para guardar e mandar ao contador). */
+  fetchXml?(invoice: { xml_url: string | null; environment: Environment }, ctx: ProviderContext): Promise<string | null>;
   cancel(ref: string, environment: Environment, reason: string, ctx: ProviderContext): Promise<{ protocol: string | null; raw: unknown }>;
   syncCompany?(company: CompanyData, certificate: { base64: string; password: string } | null, account: Account | null):
     Promise<Account>;
@@ -211,6 +213,14 @@ export const focusProvider: FiscalProvider = {
   async consult(ref, environment, ctx) {
     const res = await focusFetch(`${focusHost(environment)}/v2/nfce/${encodeURIComponent(ref)}?completa=1`, companyToken(ctx, environment));
     return focusResult(res.body);
+  },
+  async fetchXml(invoice, ctx) {
+    if (!invoice.xml_url) return null;
+    // o caminho vem da Focus; o servidor certo depende do ambiente da nota
+    const url = invoice.xml_url.replace(/^https:\/\/api\.focusnfe\.com\.br/, focusHost(invoice.environment));
+    const res = await fetch(url, { headers: { Authorization: basic(companyToken(ctx, invoice.environment)) } });
+    if (!res.ok) return null;
+    return await res.text();
   },
   async cancel(ref, environment, reason, ctx) {
     const res = await focusFetch(`${focusHost(environment)}/v2/nfce/${encodeURIComponent(ref)}`, companyToken(ctx, environment),

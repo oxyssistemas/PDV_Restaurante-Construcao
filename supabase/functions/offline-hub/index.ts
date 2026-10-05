@@ -65,6 +65,16 @@ Deno.serve(async (req) => {
         return json({ hubId: hub.id, channelToken: hub.channel_token, snapshot: data });
       }
 
+      // foto do cardápio / logo da própria loja: endereço temporário para baixar e guardar no computador
+      if (action === 'media') {
+        const bucket = String(body?.bucket ?? '');
+        const path = String(body?.path ?? '');
+        if (bucket !== 'menu-images' || !path.startsWith(`${hub.restaurant_id}/`) || path.includes('..')) return json({ error: 'Arquivo inválido.' }, 400);
+        const { data, error } = await sb.storage.from(bucket).createSignedUrl(path, 300);
+        if (error || !data) return json({ error: 'Arquivo não encontrado.' }, 404);
+        return json({ url: data.signedUrl });
+      }
+
       if (action === 'push') {
         const ops = Array.isArray(body?.ops) ? body.ops.slice(0, 500) : [];
         if (!ops.every((o: any) => UUID.test(String(o?.id ?? '')) && typeof o?.type === 'string')) return json({ error: 'Operações inválidas.' }, 400);

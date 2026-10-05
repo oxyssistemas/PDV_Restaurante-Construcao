@@ -22,17 +22,17 @@ export type MyOrder = {
   id: string; code: string; created_at: string; delivery_status: string; order_type: string; total: number; delivery_fee: number; public_token: string | null;
   order_items: { quantity: number; status: string; menu_items: { name: string } | null }[];
 };
-export type CustomerAccount = { email: string | null; profile: CustomerProfile | null; orders: MyOrder[] };
+export type CustomerAccount = { email: string | null; profile: CustomerProfile | null; orders: MyOrder[]; cashback?: { balance: number; percent: number } | null };
 
 export type TrackedOrder = {
   id: string; code: string; order_type: string; delivery_status: string; total: number; delivery_fee: number;
   customer_name: string | null; customer_address: string | null; payment_hint: string | null; change_for: number | null; created_at: string;
   order_items: { quantity: number; unit_price: number; status: string; notes: string | null; menu_items: { name: string } | null }[];
 };
-export type TrackData = { order: TrackedOrder; store: { slug: string; whatsapp: string | null; eta_minutes: number; pickup_eta_minutes: number } | null };
+export type TrackData = { order: TrackedOrder; store: { slug: string; whatsapp: string | null; eta_minutes: number; pickup_eta_minutes: number } | null; review_ref?: string };
 
 export const PAYMENT_LABELS: Record<string, string> = {
-  cash: 'Dinheiro', credit_card: 'Cartão de crédito', debit_card: 'Cartão de débito', pix: 'Pix',
+  cash: 'Dinheiro', credit_card: 'Cartão de crédito', debit_card: 'Cartão de débito', pix: 'Pix', counter: 'no caixa (totem)',
 };
 
 export const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });

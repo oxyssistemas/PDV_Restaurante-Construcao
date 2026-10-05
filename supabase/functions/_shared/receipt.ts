@@ -26,8 +26,8 @@ const dt = (v?: string | null) => {
   return d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 const TYPE_LABELS: Record<string, string> = { dine_in: 'Mesa', delivery: 'Delivery', takeaway: 'Retirada' };
-const METHOD_LABELS: Record<string, string> = { cash: 'Dinheiro', credit_card: 'Cartao Credito', debit_card: 'Cartao Debito', pix: 'PIX' };
-const NFCE_METHODS: Record<string, string> = { '01': 'Dinheiro', '03': 'Cartao de Credito', '04': 'Cartao de Debito', '17': 'PIX', '99': 'Outros' };
+const METHOD_LABELS: Record<string, string> = { cash: 'Dinheiro', credit_card: 'Cartao Credito', debit_card: 'Cartao Debito', pix: 'PIX', cashback: 'Cashback' };
+const NFCE_METHODS: Record<string, string> = { '01': 'Dinheiro', '03': 'Cartao de Credito', '04': 'Cartao de Debito', '05': 'Credito Loja', '17': 'PIX', '99': 'Outros' };
 
 function orderHeader(doc: any, title: string): Op[] {
   const o = doc.order ?? {};
@@ -56,6 +56,15 @@ function items(doc: any, prices: boolean): Op[] {
     if (i.notes) ops.push({ t: 'text', s: `> Obs: ${i.notes}` });
   }
   return ops;
+}
+
+/** Taxa de serviço e couvert cobrados na conta. */
+function extraRows(order: any): Op[] {
+  const out: Op[] = [];
+  const svc = Number(order?.service_fee ?? 0), cv = Number(order?.couvert_total ?? 0);
+  if (svc > 0) out.push({ t: 'row', l: order?.service_percent != null ? `Servico (${Number(order.service_percent)}%)` : 'Servico', r: money(svc) });
+  if (cv > 0) out.push({ t: 'row', l: `${order?.couvert_label || 'Couvert'}${order?.people_count ? ` x${order.people_count}` : ''}`, r: money(cv) });
+  return out;
 }
 
 /** Operações do documento, já com vias, textos de topo/rodapé e corte. */
@@ -91,7 +100,9 @@ export function layout(doc: any, printer: PrinterOptions): Op[] {
       { t: 'sep' },
       { t: 'row', l: 'Subtotal', r: money(sub) },
       ...(fee > 0 ? [{ t: 'row', l: 'Taxa entrega', r: money(fee) } as Op] : []),
-      { t: 'row', l: 'TOTAL', r: money(doc.order?.total ?? sub + fee), bold: true, big: true },
+      ...extraRows(doc.order),
+      // no momento do pagamento o total da comanda ainda pode estar sem a taxa/couvert
+      { t: 'row', l: 'TOTAL', r: money(Math.max(Number(doc.order?.total ?? 0), sub + fee + Number(doc.order?.service_fee ?? 0) + Number(doc.order?.couvert_total ?? 0))), bold: true, big: true },
       { t: 'sep' },
       ...(doc.payments ?? []).map((p: any) => ({ t: 'row', l: METHOD_LABELS[p.method] ?? p.method, r: money(p.amount) } as Op)),
       { t: 'row', l: 'Pago', r: money(paid) },
@@ -99,6 +110,12 @@ export function layout(doc: any, printer: PrinterOptions): Op[] {
       { t: 'sep' },
       { t: 'text', s: 'Documento sem valor fiscal', align: 'center' },
       { t: 'text', s: 'Obrigado pela preferencia!', align: 'center' },
+      ...(doc.review_url ? [
+        { t: 'sep' } as Op,
+        { t: 'text', s: 'Avalie seu pedido', align: 'center', bold: true } as Op,
+        { t: 'text', s: 'Aponte a camera do celular', align: 'center' } as Op,
+        { t: 'qr', data: String(doc.review_url) } as Op,
+      ] : []),
     ];
   } else if (k === 'nfce') {
     const e = doc.emitter ?? {};
@@ -288,7 +305,7 @@ export function toPlainText(ops: Op[], width: '58mm' | '80mm'): string {
     else if (op.t === 'row') out.push(...row(op.l, op.r, cols));
     else if (op.t === 'sep') out.push('-'.repeat(cols));
     else if (op.t === 'feed') out.push(...Array(op.n).fill(''));
-    else if (op.t === 'qr') out.push(center('[QR Code: consulte pela chave de acesso]'));
+    else if (op.t === 'qr') out.push(...(op.data.includes('/avaliar/') ? wrap(op.data, cols) : [center('[QR Code: consulte pela chave de acesso]')]));
   }
   return out.join('\n') + '\n';
 }

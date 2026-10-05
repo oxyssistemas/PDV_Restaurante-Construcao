@@ -25,6 +25,9 @@ export const fiscalApi = {
   danfe: (rid: string, invoiceId: string) => call<{ document: NfceDocument }>(rid, 'danfe', { invoiceId }),
   print: (rid: string, invoiceId: string) => call<{ printers: number }>(rid, 'print', { invoiceId }),
   syncCompany: (rid: string, certificatePassword?: string) => call<{ ok: true }>(rid, 'sync_company', { certificatePassword }),
+  accountantPackage: (rid: string, month: string) => call<{ export: { id: string }; url: string }>(rid, 'accountant_package', { month }),
+  accountantLink: (rid: string, exportId: string) => call<{ url: string }>(rid, 'accountant_link', { exportId }),
+  accountantContact: (rid: string, contact: { name: string; email: string; phone: string }) => call<{ ok: true }>(rid, 'accountant_contact', contact),
 };
 
 export const SIMULATED_PROVIDER = 'simulado';

@@ -103,7 +103,14 @@ export default function Restaurants() {
               <TableBody>
                 {restaurants?.map(r => (
                   <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div>{r.name}</div>
+                      {r.parent_id ? (
+                        <div className="text-xs text-muted-foreground">Filial de {restaurants?.find(p => p.id === r.parent_id)?.name ?? '—'}</div>
+                      ) : r.plan_code === 'enterprise' && (
+                        <BranchLimit id={r.id} limit={r.branch_limit} used={restaurants?.filter(b => b.parent_id === r.id).length ?? 0} />
+                      )}
+                    </TableCell>
                     <TableCell>{r.phone || '—'}</TableCell>
                     <TableCell className="capitalize">{r.subscription_plan}</TableCell>
                     <TableCell>
@@ -291,5 +298,25 @@ function CreateAdminForm({ restaurantId, restaurantName, onSuccess }: {
         </DialogFooter>
       </form>
     </>
+  );
+}
+
+/** Limite de filiais da matriz (plano Enterprise): o dono cria filiais até esse número. */
+function BranchLimit({ id, limit, used }: { id: string; limit: number; used: number }) {
+  const queryClient = useQueryClient();
+  const [value, setValue] = useState(String(limit));
+  const save = async () => {
+    const n = Math.max(0, Math.floor(Number(value) || 0));
+    if (n === limit) return;
+    const { error } = await supabase.from('restaurants').update({ branch_limit: n }).eq('id', id);
+    if (error) toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    else { toast({ title: `Limite: ${n} filial(is)` }); queryClient.invalidateQueries({ queryKey: ['super-admin-restaurants'] }); }
+  };
+  return (
+    <label className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+      Filiais: {used} de
+      <Input type="number" min={0} value={value} onChange={e => setValue(e.target.value)} onBlur={save}
+        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} className="h-7 w-16 px-2 text-xs" />
+    </label>
   );
 }

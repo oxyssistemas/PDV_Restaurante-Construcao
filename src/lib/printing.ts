@@ -76,6 +76,15 @@ export interface PrintOrder {
   order_type?: string | null;
   notes?: string | null;
   delivery_fee?: number | null;
+  /** taxa de serviço e couvert cobrados na conta */
+  service_fee?: number | null;
+  service_label?: string | null;
+  couvert?: number | null;
+  couvert_label?: string | null;
+  /** mesmos dados vindos do banco (fila de impressão) */
+  couvert_total?: number | null;
+  service_percent?: number | null;
+  people_count?: number | null;
   total?: number | null;
   created_by_name?: string | null;
   created_by_role?: string | null;
@@ -106,6 +115,7 @@ const methodLabels: Record<string, string> = {
   credit_card: 'Cartao Credito',
   debit_card: 'Cartao Debito',
   pix: 'PIX',
+  cashback: 'Cashback',
 };
 
 function shell(width: ThermalWidth, body: string) {
@@ -172,6 +182,16 @@ function header(restaurantName: string, title: string, order: PrintOrder) {
   return lines.join('');
 }
 
+/** Taxa de serviço e couvert (quando cobrados). */
+function extrasBlock(order: PrintOrder) {
+  const out: string[] = [];
+  const svcLabel = order.service_label || (order.service_percent != null ? `Servico (${Number(order.service_percent)}%)` : 'Servico');
+  const couvert = Number(order.couvert ?? order.couvert_total ?? 0);
+  if (Number(order.service_fee || 0) > 0) out.push(`<div class="row"><span>${esc(svcLabel)}</span><span>${money(Number(order.service_fee))}</span></div>`);
+  if (couvert > 0) out.push(`<div class="row"><span>${esc(order.couvert_label || 'Couvert')}${order.people_count ? ` x${order.people_count}` : ''}</span><span>${money(couvert)}</span></div>`);
+  return out.join('');
+}
+
 function itemsBlock(items: PrintItem[], showPrices: boolean) {
   const rows = items.map(i => {
     const line = showPrices
@@ -219,6 +239,7 @@ function orderTicketBody(opts: OrderTicketOptions) {
     '<div class="sep"></div>',
     showPrices ? `<div class="row"><span>Subtotal</span><span>${money(subtotal)}</span></div>` : '',
     showPrices && fee > 0 ? `<div class="row"><span>Taxa entrega</span><span>${money(fee)}</span></div>` : '',
+    showPrices ? extrasBlock(order) : '',
     showPrices ? `<div class="row total"><span>TOTAL</span><span>${money(order.total ?? subtotal + fee)}</span></div>` : '',
     order.notes ? `<div class="sep"></div><div class="small">Obs.: ${esc(order.notes)}</div>` : '',
     '<div class="sep"></div>',
@@ -245,13 +266,15 @@ type ReceiptOptions = {
   width?: ThermalWidth;
   footerNote?: string;
   config?: PrinterConfig | null;
+  /** link da avaliação do pedido (vira QR Code no rodapé) */
+  reviewUrl?: string | null;
 };
 
-function receiptBody(opts: ReceiptOptions) {
+function receiptBody(opts: ReceiptOptions, reviewQr?: string | null) {
   const { restaurantName, order, items, payments, change = 0 } = opts;
   const subtotal = items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
   const fee = Number(order.delivery_fee || 0);
-  const total = order.total ?? subtotal + fee;
+  const total = Math.max(Number(order.total ?? 0), subtotal + fee + Number(order.service_fee || 0) + Number(order.couvert ?? order.couvert_total ?? 0));
   const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
   const body = [
     header(restaurantName, 'Recibo de pagamento', order),
@@ -259,6 +282,7 @@ function receiptBody(opts: ReceiptOptions) {
     '<div class="sep"></div>',
     `<div class="row"><span>Subtotal</span><span>${money(subtotal)}</span></div>`,
     fee > 0 ? `<div class="row"><span>Taxa entrega</span><span>${money(fee)}</span></div>` : '',
+    extrasBlock(order),
     `<div class="row total"><span>TOTAL</span><span>${money(total)}</span></div>`,
     '<div class="sep"></div>',
     payments
@@ -269,18 +293,28 @@ function receiptBody(opts: ReceiptOptions) {
     '<div class="sep"></div>',
     `<div class="center small">${esc(opts.footerNote || 'Documento sem valor fiscal')}</div>`,
     `<div class="center small">Obrigado pela preferencia!</div>`,
+    reviewQr ? `<div class="sep"></div><div class="center bold">Avalie seu pedido</div><div class="center small">Aponte a camera do celular</div><div class="center" style="margin:4px 0"><img src="${reviewQr}" style="width:30mm;height:30mm" /></div>` : '',
     `<div class="center small">${esc(dt())}</div>`,
     '<div class="small">&nbsp;</div><div class="small">&nbsp;</div>',
   ].join('');
   return body;
 }
 
+/** QR Code (imagem) do link da avaliação. */
+async function reviewQrOf(url?: string | null) {
+  if (!url) return null;
+  try {
+    const { default: QRCode } = await import('qrcode');
+    return await QRCode.toDataURL(url, { margin: 0, width: 200, errorCorrectionLevel: 'M' });
+  } catch { return null; }
+}
+
 /** HTML do recibo de pagamento (sem valor fiscal). */
-export const renderReceipt = (opts: ReceiptOptions) => compose(receiptBody(opts), opts.config, opts.width);
+export const renderReceipt = async (opts: ReceiptOptions) => compose(receiptBody(opts, await reviewQrOf(opts.reviewUrl)), opts.config, opts.width);
 
 /** Recibo de pagamento (nao possui valor fiscal). */
-export function printReceipt(opts: ReceiptOptions) {
-  emit(receiptBody(opts), opts.config, opts.width);
+export async function printReceipt(opts: ReceiptOptions) {
+  emit(receiptBody(opts, await reviewQrOf(opts.reviewUrl)), opts.config, opts.width);
 }
 
 // ---------- DANFE NFC-e ----------

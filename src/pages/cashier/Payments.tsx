@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import {
-  Loader2, ReceiptText, Banknote, CreditCard, Smartphone, Users, Search, MoreHorizontal, Wallet, Bike, Printer, Plus, Trash2,
+  Loader2, ReceiptText, Banknote, CreditCard, Smartphone, Users, Search, MoreHorizontal, Wallet, Bike, Printer, Plus, Trash2, Gift,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useMemo, useState } from 'react';
@@ -17,6 +18,9 @@ import { printReceipt } from '@/lib/printing';
 import { usePrinterSettings } from '@/hooks/usePrinterSettings';
 import { logAudit } from '@/lib/audit';
 import DeliverySaleDialog from '@/components/delivery/DeliverySaleDialog';
+import { couvertOf, percentLabel, serviceFeeOf, useServiceSettings } from '@/lib/serviceCharge';
+import { PUBLIC_ORIGIN } from '@/lib/native';
+import { IS_DEDICATED } from '@/lib/central';
 
 const methods = [
   { value: 'cash', label: 'Dinheiro', icon: Banknote },
@@ -25,7 +29,13 @@ const methods = [
   { value: 'pix', label: 'PIX', icon: Smartphone },
 ];
 
-const methodLabel = (v: string) => methods.find(m => m.value === v)?.label || v;
+const methodLabel = (v: string) => (v === 'cashback' ? 'Cashback' : methods.find(m => m.value === v)?.label || v);
+
+/** Saldo de fidelidade do cliente (pelo telefone). */
+type LoyaltyInfo = {
+  found: boolean; enabled: boolean; mode: string | null; phone?: string; name?: string | null;
+  cashback: number; points: number; stamps: number; stamps_required?: number; cashback_percent?: number;
+};
 
 interface PayLine { id: string; method: string; amount: string }
 
@@ -43,6 +53,18 @@ export default function Payments() {
   const [receivedAmount, setReceivedAmount] = useState('');
   const [search, setSearch] = useState('');
   const [deliverySaleOpen, setDeliverySaleOpen] = useState(false);
+  const { data: service } = useServiceSettings(restaurantId);
+  const { data: feedback } = useQuery({
+    queryKey: ['feedback-settings', restaurantId],
+    enabled: !!restaurantId,
+    queryFn: async () => (await supabase.from('feedback_settings').select('enabled, print_on_receipt').eq('restaurant_id', restaurantId!).maybeSingle()).data,
+  });
+  const [serviceOn, setServiceOn] = useState(true);
+  const [couvertOn, setCouvertOn] = useState(true);
+  const [people, setPeople] = useState('');
+  const [phone, setPhone] = useState('');
+  const [loyalty, setLoyalty] = useState<LoyaltyInfo | null>(null);
+  const [lookingUp, setLookingUp] = useState(false);
 
   const { data: restaurant } = useQuery({
     queryKey: ['restaurant-name', restaurantId],
@@ -91,7 +113,7 @@ export default function Payments() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, table_id, total, status, customer_name, created_at, created_by_name, created_by_role')
+        .select('id, table_id, total, status, customer_name, created_at, created_by_name, created_by_role, service_fee, couvert_total, people_count, customer_phone, public_token')
         .eq('restaurant_id', restaurantId!)
         .is('archived_at', null)
         .in('status', ['pending', 'preparing', 'ready', 'delivered'])
@@ -125,8 +147,24 @@ export default function Payments() {
     },
   });
 
-  const orderTotal = (id: string) =>
+  const itemsTotal = (id: string) =>
     round2((items || []).filter(i => i.order_id === id).reduce((s, i) => s + Number(i.unit_price) * i.quantity, 0));
+
+  // taxa de serviço e couvert: o valor gravado na comanda vale; sem valor gravado, calcula com as opções do caixa
+  const couvertOrderId = tableOrders.find(o => o.couvert_total != null)?.id ?? tableOrders[0]?.id;
+  const peopleCount = people === '' ? (tables?.find(t => t.id === selectedTableId)?.capacity ?? 0) : Math.max(0, parseInt(people) || 0);
+  const serviceOf = (id: string) => {
+    const o = tableOrders.find(x => x.id === id);
+    if (o?.service_fee != null) return Number(o.service_fee);
+    return serviceOn ? serviceFeeOf(itemsTotal(id), service) : 0;
+  };
+  const couvertFor = (id: string) => {
+    if (id !== couvertOrderId) return 0;
+    const o = tableOrders.find(x => x.id === id);
+    if (o?.couvert_total != null) return Number(o.couvert_total);
+    return couvertOn ? couvertOf(peopleCount, service) : 0;
+  };
+  const orderTotal = (id: string) => round2(itemsTotal(id) + serviceOf(id) + couvertFor(id));
 
   /** Comandas com saldo em aberto na mesa. */
   const pendingOrders = useMemo(
@@ -134,6 +172,13 @@ export default function Payments() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [tableOrders, items]
   );
+
+  // telefone já gravado na comanda (pedido de delivery, cliente identificado antes)
+  useEffect(() => {
+    const known = tableOrders.find(o => o.customer_phone)?.customer_phone;
+    if (known && !phone) { setPhone(known); lookupLoyalty(known); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTableId, tableOrders.length]);
 
   // seleciona automaticamente todas as comandas com saldo ao trocar de mesa
   useEffect(() => {
@@ -157,6 +202,11 @@ export default function Payments() {
 
   const selectedOrders = tableOrders.filter(o => selectedOrderIds.includes(o.id));
   const selectedTotal = round2(selectedOrders.reduce((s, o) => s + orderTotal(o.id), 0));
+  const selectedItems = round2(selectedOrders.reduce((s, o) => s + itemsTotal(o.id), 0));
+  const selectedService = round2(selectedOrders.reduce((s, o) => s + serviceOf(o.id), 0));
+  const selectedCouvert = round2(selectedOrders.reduce((s, o) => s + couvertFor(o.id), 0));
+  const serviceLocked = selectedOrders.some(o => o.service_fee != null);
+  const couvertLocked = selectedOrders.some(o => o.id === couvertOrderId && o.couvert_total != null);
   const selectedPaid = round2(selectedOrders.reduce((s, o) => s + o.paid, 0));
   const dueNow = round2(Math.max(0, selectedTotal - selectedPaid));
 
@@ -175,7 +225,18 @@ export default function Payments() {
     ]);
   };
 
-  const resetPayment = () => { setLines([]); setReceivedAmount(''); };
+  const resetPayment = () => { setLines([]); setReceivedAmount(''); setServiceOn(true); setCouvertOn(true); setPeople(''); setPhone(''); setLoyalty(null); };
+
+  const lookupLoyalty = async (value = phone) => {
+    if (value.replace(/\D/g, '').length < 10) { setLoyalty(null); return; }
+    setLookingUp(true);
+    const { data, error } = await supabase.rpc('loyalty_lookup', { _phone: value });
+    setLookingUp(false);
+    if (error) { setLoyalty(null); toast.error('Não foi possível consultar a fidelidade agora.'); return; }
+    setLoyalty(data as unknown as LoyaltyInfo);
+  };
+  const cashbackAvailable = loyalty?.enabled && loyalty.mode === 'cashback' ? Number(loyalty.cashback) : 0;
+  const cashbackLines = round2(lines.filter(l => l.method === 'cashback').reduce((s, l) => s + (parseFloat(l.amount) || 0), 0));
 
   const toggleOrder = (id: string) =>
     setSelectedOrderIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
@@ -186,6 +247,30 @@ export default function Payments() {
       if (!selectedOrders.length) throw new Error('Selecione ao menos uma comanda');
       if (linesTotal <= 0) throw new Error('Informe ao menos uma forma de pagamento');
       if (linesTotal - dueNow > 0.009) throw new Error('Valor informado maior que o saldo devedor');
+      if (cashbackLines > 0.009 && cashbackLines - cashbackAvailable > 0.009) throw new Error('Cashback maior que o saldo do cliente');
+
+      // cliente identificado: fica na comanda (acumula fidelidade quando a conta fecha e permite usar o cashback)
+      const digits = phone.replace(/\D/g, '');
+      if (digits.length >= 10) {
+        for (const o of selectedOrders) {
+          if ((o.customer_phone ?? '').replace(/\D/g, '').endsWith(digits.slice(-10))) continue;
+          const patch: { customer_phone: string; customer_name?: string } = { customer_phone: phone.trim() };
+          if (!o.customer_name && loyalty?.name) patch.customer_name = loyalty.name;
+          const { error } = await supabase.from('orders').update(patch).eq('id', o.id);
+          if (error) throw error;
+        }
+      } else if (cashbackLines > 0) throw new Error('Informe o telefone do cliente para usar o cashback');
+
+      // grava a taxa de serviço e o couvert da conta (ficam fixos a partir do primeiro pagamento)
+      for (const o of selectedOrders) {
+        const patch: { service_fee?: number; couvert_total?: number; people_count?: number } = {};
+        if (o.service_fee == null) patch.service_fee = serviceOf(o.id);
+        if (o.id === couvertOrderId && o.couvert_total == null) { patch.couvert_total = couvertFor(o.id); patch.people_count = peopleCount; }
+        if (Object.keys(patch).length) {
+          const { error } = await supabase.from('orders').update(patch).eq('id', o.id);
+          if (error) throw error;
+        }
+      }
 
       // saldo devedor por comanda (ordem de criação)
       const balances = selectedOrders.map(o => ({ id: o.id, due: round2(orderTotal(o.id) - o.paid) })).filter(b => b.due > 0.009);
@@ -302,6 +387,10 @@ export default function Payments() {
         customer_name: selectedOrders.map((o: any, i) => o.customer_name || `Comanda ${i + 1}`).join(' / '),
         table_number: selectedTable?.number ?? null,
         total: selectedTotal,
+        service_fee: selectedService,
+        service_label: service?.service_enabled ? `Servico (${percentLabel(service.service_percent)})` : 'Servico',
+        couvert: selectedCouvert,
+        couvert_label: service?.couvert_label,
         created_by_name: first.created_by_name,
         created_by_role: first.created_by_role,
       },
@@ -317,6 +406,8 @@ export default function Payments() {
         .map(l => ({ method: l.method, amount: parseFloat(l.amount) || 0 })),
       change,
       config: getConfig('receipt'),
+      reviewUrl: feedback?.enabled !== false && feedback?.print_on_receipt !== false && first.public_token
+        ? `${PUBLIC_ORIGIN}/avaliar/${first.public_token}${IS_DEDICATED ? `?r=${restaurantId}` : ''}` : null,
     });
     logAudit({
       restaurantId: restaurantId!,
@@ -419,13 +510,64 @@ export default function Payments() {
 
       <div className="pdv-card space-y-4 p-4">
         <div className="space-y-1 text-sm">
-          <div className="flex justify-between text-muted-foreground"><span>Consumo selecionado</span><span>R$ {selectedTotal.toFixed(2)}</span></div>
+          <div className="flex justify-between text-muted-foreground"><span>Consumo selecionado</span><span>R$ {selectedItems.toFixed(2)}</span></div>
+          {(service?.service_enabled || selectedService > 0) && (
+            <div className="flex items-center justify-between gap-2 text-muted-foreground">
+              <label className="flex items-center gap-2">
+                <Switch checked={serviceLocked ? selectedService > 0 : serviceOn} disabled={serviceLocked || !selectedOrders.length}
+                  onCheckedChange={setServiceOn} aria-label="Cobrar taxa de serviço" />
+                Taxa de serviço{service?.service_enabled ? ` (${percentLabel(service.service_percent)})` : ''}
+              </label>
+              <span>R$ {selectedService.toFixed(2)}</span>
+            </div>
+          )}
+          {(service?.couvert_enabled || selectedCouvert > 0) && (
+            <div className="flex items-center justify-between gap-2 text-muted-foreground">
+              <label className="flex items-center gap-2">
+                <Switch checked={couvertLocked ? selectedCouvert > 0 : couvertOn} disabled={couvertLocked || !selectedOrders.length}
+                  onCheckedChange={setCouvertOn} aria-label="Cobrar couvert" />
+                {service?.couvert_label || 'Couvert'}
+                {!couvertLocked && couvertOn && selectedOrders.some(o => o.id === couvertOrderId) && (
+                  <Input type="number" min="0" step="1" className="h-7 w-16 rounded-lg px-2 text-xs" aria-label="Pessoas"
+                    value={people === '' ? String(peopleCount) : people} onChange={e => setPeople(e.target.value)} />
+                )}
+                {couvertLocked
+                  ? <span className="text-xs">{tableOrders.find(o => o.id === couvertOrderId)?.people_count ?? 0} pessoa(s)</span>
+                  : couvertOn && selectedOrders.some(o => o.id === couvertOrderId) && <span className="text-xs">pessoa(s)</span>}
+              </label>
+              <span>R$ {selectedCouvert.toFixed(2)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-muted-foreground"><span>Já pago</span><span>R$ {selectedPaid.toFixed(2)}</span></div>
         </div>
 
         <div className="flex items-end justify-between border-t border-border pt-3">
           <span className="text-sm text-muted-foreground">Saldo devedor</span>
           <span className="text-3xl font-bold text-primary">R$ {dueNow.toFixed(2)}</span>
+        </div>
+
+        <div className="space-y-1.5 rounded-xl border border-border p-2.5">
+          <Label className="flex items-center gap-1.5 text-xs"><Gift className="h-3.5 w-3.5 text-primary" /> Cliente (fidelidade e cashback)</Label>
+          <div className="flex gap-2">
+            <Input className="h-9 rounded-lg" inputMode="tel" placeholder="Telefone com DDD" value={phone}
+              onChange={e => { setPhone(e.target.value); if (loyalty) setLoyalty(null); }}
+              onBlur={() => lookupLoyalty()} onKeyDown={e => { if (e.key === 'Enter') lookupLoyalty(); }} disabled={!selectedOrders.length} />
+            <Button variant="outline" size="sm" className="h-9 rounded-lg" onClick={() => lookupLoyalty()} disabled={lookingUp || !selectedOrders.length}>
+              {lookingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Consultar'}
+            </Button>
+          </div>
+          {loyalty && (
+            <p className="text-xs text-muted-foreground">
+              {!loyalty.enabled ? 'Programa de fidelidade desligado.'
+                : !loyalty.found ? 'Cliente novo no programa: acumula ao fechar a conta.'
+                : <>
+                    <b className="text-foreground">{loyalty.name || 'Cliente'}</b>
+                    {loyalty.mode === 'cashback' && <> · saldo de cashback <b className="text-[hsl(var(--success))]">R$ {Number(loyalty.cashback).toFixed(2)}</b></>}
+                    {loyalty.mode === 'points' && <> · {Number(loyalty.points)} pontos</>}
+                    {loyalty.mode === 'stamps' && <> · {loyalty.stamps}/{loyalty.stamps_required} selos</>}
+                  </>}
+            </p>
+          )}
         </div>
 
         <div>
@@ -445,6 +587,21 @@ export default function Payments() {
                 <Plus className="ml-auto h-3.5 w-3.5" />
               </button>
             ))}
+            {cashbackAvailable > 0.009 && (
+              <button
+                onClick={() => {
+                  const rest = round2(dueNow - linesTotal);
+                  const amount = Math.min(rest, round2(cashbackAvailable - cashbackLines));
+                  if (amount <= 0) return;
+                  setLines(prev => [...prev, { id: crypto.randomUUID(), method: 'cashback', amount: amount.toFixed(2) }]);
+                }}
+                disabled={!selectedOrders.length || cashbackLines >= cashbackAvailable - 0.009}
+                className="pdv-ripple col-span-2 flex items-center gap-2 rounded-xl border border-[hsl(var(--success))]/40 px-3 py-3 text-sm font-medium text-[hsl(var(--success))] transition-all duration-200 hover:bg-[hsl(var(--success))]/10 disabled:opacity-40"
+              >
+                <Gift className="h-4 w-4" /> Usar cashback (R$ {round2(cashbackAvailable - cashbackLines).toFixed(2)} disponível)
+                <Plus className="ml-auto h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         </div>
 

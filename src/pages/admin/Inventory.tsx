@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
@@ -51,7 +52,10 @@ export default function InventoryPage() {
           <h1 className="text-3xl font-bold tracking-tight">Estoque de Ingredientes</h1>
           <p className="text-sm text-muted-foreground">Cadastre aqui os ingredientes usados nas fichas técnicas do cardápio (baixa automática).</p>
         </div>
-        <InventoryDialog restaurantId={restaurantId!} />
+        <div className="flex gap-2">
+          <Button asChild variant="outline"><Link to="/admin/stock-counts">Balanço de estoque</Link></Button>
+          <InventoryDialog restaurantId={restaurantId!} />
+        </div>
       </div>
 
       {isLoading ? (

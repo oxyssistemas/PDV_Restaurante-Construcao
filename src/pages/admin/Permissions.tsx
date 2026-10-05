@@ -10,12 +10,9 @@ import { Loader2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { ModuleKey, moduleKeys, moduleLabels, defaultModuleAccess } from '@/lib/modules';
 import { logAudit } from '@/lib/audit';
+import { ROLE_LABELS } from '@/lib/roles';
 
-const roleLabels: Record<string, string> = {
-  admin: 'Admin', waiter: 'Garçom', kitchen: 'Cozinha', cashier: 'Caixa',
-  finance: 'Financeiro', delivery: 'Delivery', courier: 'Entregador',
-  hr: 'RH', marketing: 'Marketing',
-};
+const roleLabels = ROLE_LABELS;
 
 interface PermRow { module: string; can_view: boolean; can_edit: boolean; user_id: string }
 

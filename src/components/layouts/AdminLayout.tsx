@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import {
   UtensilsCrossed, LayoutDashboard, BookOpen, Grid3X3, Users, Package, Settings, LogOut, Menu, Bike,
   Building2, History, Briefcase, PieChart, Gift, Palette, Sparkles, Megaphone, ShieldCheck,
-  ShoppingBag,
+  ShoppingBag, Network, LineChart, ClipboardCheck, MessageSquareHeart, FileArchive, MonitorSmartphone, Store,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
@@ -12,22 +12,31 @@ import { useState } from 'react';
 import NotificationsBell from '@/components/NotificationsBell';
 import { ModuleKey } from '@/lib/modules';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
+import { useCurrentStore } from '@/hooks/useCurrentStore';
+import StoreSwitcher from '@/components/StoreSwitcher';
 
-const navItems: { to: string; icon: typeof Users; label: string; end: boolean; module?: ModuleKey }[] = [
+const navItems: { to: string; icon: typeof Users; label: string; end: boolean; module?: ModuleKey; branches?: true; network?: true }[] = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
+  { to: '/admin/network', icon: LineChart, label: 'Painel da rede', end: false, network: true },
   { to: '/admin/assistant', icon: Sparkles, label: 'Assistente IA', end: false, module: 'ai' },
   { to: '/admin/crm', icon: Building2, label: 'CRM', end: false },
   { to: '/admin/menu', icon: BookOpen, label: 'Cardápio', end: false },
   { to: '/admin/tables', icon: Grid3X3, label: 'Mesas', end: false },
+  { to: '/admin/kiosks', icon: MonitorSmartphone, label: 'Autoatendimento', end: false },
   { to: '/admin/inventory', icon: Package, label: 'Estoque', end: false },
+  { to: '/admin/stock-counts', icon: ClipboardCheck, label: 'Balanço de estoque', end: false },
   { to: '/admin/hr', icon: Briefcase, label: 'RH', end: false, module: 'hr' },
   { to: '/admin/dre', icon: PieChart, label: 'DRE', end: false, module: 'dre' },
   { to: '/admin/loyalty', icon: Gift, label: 'Fidelidade', end: false, module: 'loyalty' },
+  { to: '/admin/reviews', icon: MessageSquareHeart, label: 'Avaliações (NPS)', end: false },
   { to: '/marketing', icon: Megaphone, label: 'Marketing', end: false, module: 'marketing' },
+  { to: '/admin/accountant', icon: FileArchive, label: 'Pacote do contador', end: false },
   { to: '/admin/history', icon: History, label: 'Histórico', end: false },
   { to: '/delivery', icon: Bike, label: 'Delivery', end: false },
   { to: '/admin/couriers', icon: Bike, label: 'Entregadores', end: false },
   { to: '/admin/ifood', icon: ShoppingBag, label: 'iFood', end: false },
+  { to: '/admin/marketplaces', icon: Store, label: '99Food, Keeta e Rappi', end: false },
+  { to: '/admin/branches', icon: Network, label: 'Filiais', end: false, branches: true },
   { to: '/admin/users', icon: Users, label: 'Usuários', end: false },
   { to: '/admin/permissions', icon: ShieldCheck, label: 'Permissões', end: false },
   { to: '/admin/branding', icon: Palette, label: 'Identidade visual', end: false, module: 'branding' },
@@ -39,9 +48,10 @@ const navItems: { to: string; icon: typeof Users; label: string; end: boolean; m
 
 
 export default function AdminLayout() {
-  const { signOut, user } = useAuth();
+  const { signOut, user, stores } = useAuth();
   const { canView } = useModuleAccess();
-  const visibleItems = navItems.filter(i => !i.module || canView(i.module));
+  const { canManageBranches } = useCurrentStore();
+  const visibleItems = navItems.filter(i => (!i.module || canView(i.module)) && (!i.branches || canManageBranches) && (!i.network || stores.length > 1));
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -55,6 +65,7 @@ export default function AdminLayout() {
       <div className="flex h-16 shrink-0 items-center gap-3 px-6 border-b border-sidebar-border">
         <BrandLogo fallbackIcon={UtensilsCrossed} fallbackName="Administração" />
       </div>
+      <StoreSwitcher />
 
       <nav className="flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-4">
         {visibleItems.map(item => (

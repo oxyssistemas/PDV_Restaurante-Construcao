@@ -26,6 +26,13 @@ import MenuPage from "./pages/admin/Menu";
 import TablesPage from "./pages/admin/Tables";
 import InventoryPage from "./pages/admin/Inventory";
 import UsersPage from "./pages/admin/Users";
+import BranchesPage from "./pages/admin/Branches";
+import NetworkPage from "./pages/admin/Network";
+import FinanceCmvPage from './pages/finance/Cmv';
+import ReviewsPage from './pages/shared/ReviewsPage';
+import AccountantPage from './pages/shared/AccountantPage';
+import StockCountsPage from "./pages/shared/StockCounts";
+import StockCountDetailPage from "./pages/shared/StockCountDetail";
 import SettingsPage from "./pages/admin/Settings";
 import CrmPage from "./pages/admin/Crm";
 import FinanceCrmPage from "./pages/finance/FinanceCrm";
@@ -58,6 +65,10 @@ import StoreSettings from "./pages/delivery/StoreSettings";
 import WhatsAppBot from "./pages/delivery/WhatsAppBot";
 import OnlineStore from "./pages/public/OnlineStore";
 import OrderTracking from "./pages/public/OrderTracking";
+import ReviewOrder from "./pages/public/ReviewOrder";
+import Kiosk from "./pages/public/Kiosk";
+import KiosksPage from "./pages/admin/Kiosks";
+import MarketplacesPage from "./pages/admin/Marketplaces";
 
 import CourierLayout from "./components/layouts/CourierLayout";
 import MyDeliveries from "./pages/courier/MyDeliveries";
@@ -110,6 +121,8 @@ const App = () => (
             <Route path="/mesa/:token" element={<TableMenu />} />
             <Route path="/pedir/:slug" element={<OnlineStore />} />
             <Route path="/pedir/:slug/pedido/:orderId" element={<OrderTracking />} />
+            <Route path="/avaliar/:token" element={<ReviewOrder />} />
+            <Route path="/totem/:token" element={<Kiosk />} />
             <Route path="/privacidade" element={<Privacy />} />
             <Route path="/termos" element={<Terms />} />
             <Route path="/impressao" element={<ProtectedRoute><PrintStation /></ProtectedRoute>} />
@@ -127,7 +140,7 @@ const App = () => (
 
             {/* Admin do Restaurante */}
             <Route path="/admin" element={
-              <ProtectedRoute allowedRoles={['admin']}>
+              <ProtectedRoute allowedRoles={['admin', 'manager', 'supervisor']}>
                 <AdminLayout />
               </ProtectedRoute>
             }>
@@ -137,6 +150,14 @@ const App = () => (
               <Route path="tables" element={<TablesPage />} />
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="users" element={<UsersPage />} />
+              <Route path="branches" element={<BranchesPage />} />
+              <Route path="network" element={<NetworkPage />} />
+              <Route path="stock-counts" element={<StockCountsPage />} />
+              <Route path="stock-counts/:id" element={<StockCountDetailPage />} />
+              <Route path="reviews" element={<ReviewsPage />} />
+              <Route path="accountant" element={<AccountantPage />} />
+              <Route path="kiosks" element={<KiosksPage />} />
+              <Route path="marketplaces" element={<MarketplacesPage />} />
               <Route path="permissions" element={<PermissionsPage />} />
               <Route path="couriers" element={<CouriersPage />} />
               <Route path="history" element={<OrdersHistory />} />
@@ -203,6 +224,11 @@ const App = () => (
               <Route path="reports" element={<RoleGate roles={['finance']}><FinanceReports /></RoleGate>} />
               <Route path="inventory" element={<RoleGate roles={['finance']}><FinanceInventory /></RoleGate>} />
               <Route path="history" element={<RoleGate roles={['finance']}><OrdersHistory /></RoleGate>} />
+              <Route path="stock-counts" element={<RoleGate roles={['finance']}><StockCountsPage /></RoleGate>} />
+              <Route path="stock-counts/:id" element={<RoleGate roles={['finance']}><StockCountDetailPage /></RoleGate>} />
+              <Route path="cmv" element={<RoleGate roles={['finance']}><FinanceCmvPage /></RoleGate>} />
+              <Route path="reviews" element={<RoleGate roles={['finance']}><ReviewsPage /></RoleGate>} />
+              <Route path="accountant" element={<RoleGate roles={['finance']}><AccountantPage /></RoleGate>} />
               <Route path="hr" element={<HrPage />} />
               <Route path="dre" element={<DrePage />} />
               <Route path="loyalty" element={<LoyaltyPage />} />

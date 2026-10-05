@@ -18,6 +18,7 @@ import { Bot, Hand, Loader2, MessageCircle, Send, UserRound } from 'lucide-react
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { callBot } from '@/lib/deliveryStore';
+import { isAdminLike } from '@/lib/roles';
 
 type Settings = { enabled: boolean; greeting: string; closed_message: string; notify_status: boolean; human_pause_minutes: number };
 const DEFAULTS: Settings = {
@@ -110,7 +111,7 @@ export default function WhatsAppBot() {
                 <div className="space-y-2">
                   <p>1. Um administrador conecta a conta Meta do restaurante em <strong>Marketing → Conexões</strong> (a mesma do Instagram e Facebook).</p>
                   <p>2. Volte aqui e escolha o número.</p>
-                  {currentRole?.role === 'admin' && <Button asChild size="sm" variant="outline"><Link to="/marketing/connections">Abrir Conexões</Link></Button>}
+                  {isAdminLike(currentRole?.role) && <Button asChild size="sm" variant="outline"><Link to="/marketing/connections">Abrir Conexões</Link></Button>}
                 </div>
               ) : !overview.accounts.length ? (
                 <p>A conta Meta conectada não tem número de WhatsApp Business. Cadastre o número no Gerenciador do WhatsApp da Meta e conecte de novo em Marketing → Conexões.</p>

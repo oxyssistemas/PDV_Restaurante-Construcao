@@ -2,7 +2,7 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { FiscalRejection, type NfceInput, type NfceItem } from './providers.ts';
 
 // Códigos de forma de pagamento da NFC-e (tPag).
-const PAYMENT_CODES: Record<string, string> = { cash: '01', credit_card: '03', debit_card: '04', pix: '17' };
+const PAYMENT_CODES: Record<string, string> = { cash: '01', credit_card: '03', debit_card: '04', pix: '17', cashback: '05' }; // 05 = crédito loja
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Monta os dados da NFC-e a partir da nota (e do pedido ligado a ela). */
@@ -23,13 +23,14 @@ export async function buildNfce(admin: SupabaseClient, invoice: any): Promise<Nf
 
   if (invoice.order_id) {
     const [{ data: order }, { data: rows }, { data: pays }] = await Promise.all([
-      admin.from('orders').select('delivery_fee').eq('id', invoice.order_id).maybeSingle(),
+      admin.from('orders').select('delivery_fee, service_fee, couvert_total').eq('id', invoice.order_id).maybeSingle(),
       admin.from('order_items')
         .select('quantity, unit_price, status, menu_item_id, menu_items(id, name, ncm, cfop, csosn, origin, commercial_unit)')
         .eq('order_id', invoice.order_id).neq('status', 'cancelled').order('created_at'),
       admin.from('payments').select('method, amount, change_amount').eq('order_id', invoice.order_id).order('created_at'),
     ]);
-    deliveryFee = Number(order?.delivery_fee ?? 0);
+    // taxa de entrega, taxa de serviço e couvert entram como "outras despesas"
+    deliveryFee = round2(Number(order?.delivery_fee ?? 0) + Number(order?.service_fee ?? 0) + Number(order?.couvert_total ?? 0));
     items = (rows ?? []).map((r: any) => {
       const m = r.menu_items ?? {};
       const q = Number(r.quantity), price = Number(r.unit_price);
@@ -53,7 +54,7 @@ export async function buildNfce(admin: SupabaseClient, invoice: any): Promise<Nf
     payments = ((invoice.payments ?? []) as any[]).map(x => ({ code: PAYMENT_CODES[x.method] ?? '99', amount: Number(x.amount) }));
   }
 
-  // Taxa de entrega vai como "outras despesas" no primeiro item.
+  // Taxa de entrega / serviço / couvert vão como "outras despesas" no primeiro item.
   if (deliveryFee > 0 && items.length) items[0] = { ...items[0], other_expenses: deliveryFee };
 
   const total = round2(items.reduce((s, i) => s + i.total, 0) + deliveryFee - Number(invoice.discount ?? 0));

@@ -24,3 +24,15 @@ verify_jwt = false
 
 [functions.dedicated-server]
 verify_jwt = false
+
+[functions.branches]
+verify_jwt = false
+
+[functions.order-review]
+verify_jwt = false
+
+[functions.kiosk]
+verify_jwt = false
+
+[functions.marketplace-webhook]
+verify_jwt = false

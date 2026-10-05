@@ -113,6 +113,7 @@ export default function OnlineStore() {
   const [complement, setComplement] = useState(saved.complement ?? '');
   const [zone, setZone] = useState(saved.zone ?? '');
   const [payment, setPayment] = useState('');
+  const [useCashback, setUseCashback] = useState(true);
   const [changeFor, setChangeFor] = useState('');
   const [notes, setNotes] = useState('');
   const sections = useRef<Record<string, HTMLElement | null>>({});
@@ -199,6 +200,7 @@ export default function OnlineStore() {
         address: mode === 'delivery' ? [address.trim(), complement.trim()].filter(Boolean).join(' · ') : '',
         address_line: address.trim(), complement: complement.trim(),
         zone: mode === 'delivery' ? zone : '',
+        use_cashback: cashbackUse > 0,
         items: lines.map(l => ({ menu_item_id: l.item!.id, quantity: l.qty, notes: l.notes || null })),
       },
     }),
@@ -251,6 +253,11 @@ export default function OnlineStore() {
   }
 
   const phoneOk = phone.replace(/\D/g, '').length >= 10;
+  // cashback do cliente (programa de fidelidade da loja): abate do total, o restante é pago na entrega/retirada
+  const cashbackBalance = Number(account?.cashback?.balance ?? 0);
+  const samePhone = !!account?.profile?.phone && account.profile.phone.replace(/\D/g, '').slice(-10) === phone.replace(/\D/g, '').slice(-10);
+  const cashbackUse = userId && useCashback && samePhone && cashbackBalance >= 0.01 ? Math.min(cashbackBalance, total) : 0;
+  const toPay = Math.max(0, total - cashbackUse);
   const canSubmit = store.is_open && count > 0 && !belowMin && name.trim().length >= 2 && phoneOk && !!payment
     && (mode === 'pickup' || (address.trim().length >= 5 && (!store.zones.length || !!zone)));
 
@@ -685,13 +692,22 @@ export default function OnlineStore() {
               {mode === 'delivery' && (
                 <div className="flex justify-between text-muted-foreground"><span>Entrega</span><span>{store.zones.length && !zone ? 'escolha o bairro' : fee > 0 ? brl(fee) : 'grátis'}</span></div>
               )}
-              <div className="flex justify-between pt-1 text-lg font-extrabold"><span>Total</span><span>{brl(total)}</span></div>
+              {userId && samePhone && cashbackBalance >= 0.01 && (
+                <label className="flex cursor-pointer items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-emerald-400">
+                  <span className="flex items-center gap-2">
+                    <input type="checkbox" checked={useCashback} onChange={e => setUseCashback(e.target.checked)} className="h-4 w-4 accent-emerald-500" />
+                    Usar meu cashback ({brl(cashbackBalance)})
+                  </span>
+                  {cashbackUse > 0 && <span>−{brl(cashbackUse)}</span>}
+                </label>
+              )}
+              <div className="flex justify-between pt-1 text-lg font-extrabold"><span>{cashbackUse > 0 ? 'A pagar' : 'Total'}</span><span>{brl(toPay)}</span></div>
               {belowMin && <p className="text-xs font-semibold text-red-400">Pedido mínimo: {brl(store.min_order)}</p>}
             </div>
             {userId ? (
               <Button size="lg" className="h-12 w-full gap-2 rounded-2xl text-base font-bold shadow-[0_14px_30px_-12px_rgba(225,29,42,0.8)]" disabled={!canSubmit || submit.isPending} onClick={() => submit.mutate()}>
                 {submit.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                {store.is_open ? `Fazer pedido · ${brl(total)}` : 'Loja fechada'}
+                {store.is_open ? `Fazer pedido · ${brl(toPay)}` : 'Loja fechada'}
               </Button>
             ) : (
               <>

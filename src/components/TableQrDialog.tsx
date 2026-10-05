@@ -6,7 +6,9 @@ import { Label } from '@/components/ui/label';
 import { DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Copy, Download, Printer, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { publicOrigin } from '@/lib/native';
+import { PUBLIC_ORIGIN, publicOrigin } from '@/lib/native';
+import { IS_DEDICATED } from '@/lib/central';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Props {
   tableNumber: number;
@@ -16,7 +18,9 @@ interface Props {
 
 export default function TableQrDialog({ tableNumber, qrToken, brandName }: Props) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
-  const link = `${publicOrigin()}/mesa/${qrToken}`;
+  const { currentRole } = useAuth();
+  // servidor dedicado: o QR aponta para o endereço de sempre e a nuvem repassa para o servidor da loja
+  const link = IS_DEDICATED ? `${PUBLIC_ORIGIN}/mesa/${qrToken}?r=${currentRole?.restaurant_id ?? ''}` : `${publicOrigin()}/mesa/${qrToken}`;
 
   useEffect(() => {
     QRCode.toDataURL(link, { width: 600, margin: 1 })

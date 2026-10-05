@@ -30,7 +30,7 @@ const navItems = [
 ];
 
 export default function CashierLayout() {
-  const { signOut, user } = useAuth();
+  const { signOut, user, currentRole } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [now, setNow] = useState(new Date());
@@ -41,11 +41,14 @@ export default function CashierLayout() {
   }, []);
 
   const { data: register } = useQuery({
-    queryKey: ['cashier-open-register-bar'],
+    // caixa da loja em que a pessoa está (dono/supervisor enxergam várias lojas)
+    queryKey: ['cashier-open-register-bar', currentRole?.restaurant_id],
+    enabled: !!currentRole?.restaurant_id,
     queryFn: async () => {
       const { data } = await supabase
         .from('cash_registers')
         .select('id, opened_at, opening_amount')
+        .eq('restaurant_id', currentRole!.restaurant_id!)
         .is('closed_at', null)
         .order('opened_at', { ascending: false })
         .limit(1)
