@@ -12,6 +12,7 @@ import {
   Circle,
   Clock,
   Printer,
+  Bike,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
@@ -20,10 +21,14 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import SideNavShell from './SideNavShell';
+import { ModuleKey } from '@/lib/modules';
+import { useModuleAccess } from '@/hooks/useModuleAccess';
 
-const navItems = [
+const navItems: { to: string; icon: typeof Wallet; label: string; end: boolean; module?: ModuleKey }[] = [
   { to: '/cashier', icon: Wallet, label: 'Caixa', end: true },
   { to: '/cashier/orders', icon: ShoppingCart, label: 'Lançar Pedido', end: false },
+  { to: '/cashier/delivery', icon: Bike, label: 'Delivery', end: false, module: 'delivery' },
   { to: '/cashier/payments', icon: ReceiptText, label: 'Pagamentos', end: false },
   { to: '/cashier/movements', icon: ArrowDownUp, label: 'Movimentações', end: false },
   { to: '/impressao', icon: Printer, label: 'Impressão', end: false },
@@ -31,6 +36,8 @@ const navItems = [
 
 export default function CashierLayout() {
   const { signOut, user, currentRole } = useAuth();
+  const { canView } = useModuleAccess();
+  const visibleItems = navItems.filter(i => !i.module || canView(i.module));
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [now, setNow] = useState(new Date());
@@ -78,7 +85,7 @@ export default function CashierLayout() {
       </div>
 
       <nav className="pdv-scroll flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {navItems.map(item => (
+        {visibleItems.map(item => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -114,17 +121,9 @@ export default function CashierLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
-      <aside
-        className={cn(
-          'fixed inset-y-0 left-0 z-50 w-[260px] transform transition-transform duration-200 lg:relative lg:translate-x-0',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        )}
-      >
+      <SideNavShell open={sidebarOpen} onClose={() => setSidebarOpen(false)} widthClass="w-[260px]">
         {sidebar}
-      </aside>
+      </SideNavShell>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex h-14 items-center gap-3 border-b border-border px-4 lg:hidden">

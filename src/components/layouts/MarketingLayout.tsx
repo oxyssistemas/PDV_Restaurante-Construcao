@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
 import { useState } from 'react';
 import NotificationsBell from '@/components/NotificationsBell';
+import SideNavShell from './SideNavShell';
 
 const navItems = [
   { to: '/marketing', icon: LayoutDashboard, label: 'Visão geral', end: true },
@@ -56,10 +57,9 @@ export default function MarketingLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />}
-      <aside className={cn('fixed inset-y-0 left-0 z-50 w-64 transform transition-transform lg:relative lg:translate-x-0', sidebarOpen ? 'translate-x-0' : '-translate-x-full')}>
+      <SideNavShell open={sidebarOpen} onClose={() => setSidebarOpen(false)}>
         {sidebar}
-      </aside>
+      </SideNavShell>
       <main className="flex min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain">
         <div className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-4 border-b bg-background px-4">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}><Menu className="h-5 w-5" /></Button>

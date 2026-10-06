@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -31,6 +31,8 @@ import NetworkPage from "./pages/admin/Network";
 import FinanceCmvPage from './pages/finance/Cmv';
 import ReviewsPage from './pages/shared/ReviewsPage';
 import AccountantPage from './pages/shared/AccountantPage';
+import FiscalPage from './pages/shared/FiscalPage';
+import ModuleGate from "./components/ModuleGate";
 import StockCountsPage from "./pages/shared/StockCounts";
 import StockCountDetailPage from "./pages/shared/StockCountDetail";
 import SettingsPage from "./pages/admin/Settings";
@@ -69,6 +71,7 @@ import ReviewOrder from "./pages/public/ReviewOrder";
 import Kiosk from "./pages/public/Kiosk";
 import KiosksPage from "./pages/admin/Kiosks";
 import MarketplacesPage from "./pages/admin/Marketplaces";
+import DeliveryHub, { DeliveryOverview } from "./pages/admin/DeliveryHub";
 
 import CourierLayout from "./components/layouts/CourierLayout";
 import MyDeliveries from "./pages/courier/MyDeliveries";
@@ -144,31 +147,46 @@ const App = () => (
                 <AdminLayout />
               </ProtectedRoute>
             }>
-              <Route index element={<AdminDashboard />} />
-              <Route path="crm" element={<CrmPage />} />
-              <Route path="menu" element={<MenuPage />} />
-              <Route path="tables" element={<TablesPage />} />
-              <Route path="inventory" element={<InventoryPage />} />
-              <Route path="users" element={<UsersPage />} />
-              <Route path="branches" element={<BranchesPage />} />
-              <Route path="network" element={<NetworkPage />} />
-              <Route path="stock-counts" element={<StockCountsPage />} />
-              <Route path="stock-counts/:id" element={<StockCountDetailPage />} />
-              <Route path="reviews" element={<ReviewsPage />} />
-              <Route path="accountant" element={<AccountantPage />} />
-              <Route path="kiosks" element={<KiosksPage />} />
-              <Route path="marketplaces" element={<MarketplacesPage />} />
-              <Route path="permissions" element={<PermissionsPage />} />
-              <Route path="couriers" element={<CouriersPage />} />
-              <Route path="history" element={<OrdersHistory />} />
-              <Route path="hr" element={<HrPage />} />
-              <Route path="dre" element={<DrePage />} />
-              <Route path="loyalty" element={<LoyaltyPage />} />
-              <Route path="branding" element={<BrandingPage />} />
-              <Route path="assistant" element={<AssistantPage />} />
+              <Route index element={<ModuleGate module="dashboard"><AdminDashboard /></ModuleGate>} />
+              <Route path="crm" element={<ModuleGate module="crm"><CrmPage /></ModuleGate>} />
+              <Route path="menu" element={<ModuleGate module="menu"><MenuPage /></ModuleGate>} />
+              <Route path="tables" element={<ModuleGate module="tables"><TablesPage /></ModuleGate>} />
+              <Route path="inventory" element={<ModuleGate module="inventory"><InventoryPage /></ModuleGate>} />
+              <Route path="users" element={<ModuleGate module="users"><UsersPage /></ModuleGate>} />
+              <Route path="branches" element={<ModuleGate module="branches"><BranchesPage /></ModuleGate>} />
+              <Route path="network" element={<ModuleGate module="network"><NetworkPage /></ModuleGate>} />
+              <Route path="stock-counts" element={<ModuleGate module="stock_counts"><StockCountsPage /></ModuleGate>} />
+              <Route path="stock-counts/:id" element={<ModuleGate module="stock_counts"><StockCountDetailPage /></ModuleGate>} />
+              <Route path="reviews" element={<ModuleGate module="reviews"><ReviewsPage /></ModuleGate>} />
+              <Route path="accountant" element={<ModuleGate module="accountant"><AccountantPage /></ModuleGate>} />
+              <Route path="kiosks" element={<ModuleGate module="kiosks"><KiosksPage /></ModuleGate>} />
+              <Route path="permissions" element={<RoleGate roles={['admin']}><PermissionsPage /></RoleGate>} />
+              <Route path="history" element={<ModuleGate module="history"><OrdersHistory /></ModuleGate>} />
+              <Route path="hr" element={<ModuleGate module="hr"><HrPage /></ModuleGate>} />
+              <Route path="dre" element={<ModuleGate module="dre"><DrePage /></ModuleGate>} />
+              <Route path="loyalty" element={<ModuleGate module="loyalty"><LoyaltyPage /></ModuleGate>} />
+              <Route path="branding" element={<ModuleGate module="branding"><BrandingPage /></ModuleGate>} />
+              <Route path="assistant" element={<ModuleGate module="ai"><AssistantPage /></ModuleGate>} />
 
-              <Route path="ifood" element={<IfoodPage />} />
-              <Route path="settings" element={<SettingsPage />} />
+              <Route path="delivery" element={<DeliveryHub />}>
+                <Route index element={<ModuleGate module="delivery"><DeliveryOverview /></ModuleGate>} />
+                <Route path="pedidos" element={<ModuleGate module="delivery"><DeliveryOrders readOnly /></ModuleGate>} />
+                <Route path="loja" element={<ModuleGate module="online_store"><StoreSettings /></ModuleGate>} />
+                <Route path="whatsapp" element={<ModuleGate module="whatsapp"><WhatsAppBot /></ModuleGate>} />
+                <Route path="ifood" element={<ModuleGate module="ifood"><IfoodPage /></ModuleGate>} />
+                <Route path="99food" element={<ModuleGate module="marketplaces"><MarketplacesPage only="99food" /></ModuleGate>} />
+                <Route path="keeta" element={<ModuleGate module="marketplaces"><MarketplacesPage only="keeta" /></ModuleGate>} />
+                <Route path="rappi" element={<ModuleGate module="marketplaces"><MarketplacesPage only="rappi" /></ModuleGate>} />
+                <Route path="entregadores" element={<ModuleGate module="couriers"><CouriersPage /></ModuleGate>} />
+              </Route>
+              {/* endereços antigos */}
+              <Route path="ifood" element={<Navigate to="/admin/delivery/ifood" replace />} />
+              <Route path="couriers" element={<Navigate to="/admin/delivery/entregadores" replace />} />
+              <Route path="marketplaces" element={<Navigate to="/admin/delivery" replace />} />
+              <Route path="online-store" element={<Navigate to="/admin/delivery/loja" replace />} />
+              <Route path="whatsapp" element={<Navigate to="/admin/delivery/whatsapp" replace />} />
+              <Route path="fiscal" element={<ModuleGate module="fiscal"><FiscalPage /></ModuleGate>} />
+              <Route path="settings" element={<ModuleGate module="settings"><SettingsPage /></ModuleGate>} />
             </Route>
 
             {/* Marketing */}
@@ -212,6 +230,8 @@ const App = () => (
               <Route index element={<CashRegisterPage />} />
               <Route path="payments" element={<PaymentsPage />} />
               <Route path="orders" element={<CashierNewOrder />} />
+              <Route path="delivery" element={<ModuleGate module="delivery"><DeliveryOrders newOrderPath="/cashier/delivery/new" /></ModuleGate>} />
+              <Route path="delivery/new" element={<ModuleGate module="delivery"><NewDelivery /></ModuleGate>} />
               <Route path="movements" element={<CashMovementsPage />} />
             </Route>
             <Route path="/finance" element={
@@ -219,31 +239,32 @@ const App = () => (
                 <FinanceLayout />
               </ProtectedRoute>
             }>
-              <Route index element={<RoleGate roles={['finance']}><FinanceDashboard /></RoleGate>} />
-              <Route path="crm" element={<RoleGate roles={['finance']}><FinanceCrmPage /></RoleGate>} />
-              <Route path="reports" element={<RoleGate roles={['finance']}><FinanceReports /></RoleGate>} />
-              <Route path="inventory" element={<RoleGate roles={['finance']}><FinanceInventory /></RoleGate>} />
-              <Route path="history" element={<RoleGate roles={['finance']}><OrdersHistory /></RoleGate>} />
-              <Route path="stock-counts" element={<RoleGate roles={['finance']}><StockCountsPage /></RoleGate>} />
-              <Route path="stock-counts/:id" element={<RoleGate roles={['finance']}><StockCountDetailPage /></RoleGate>} />
-              <Route path="cmv" element={<RoleGate roles={['finance']}><FinanceCmvPage /></RoleGate>} />
-              <Route path="reviews" element={<RoleGate roles={['finance']}><ReviewsPage /></RoleGate>} />
-              <Route path="accountant" element={<RoleGate roles={['finance']}><AccountantPage /></RoleGate>} />
-              <Route path="hr" element={<HrPage />} />
-              <Route path="dre" element={<DrePage />} />
-              <Route path="loyalty" element={<LoyaltyPage />} />
+              <Route index element={<ModuleGate module="dashboard"><FinanceDashboard /></ModuleGate>} />
+              <Route path="crm" element={<ModuleGate module="crm"><FinanceCrmPage /></ModuleGate>} />
+              <Route path="reports" element={<ModuleGate module="reports"><FinanceReports /></ModuleGate>} />
+              <Route path="inventory" element={<ModuleGate module="inventory"><FinanceInventory /></ModuleGate>} />
+              <Route path="history" element={<ModuleGate module="history"><OrdersHistory /></ModuleGate>} />
+              <Route path="stock-counts" element={<ModuleGate module="stock_counts"><StockCountsPage /></ModuleGate>} />
+              <Route path="stock-counts/:id" element={<ModuleGate module="stock_counts"><StockCountDetailPage /></ModuleGate>} />
+              <Route path="cmv" element={<ModuleGate module="cmv"><FinanceCmvPage /></ModuleGate>} />
+              <Route path="reviews" element={<ModuleGate module="reviews"><ReviewsPage /></ModuleGate>} />
+              <Route path="accountant" element={<ModuleGate module="accountant"><AccountantPage /></ModuleGate>} />
+              <Route path="fiscal" element={<ModuleGate module="fiscal"><FiscalPage /></ModuleGate>} />
+              <Route path="hr" element={<ModuleGate module="hr"><HrPage /></ModuleGate>} />
+              <Route path="dre" element={<ModuleGate module="dre"><DrePage /></ModuleGate>} />
+              <Route path="loyalty" element={<ModuleGate module="loyalty"><LoyaltyPage /></ModuleGate>} />
 
             </Route>
             <Route path="/delivery" element={
-              <ProtectedRoute allowedRoles={['delivery', 'admin']}>
+              <ProtectedRoute allowedRoles={['delivery']}>
                 <DeliveryLayout />
               </ProtectedRoute>
             }>
-              <Route index element={<DeliveryOrders />} />
-              <Route path="new" element={<NewDelivery />} />
-              <Route path="ifood" element={<IfoodPage />} />
-              <Route path="loja" element={<StoreSettings />} />
-              <Route path="whatsapp" element={<WhatsAppBot />} />
+              <Route index element={<ModuleGate module="delivery"><DeliveryOrders /></ModuleGate>} />
+              <Route path="new" element={<ModuleGate module="delivery"><NewDelivery /></ModuleGate>} />
+              <Route path="ifood" element={<ModuleGate module="ifood"><IfoodPage /></ModuleGate>} />
+              <Route path="loja" element={<ModuleGate module="online_store"><StoreSettings /></ModuleGate>} />
+              <Route path="whatsapp" element={<ModuleGate module="whatsapp"><WhatsAppBot /></ModuleGate>} />
             </Route>
             <Route path="/courier" element={
               <ProtectedRoute allowedRoles={['courier']}>

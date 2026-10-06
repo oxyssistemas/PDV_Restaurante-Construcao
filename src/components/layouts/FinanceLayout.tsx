@@ -1,39 +1,39 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
-  LineChart, LogOut, Menu, FileBarChart, Package, Building2, History, Briefcase, PieChart, Gift, ClipboardCheck, Calculator, MessageSquareHeart, FileArchive } from 'lucide-react';
+  LineChart, LogOut, Menu, FileBarChart, Package, Building2, History, Briefcase, PieChart, Gift, ClipboardCheck, Calculator, MessageSquareHeart, FileArchive, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
 import { useState } from 'react';
 import NotificationsBell from '@/components/NotificationsBell';
 import { ModuleKey } from '@/lib/modules';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
+import SideNavShell from './SideNavShell';
 
 
-const navItems: { to: string; icon: typeof LineChart; label: string; end: boolean; module?: ModuleKey; financeOnly?: boolean }[] = [
-  { to: '/finance', icon: LineChart, label: 'Dashboard', end: true, financeOnly: true },
-  { to: '/finance/crm', icon: Building2, label: 'CRM Financeiro', end: false, financeOnly: true },
+const navItems: { to: string; icon: typeof LineChart; label: string; end: boolean; module: ModuleKey }[] = [
+  { to: '/finance', icon: LineChart, label: 'Dashboard', end: true, module: 'dashboard' },
+  { to: '/finance/crm', icon: Building2, label: 'CRM Financeiro', end: false, module: 'crm' },
   { to: '/finance/dre', icon: PieChart, label: 'DRE', end: false, module: 'dre' },
+  { to: '/finance/fiscal', icon: Receipt, label: 'Fiscal (NFC-e)', end: false, module: 'fiscal' },
   { to: '/finance/hr', icon: Briefcase, label: 'RH', end: false, module: 'hr' },
   { to: '/finance/loyalty', icon: Gift, label: 'Fidelidade', end: false, module: 'loyalty' },
-  { to: '/finance/reports', icon: FileBarChart, label: 'Relatórios', end: false, financeOnly: true },
-  { to: '/finance/inventory', icon: Package, label: 'Estoque', end: false, financeOnly: true },
-  { to: '/finance/stock-counts', icon: ClipboardCheck, label: 'Balanço de estoque', end: false, financeOnly: true },
-  { to: '/finance/cmv', icon: Calculator, label: 'Custo do prato (CMV)', end: false, financeOnly: true },
-  { to: '/finance/reviews', icon: MessageSquareHeart, label: 'Avaliações (NPS)', end: false, financeOnly: true },
-  { to: '/finance/accountant', icon: FileArchive, label: 'Pacote do contador', end: false, financeOnly: true },
-  { to: '/finance/history', icon: History, label: 'Histórico', end: false, financeOnly: true },
+  { to: '/finance/reports', icon: FileBarChart, label: 'Relatórios', end: false, module: 'reports' },
+  { to: '/finance/inventory', icon: Package, label: 'Estoque', end: false, module: 'inventory' },
+  { to: '/finance/stock-counts', icon: ClipboardCheck, label: 'Balanço de estoque', end: false, module: 'stock_counts' },
+  { to: '/finance/cmv', icon: Calculator, label: 'Custo do prato (CMV)', end: false, module: 'cmv' },
+  { to: '/finance/reviews', icon: MessageSquareHeart, label: 'Avaliações (NPS)', end: false, module: 'reviews' },
+  { to: '/finance/accountant', icon: FileArchive, label: 'Pacote do contador', end: false, module: 'accountant' },
+  { to: '/finance/history', icon: History, label: 'Histórico', end: false, module: 'history' },
 ];
 
 
 export default function FinanceLayout() {
-  const { signOut, user, roles, isSuperAdmin } = useAuth();
-  const { canView } = useModuleAccess();
-  const isFinance = isSuperAdmin || roles.some(r => r.role === 'finance');
-  const visibleItems = navItems.filter(i =>
-    (i.financeOnly ? isFinance : true) && (!i.module || canView(i.module))
-  );
+  const { signOut, user } = useAuth();
+  const { canView, isLoading: accessLoading } = useModuleAccess();
+  const location = useLocation();
+  const visibleItems = navItems.filter(i => canView(i.module));
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -41,6 +41,11 @@ export default function FinanceLayout() {
     await signOut();
     navigate('/login');
   };
+
+  // sem acesso à tela inicial do portal: abre a primeira tela liberada
+  if (!accessLoading && location.pathname === '/finance' && !canView('dashboard') && visibleItems[0] && visibleItems[0].to !== '/finance') {
+    return <Navigate to={visibleItems[0].to} replace />;
+  }
 
   const sidebar = (
     <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
@@ -79,10 +84,9 @@ export default function FinanceLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />}
-      <aside className={cn('fixed inset-y-0 left-0 z-50 w-64 transform transition-transform lg:relative lg:translate-x-0', sidebarOpen ? 'translate-x-0' : '-translate-x-full')}>
+      <SideNavShell open={sidebarOpen} onClose={() => setSidebarOpen(false)}>
         {sidebar}
-      </aside>
+      </SideNavShell>
       <main className="flex min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain">
         <div className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-4 border-b bg-background px-4">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}><Menu className="h-5 w-5" /></Button>

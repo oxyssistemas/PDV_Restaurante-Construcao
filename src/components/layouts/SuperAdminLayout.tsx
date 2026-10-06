@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
+import SideNavShell from './SideNavShell';
 
 const navItems = [
   { to: '/super-admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
@@ -72,17 +73,9 @@ export default function SuperAdminLayout() {
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
-
-      {/* Sidebar */}
-      <aside className={cn(
-        'fixed inset-y-0 left-0 z-50 w-64 transform transition-transform lg:relative lg:translate-x-0',
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      )}>
+      <SideNavShell open={sidebarOpen} onClose={() => setSidebarOpen(false)}>
         {sidebar}
-      </aside>
+      </SideNavShell>
 
       {/* Main */}
       <main className="flex min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain">

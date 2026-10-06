@@ -5,17 +5,22 @@ import { Bike, LogOut, Menu, ListOrdered, MessageCircle, PlusCircle, ShoppingBag
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
 import { useState } from 'react';
+import SideNavShell from './SideNavShell';
+import { ModuleKey } from '@/lib/modules';
+import { useModuleAccess } from '@/hooks/useModuleAccess';
 
-const navItems = [
-  { to: '/delivery', icon: ListOrdered, label: 'Pedidos', end: true },
-  { to: '/delivery/new', icon: PlusCircle, label: 'Novo Pedido', end: false },
-  { to: '/delivery/ifood', icon: ShoppingBag, label: 'iFood', end: false },
-  { to: '/delivery/loja', icon: Store, label: 'Loja online', end: false },
-  { to: '/delivery/whatsapp', icon: MessageCircle, label: 'WhatsApp', end: false },
+const navItems: { to: string; icon: typeof Bike; label: string; end: boolean; module: ModuleKey }[] = [
+  { to: '/delivery', icon: ListOrdered, label: 'Pedidos', end: true, module: 'delivery' },
+  { to: '/delivery/new', icon: PlusCircle, label: 'Novo Pedido', end: false, module: 'delivery' },
+  { to: '/delivery/ifood', icon: ShoppingBag, label: 'iFood', end: false, module: 'ifood' },
+  { to: '/delivery/loja', icon: Store, label: 'Loja online', end: false, module: 'online_store' },
+  { to: '/delivery/whatsapp', icon: MessageCircle, label: 'WhatsApp', end: false, module: 'whatsapp' },
 ];
 
 export default function DeliveryLayout() {
   const { signOut, user } = useAuth();
+  const { canView } = useModuleAccess();
+  const visibleItems = navItems.filter(i => canView(i.module));
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -30,7 +35,7 @@ export default function DeliveryLayout() {
         <BrandLogo fallbackIcon={Bike} fallbackName="Delivery" />
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-4">
-        {navItems.map(item => (
+        {visibleItems.map(item => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -61,10 +66,9 @@ export default function DeliveryLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />}
-      <aside className={cn('fixed inset-y-0 left-0 z-50 w-64 transform transition-transform lg:relative lg:translate-x-0', sidebarOpen ? 'translate-x-0' : '-translate-x-full')}>
+      <SideNavShell open={sidebarOpen} onClose={() => setSidebarOpen(false)}>
         {sidebar}
-      </aside>
+      </SideNavShell>
       <main className="flex min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain">
         <div className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-4 border-b bg-background px-4 lg:hidden">
           <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}><Menu className="h-5 w-5" /></Button>

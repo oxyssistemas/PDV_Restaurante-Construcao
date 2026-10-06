@@ -51,6 +51,7 @@ function policies(h) {
     couriers: [
       { cmd: 'ALL', using: r => (has('admin') && belongs(r.restaurant_id) && active(r.restaurant_id)) || sup() },
       { cmd: 'UPDATE', using: r => r.user_id === uid },
+      { cmd: 'UPDATE', using: r => any('delivery', 'cashier') && mine(r.restaurant_id) },
       { cmd: 'SELECT', using: r => belongs(r.restaurant_id) || sup() },
     ],
     ifood_orders: [

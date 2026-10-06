@@ -39,14 +39,20 @@ export function useModuleAccess() {
     return override ?? defaultModuleAccess(roleNames, module);
   };
 
-  const canView = (module: ModuleKey) =>
-    hasFeature(moduleFeature(module)) && raw(module).view;
+  const inPlan = (module: ModuleKey) => {
+    const feature = moduleFeature(module);
+    return !feature || hasFeature(feature);
+  };
 
-  const canEdit = (module: ModuleKey) =>
-    hasFeature(moduleFeature(module)) && raw(module).edit;
+  const canView = (module: ModuleKey) => inPlan(module) && raw(module).view;
+
+  const canEdit = (module: ModuleKey) => inPlan(module) && raw(module).edit;
+
+  /** Alguma das telas liberada (ex.: mostrar o atalho do portal Gestão). */
+  const canViewAny = (modules: ModuleKey[]) => modules.some(canView);
 
   /** Bloqueado pelo plano (e não por falta de permissão). */
-  const blockedByPlan = (module: ModuleKey) => !hasFeature(moduleFeature(module));
+  const blockedByPlan = (module: ModuleKey) => !inPlan(module);
 
-  return { canView, canEdit, blockedByPlan, planName, isLoading: isLoading || planLoading };
+  return { canView, canEdit, canViewAny, blockedByPlan, planName, isLoading: isLoading || planLoading };
 }

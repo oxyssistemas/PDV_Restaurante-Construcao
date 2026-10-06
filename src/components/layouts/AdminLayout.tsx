@@ -1,10 +1,10 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
   UtensilsCrossed, LayoutDashboard, BookOpen, Grid3X3, Users, Package, Settings, LogOut, Menu, Bike,
   Building2, History, Briefcase, PieChart, Gift, Palette, Sparkles, Megaphone, ShieldCheck,
-  ShoppingBag, Network, LineChart, ClipboardCheck, MessageSquareHeart, FileArchive, MonitorSmartphone, Store,
+  Network, LineChart, ClipboardCheck, MessageSquareHeart, FileArchive, MonitorSmartphone, Receipt,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
@@ -14,33 +14,32 @@ import { ModuleKey } from '@/lib/modules';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
 import { useCurrentStore } from '@/hooks/useCurrentStore';
 import StoreSwitcher from '@/components/StoreSwitcher';
+import SideNavShell from './SideNavShell';
 
-const navItems: { to: string; icon: typeof Users; label: string; end: boolean; module?: ModuleKey; branches?: true; network?: true }[] = [
-  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/admin/network', icon: LineChart, label: 'Painel da rede', end: false, network: true },
+const navItems: { to: string; icon: typeof Users; label: string; end: boolean; module?: ModuleKey; branches?: true; network?: true; adminOnly?: true }[] = [
+  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true, module: 'dashboard' },
+  { to: '/admin/network', icon: LineChart, label: 'Painel da rede', end: false, module: 'network', network: true },
   { to: '/admin/assistant', icon: Sparkles, label: 'Assistente IA', end: false, module: 'ai' },
-  { to: '/admin/crm', icon: Building2, label: 'CRM', end: false },
-  { to: '/admin/menu', icon: BookOpen, label: 'Cardápio', end: false },
-  { to: '/admin/tables', icon: Grid3X3, label: 'Mesas', end: false },
-  { to: '/admin/kiosks', icon: MonitorSmartphone, label: 'Autoatendimento', end: false },
-  { to: '/admin/inventory', icon: Package, label: 'Estoque', end: false },
-  { to: '/admin/stock-counts', icon: ClipboardCheck, label: 'Balanço de estoque', end: false },
+  { to: '/admin/crm', icon: Building2, label: 'CRM', end: false, module: 'crm' },
+  { to: '/admin/menu', icon: BookOpen, label: 'Cardápio', end: false, module: 'menu' },
+  { to: '/admin/tables', icon: Grid3X3, label: 'Mesas', end: false, module: 'tables' },
+  { to: '/admin/kiosks', icon: MonitorSmartphone, label: 'Autoatendimento', end: false, module: 'kiosks' },
+  { to: '/admin/inventory', icon: Package, label: 'Estoque', end: false, module: 'inventory' },
+  { to: '/admin/stock-counts', icon: ClipboardCheck, label: 'Balanço de estoque', end: false, module: 'stock_counts' },
+  { to: '/admin/fiscal', icon: Receipt, label: 'Fiscal (NFC-e)', end: false, module: 'fiscal' },
+  { to: '/admin/accountant', icon: FileArchive, label: 'Pacote do contador', end: false, module: 'accountant' },
   { to: '/admin/hr', icon: Briefcase, label: 'RH', end: false, module: 'hr' },
   { to: '/admin/dre', icon: PieChart, label: 'DRE', end: false, module: 'dre' },
   { to: '/admin/loyalty', icon: Gift, label: 'Fidelidade', end: false, module: 'loyalty' },
-  { to: '/admin/reviews', icon: MessageSquareHeart, label: 'Avaliações (NPS)', end: false },
+  { to: '/admin/reviews', icon: MessageSquareHeart, label: 'Avaliações (NPS)', end: false, module: 'reviews' },
   { to: '/marketing', icon: Megaphone, label: 'Marketing', end: false, module: 'marketing' },
-  { to: '/admin/accountant', icon: FileArchive, label: 'Pacote do contador', end: false },
-  { to: '/admin/history', icon: History, label: 'Histórico', end: false },
-  { to: '/delivery', icon: Bike, label: 'Delivery', end: false },
-  { to: '/admin/couriers', icon: Bike, label: 'Entregadores', end: false },
-  { to: '/admin/ifood', icon: ShoppingBag, label: 'iFood', end: false },
-  { to: '/admin/marketplaces', icon: Store, label: '99Food, Keeta e Rappi', end: false },
-  { to: '/admin/branches', icon: Network, label: 'Filiais', end: false, branches: true },
-  { to: '/admin/users', icon: Users, label: 'Usuários', end: false },
-  { to: '/admin/permissions', icon: ShieldCheck, label: 'Permissões', end: false },
+  { to: '/admin/history', icon: History, label: 'Histórico', end: false, module: 'history' },
+  { to: '/admin/delivery', icon: Bike, label: 'Delivery', end: false, module: 'delivery' },
+  { to: '/admin/branches', icon: Network, label: 'Filiais', end: false, module: 'branches', branches: true },
+  { to: '/admin/users', icon: Users, label: 'Usuários', end: false, module: 'users' },
+  { to: '/admin/permissions', icon: ShieldCheck, label: 'Permissões', end: false, adminOnly: true },
   { to: '/admin/branding', icon: Palette, label: 'Identidade visual', end: false, module: 'branding' },
-  { to: '/admin/settings', icon: Settings, label: 'Configurações', end: false },
+  { to: '/admin/settings', icon: Settings, label: 'Configurações', end: false, module: 'settings' },
 ];
 
 
@@ -48,10 +47,15 @@ const navItems: { to: string; icon: typeof Users; label: string; end: boolean; m
 
 
 export default function AdminLayout() {
-  const { signOut, user, stores } = useAuth();
-  const { canView } = useModuleAccess();
+  const { signOut, user, stores, roles, isSuperAdmin } = useAuth();
+  const { canView, isLoading: accessLoading } = useModuleAccess();
+  const location = useLocation();
   const { canManageBranches } = useCurrentStore();
-  const visibleItems = navItems.filter(i => (!i.module || canView(i.module)) && (!i.branches || canManageBranches) && (!i.network || stores.length > 1));
+  // Permissões ficam com o dono (o banco só deixa o admin gravar permissões)
+  const isOwner = isSuperAdmin || roles.some(r => r.role === 'admin');
+  const visibleItems = navItems.filter(i =>
+    (!i.module || canView(i.module)) && (!i.adminOnly || isOwner) &&
+    (!i.branches || canManageBranches) && (!i.network || stores.length > 1));
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -59,6 +63,11 @@ export default function AdminLayout() {
     await signOut();
     navigate('/login');
   };
+
+  // sem acesso à tela inicial do portal: abre a primeira tela liberada
+  if (!accessLoading && location.pathname === '/admin' && !canView('dashboard') && visibleItems[0] && visibleItems[0].to !== '/admin') {
+    return <Navigate to={visibleItems[0].to} replace />;
+  }
 
   const sidebar = (
     <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
@@ -106,15 +115,9 @@ export default function AdminLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
-      <aside className={cn(
-        'fixed inset-y-0 left-0 z-50 w-64 transform transition-transform lg:relative lg:translate-x-0',
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      )}>
+      <SideNavShell open={sidebarOpen} onClose={() => setSidebarOpen(false)}>
         {sidebar}
-      </aside>
+      </SideNavShell>
       <main className="flex min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain">
         <div className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-4 border-b bg-background px-4">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>

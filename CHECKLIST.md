@@ -18,11 +18,14 @@ Atualizado a cada integração.
 - [x] Admin: painel, CRM, cardápio, mesas, estoque, usuários, permissões, entregadores, histórico, RH, DRE, fidelidade, identidade visual, assistente IA, configurações
 - [x] Garçom (mesas, pedidos, cardápio, reservas)
 - [x] Cozinha (quadro de pedidos responsivo, setores, impressão)
-- [x] Caixa (pagamentos, pedidos, sangria/suprimento)
+- [x] Caixa (pagamentos, pedidos, sangria/suprimento e aba Delivery: quadro dos pedidos, entregador, pagamento e novo pedido)
 - [x] Financeiro (CRM, relatórios, estoque, histórico, RH, DRE, fidelidade)
-- [x] Delivery (pedidos com origem, novo pedido, iFood, loja online, WhatsApp)
+- [x] Delivery como portal independente, só da equipe de delivery (pedidos com origem, novo pedido, iFood, loja online, WhatsApp)
+- [x] Aba única Delivery no admin: visão geral com todos os canais (abrir/fechar cada um ou "Abrir tudo"/"Fechar tudo", pedidos e vendas do dia) e botões no topo para configurar cada canal (pedidos só para ver, loja online, WhatsApp, iFood, 99Food, Keeta, Rappi e entregadores)
 - [x] Entregador
 - [x] Marketing (central de publicação, posts, conexões, campanhas)
+- [x] Menu lateral recolhido (só ícones) que abre ao passar o mouse e rebate sozinho, em todos os portais
+- [x] Permissões de ver/editar por pessoa em todas as telas do sistema (agrupadas, com "liberar tudo", "só ver", "bloquear" e "voltar ao padrão do cargo"); quem só pode ver abre a tela com os botões de gravar travados
 
 ## 3. Vendas e delivery
 - [x] Cardápio por QR Code na mesa
@@ -38,6 +41,7 @@ Atualizado a cada integração.
 - [~] Robô de WhatsApp por restaurante — falta configurar o WhatsApp no app da Meta (webhook + revisão de permissões)
 
 ## 4. Fiscal
+- [x] Módulo Fiscal no menu (admin e financeiro): notas emitidas, cancelamento, reemissão e configuração fiscal num lugar só
 - [x] Motor de NFC-e com emissão automática após a venda, fila e reenvio
 - [x] DANFE NFC-e na impressora térmica (com QR Code)
 - [~] Emissão real — falta contratar o emissor (Focus NFe) e cadastrar o certificado de cada restaurante
@@ -91,6 +95,7 @@ Atualizado a cada integração.
 - [x] Apagar os dados da loja da nuvem compartilhada depois de conferido
 - [x] Versão v1.0.4 publicada com os instaladores do Oxys Servidor (Windows, Linux, Mac)
 - [x] Versão v1.0.6: app lembra o servidor da loja; servidor com loja online, QR, totem, avaliação, cashback e fotos; central com balanço e totem offline
+- [x] Versão v1.0.7: módulo Fiscal no menu, permissões de ver/editar em todas as telas, menu lateral que recolhe sozinho, delivery como portal independente, aba Delivery no caixa e aba única Delivery no admin
 - [ ] Instalar o Oxys Servidor numa loja real
 - [x] Loja online e cardápio QR para lojas com servidor dedicado (mesmo endereço de sempre; a nuvem repassa para o servidor da loja com assinatura)
 - [ ] Robô de WhatsApp, iFood, emissão de NFC-e, assistente de IA e marketing no servidor dedicado

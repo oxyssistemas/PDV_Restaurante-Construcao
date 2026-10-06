@@ -4462,6 +4462,13 @@ export type Database = {
       start_stock_count: { Args: { _count_id?: string }; Returns: string }
       stock_count_scheduler: { Args: never; Returns: number }
       store_media_folder_ok: { Args: { _name: string }; Returns: boolean }
+      staff_emails: {
+        Args: { _restaurant_id: string }
+        Returns: {
+          email: string
+          user_id: string
+        }[]
+      }
       submit_review: {
         Args: {
           _comment: string

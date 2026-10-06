@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import PrintersCard from '@/components/admin/PrintersCard';
-import FiscalSettingsCard from '@/components/admin/FiscalSettingsCard';
 import ServiceChargeCard from '@/components/admin/ServiceChargeCard';
 
 export default function SettingsPage() {
@@ -93,10 +92,6 @@ export default function SettingsPage() {
       </Card>
 
       {restaurantId && <ServiceChargeCard restaurantId={restaurantId} />}
-
-      {restaurantId && (
-        <FiscalSettingsCard restaurantId={restaurantId} role={currentRole?.role} />
-      )}
 
       {restaurantId && (
         <PrintersCard restaurantId={restaurantId} />

@@ -619,7 +619,7 @@ function ItemDialog({
               <Label className="text-sm font-medium">Dados fiscais (NFC-e)</Label>
             </div>
             <p className="text-xs text-muted-foreground">
-              Opcional. Deixe em branco para herdar o padrão do restaurante definido em Configurações → Fiscal.
+              Opcional. Deixe em branco para herdar o padrão do restaurante definido em Fiscal → Configuração.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">

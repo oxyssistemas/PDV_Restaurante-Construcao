@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ interface CartItem { id: string; name: string; price: number; quantity: number; 
 
 export default function NewDelivery() {
   const { user, currentRole } = useAuth();
+  const location = useLocation();
   const restaurantId = currentRole?.restaurant_id;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -139,7 +140,8 @@ export default function NewDelivery() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['delivery-orders'] });
       toast.success('Pedido de delivery criado e enviado à cozinha!');
-      navigate('/delivery');
+      // o caixa também lança delivery (aba Delivery do caixa)
+      navigate(location.pathname.startsWith('/cashier') ? '/cashier/delivery' : '/delivery');
     },
     onError: (e: any) => toast.error(e.message || 'Erro ao criar pedido.'),
   });

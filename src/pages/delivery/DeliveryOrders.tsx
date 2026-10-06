@@ -6,7 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Bike, Phone, MapPin, CheckCircle2, XCircle, ShoppingBag, Wallet, StickyNote } from 'lucide-react';
+import { Loader2, Bike, Phone, MapPin, CheckCircle2, XCircle, ShoppingBag, Wallet, StickyNote, PlusCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -40,7 +41,14 @@ function beep() {
   } catch { /* navegador sem áudio */ }
 }
 
-export default function DeliveryOrders() {
+interface Props {
+  /** Dono acompanhando pelo portal dele: só vê o andamento, sem mexer nos pedidos. */
+  readOnly?: boolean;
+  /** Botão "Novo pedido" no topo (caixa). */
+  newOrderPath?: string;
+}
+
+export default function DeliveryOrders({ readOnly = false, newOrderPath }: Props) {
   const { currentRole } = useAuth();
   const restaurantId = currentRole?.restaurant_id;
   const queryClient = useQueryClient();
@@ -103,14 +111,16 @@ export default function DeliveryOrders() {
     if (!orders) return;
     const ids = new Set(orders.map(o => o.id));
     if (seen.current) {
-      const fresh = orders.filter(o => !seen.current!.has(o.id) && o.delivery_status === 'pending' && (o as any).created_by_role !== 'delivery' && (o as any).created_by_role !== 'admin');
+      // pedido que a própria equipe lançou não toca aviso
+      const team = [currentRole?.role, 'delivery', 'admin'];
+      const fresh = orders.filter(o => !seen.current!.has(o.id) && o.delivery_status === 'pending' && !team.includes((o as any).created_by_role));
       if (fresh.length) {
-        beep();
+        if (!readOnly) beep();
         fresh.forEach(o => toast.info(`Novo pedido · ${sourceLabel((o as any).source)}`, { description: o.customer_name || undefined }));
       }
     }
     seen.current = ids;
-  }, [orders]);
+  }, [orders, currentRole?.role, readOnly]);
 
   const registerPayment = useMutation({
     mutationFn: async ({ order, method }: { order: any; method: string }) => {
@@ -195,7 +205,19 @@ export default function DeliveryOrders() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Pedidos Delivery</h1>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Pedidos Delivery</h1>
+          {readOnly && (
+            <p className="text-sm text-muted-foreground">
+              Acompanhamento em tempo real. Quem opera os pedidos é a equipe de delivery e o caixa.
+            </p>
+          )}
+        </div>
+        {newOrderPath && (
+          <Button asChild className="gap-2"><Link to={newOrderPath}><PlusCircle className="h-4 w-4" /> Novo pedido</Link></Button>
+        )}
+      </div>
 
       {!orders?.length ? (
         <div className="py-16 text-center text-muted-foreground">
@@ -278,7 +300,12 @@ export default function DeliveryOrders() {
                         <div className="mt-1 text-[10px] text-muted-foreground">
                           Lançado por {authorLabel(o as any)} · {deliveryStatusLabels[o.delivery_status]}
                         </div>
-                        {!pickup && <Select
+                        {!pickup && readOnly && (
+                          <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                            <Bike className="h-3 w-3" /> {(couriers || []).find(c => c.id === courierId)?.name ?? 'Sem entregador'}
+                          </div>
+                        )}
+                        {!pickup && !readOnly && <Select
                           value={(o as any).courier_id || undefined}
                           onValueChange={v => assignCourier.mutate({ id: o.id, courierId: v })}
                         >
@@ -305,6 +332,8 @@ export default function DeliveryOrders() {
                           <div className="mt-2 rounded-lg border border-[hsl(var(--success))]/40 bg-[hsl(var(--success))]/10 px-2 py-1 text-[11px] text-[hsl(var(--success))]">
                             Pago · contabilizado no financeiro
                           </div>
+                        ) : readOnly ? (
+                          <div className="mt-2 text-[11px] text-muted-foreground">Aguardando pagamento · {brl(dueOf(o))}</div>
                         ) : (
                           <Select onValueChange={v => registerPayment.mutate({ order: o, method: v })}>
                             <SelectTrigger className="mt-2 h-8 text-xs">
@@ -318,7 +347,7 @@ export default function DeliveryOrders() {
                           </Select>
                         )}
 
-                        <div className="mt-2 flex gap-2">
+                        {!readOnly && <div className="mt-2 flex gap-2">
                           {col.next && (
                             <Button size="sm" className="flex-1 gap-1" disabled={setStatus.isPending || blockRoute}
                               title={blockRoute ? (!pickup && !courierId ? 'Atribua um entregador' : 'Aguardando a cozinha marcar como pronto') : undefined}
@@ -333,7 +362,7 @@ export default function DeliveryOrders() {
                               <XCircle className="h-4 w-4" />
                             </Button>
                           )}
-                        </div>
+                        </div>}
                       </div>
                     );
                   })}

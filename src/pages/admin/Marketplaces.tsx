@@ -20,14 +20,17 @@ const CHANNELS = [
   { key: 'keeta', label: 'Keeta' },
   { key: 'rappi', label: 'Rappi' },
 ] as const;
-type Channel = typeof CHANNELS[number]['key'];
+export type Channel = typeof CHANNELS[number]['key'];
+type ChannelDef = typeof CHANNELS[number];
 type Integration = Tables<'marketplace_integrations'>;
 
 const webhookUrl = (channel: string, key: string) =>
   `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/marketplace-webhook/${channel}/${key}`;
 
-/** 99Food, Keeta e Rappi: pedidos entram sozinhos pelo endereço (webhook) de cada loja. */
-export default function MarketplacesPage() {
+/** 99Food, Keeta e Rappi: pedidos entram sozinhos pelo endereço (webhook) de cada loja. only: um app só. */
+export default function MarketplacesPage({ only }: { only?: Channel }) {
+  const channels = only ? CHANNELS.filter(c => c.key === only) : CHANNELS;
+  const title = only ? channels[0].label : 'Apps de delivery';
   const { currentRole } = useAuth();
   const rid = currentRole?.restaurant_id;
   const qc = useQueryClient();
@@ -42,12 +45,14 @@ export default function MarketplacesPage() {
     },
   });
   const { data: orders } = useQuery({
-    queryKey: ['marketplace-orders', rid],
+    queryKey: ['marketplace-orders', rid, only ?? 'all'],
     enabled: !!rid,
     refetchInterval: 30_000,
     queryFn: async () => {
-      const { data, error } = await supabase.from('marketplace_orders').select('id, channel, display_id, external_id, customer_name, total, status, unmatched_items, created_at')
-        .eq('restaurant_id', rid!).order('created_at', { ascending: false }).limit(20);
+      let q = supabase.from('marketplace_orders').select('id, channel, display_id, external_id, customer_name, total, status, unmatched_items, created_at')
+        .eq('restaurant_id', rid!);
+      if (only) q = q.eq('channel', only);
+      const { data, error } = await q.order('created_at', { ascending: false }).limit(20);
       if (error) throw error;
       return data;
     },
@@ -69,16 +74,16 @@ export default function MarketplacesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight"><Store className="h-7 w-7 text-primary" /> Apps de delivery</h1>
+        <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight"><Store className="h-7 w-7 text-primary" /> {title}</h1>
         <p className="text-sm text-muted-foreground">
-          Pedidos do 99Food, Keeta e Rappi entram sozinhos em Delivery → Pedidos e vão para a cozinha. Cada app pede um contrato de parceria:
+          Pedidos do {only ? title : '99Food, Keeta e Rappi'} entram sozinhos em Delivery → Pedidos e vão para a cozinha. Cada app pede um contrato de parceria:
           ao fechar, informe o endereço de recebimento abaixo ao suporte do app. Até lá, a equipe pode lançar esses pedidos à mão (escolhendo a origem no pedido).
         </p>
       </div>
 
       {isLoading ? <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" /> : (
-        <div className="grid gap-4 lg:grid-cols-3">
-          {CHANNELS.map(c => (
+        <div className={only ? 'max-w-xl' : 'grid gap-4 lg:grid-cols-3'}>
+          {channels.map(c => (
             <ChannelCard key={c.key} channel={c.key} label={c.label} integ={integrations?.find(i => i.channel === c.key)}
               onSave={patch => save.mutate({ channel: c.key, patch })} saving={save.isPending} />
           ))}
@@ -115,7 +120,7 @@ export default function MarketplacesPage() {
         </CardContent>
       </Card>
 
-      <ProductCodes restaurantId={rid} />
+      <ProductCodes restaurantId={rid} channels={channels} />
     </div>
   );
 }
@@ -156,7 +161,7 @@ function ChannelCard({ channel, label, integ, onSave, saving }: { channel: Chann
 }
 
 /** Código de cada produto nos apps, para casar os itens dos pedidos (sem código, casa pelo nome igual). */
-function ProductCodes({ restaurantId }: { restaurantId: string }) {
+function ProductCodes({ restaurantId, channels }: { restaurantId: string; channels: readonly ChannelDef[] }) {
   const qc = useQueryClient();
   const [q, setQ] = useState('');
   const [draft, setDraft] = useState<Record<string, Record<string, string>>>({});
@@ -198,14 +203,14 @@ function ProductCodes({ restaurantId }: { restaurantId: string }) {
       </CardHeader>
       <CardContent className="p-0">
         <Table>
-          <TableHeader><TableRow><TableHead>Produto</TableHead>{CHANNELS.map(c => <TableHead key={c.key}>{c.label}</TableHead>)}</TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Produto</TableHead>{channels.map(c => <TableHead key={c.key}>{c.label}</TableHead>)}</TableRow></TableHeader>
           <TableBody>
             {visible.map(i => {
               const codes = codesOf(i);
               return (
                 <TableRow key={i.id}>
                   <TableCell className="font-medium">{i.name}</TableCell>
-                  {CHANNELS.map(c => (
+                  {channels.map(c => (
                     <TableCell key={c.key}>
                       <Input className="h-8 w-32" value={codes[c.key] ?? ''} maxLength={60}
                         onChange={e => setDraft(d => ({ ...d, [i.id]: { ...(d[i.id] ?? {}), [c.key]: e.target.value } }))} />
