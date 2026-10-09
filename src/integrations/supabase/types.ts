@@ -3662,6 +3662,7 @@ export type Database = {
           status: Database["public"]["Enums"]["restaurant_status"]
           subscription_plan: string | null
           subscription_status: string | null
+          trial_ends_at: string | null
           updated_at: string
         }
         Insert: {
@@ -3677,6 +3678,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["restaurant_status"]
           subscription_plan?: string | null
           subscription_status?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -3692,6 +3694,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["restaurant_status"]
           subscription_plan?: string | null
           subscription_status?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -4462,6 +4465,15 @@ export type Database = {
       start_stock_count: { Args: { _count_id?: string }; Returns: string }
       stock_count_scheduler: { Args: never; Returns: number }
       store_media_folder_ok: { Args: { _name: string }; Returns: boolean }
+      my_trial_status: {
+        Args: never
+        Returns: {
+          expired: boolean
+          name: string
+          restaurant_id: string
+          trial_ends_at: string
+        }[]
+      }
       staff_emails: {
         Args: { _restaurant_id: string }
         Returns: {

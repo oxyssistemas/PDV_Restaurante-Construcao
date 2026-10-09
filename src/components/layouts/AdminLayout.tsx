@@ -18,6 +18,7 @@ import { useCurrentStore } from '@/hooks/useCurrentStore';
 import StoreSwitcher from '@/components/StoreSwitcher';
 import SideNavShell from './SideNavShell';
 import ThemeToggle from '@/components/ThemeToggle';
+import TrialClock from '@/components/TrialClock';
 
 const navItems: { to: string; icon: typeof Users; label: string; end: boolean; module?: ModuleKey; branches?: true; network?: true; adminOnly?: true; feature?: FeatureKey }[] = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true, module: 'dashboard' },
@@ -129,7 +130,7 @@ export default function AdminLayout() {
             <Menu className="h-5 w-5" />
           </Button>
           <span className="font-semibold lg:hidden">Admin</span>
-          <div className="ml-auto"><NotificationsBell /></div>
+          <div className="ml-auto flex items-center gap-2"><TrialClock /><NotificationsBell /></div>
         </div>
         <div className="p-6">
           <Outlet />

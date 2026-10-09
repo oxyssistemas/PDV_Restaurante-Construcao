@@ -4,6 +4,7 @@
 //
 // Como no Postgres: políticas do mesmo comando somam (OR); "ALL" vale para todos os comandos;
 // sem política para o comando = não pode.
+const { restaurantActive } = require('./trial.cjs');
 
 function helpers(mirror, uid) {
   const person = mirror.staff.find(s => s.user_id === uid);
@@ -19,7 +20,8 @@ function helpers(mirror, uid) {
   const has = (role) => roles.some(r => (r.role === role || (role === 'admin' && (r.role === 'manager' || r.role === 'supervisor')))
     && (r.role === 'super_admin' || r.restaurant_id === home));
   const any = (...list) => list.some(has);
-  const active = (rid) => mirror.rows('restaurants').some(r => r.id === rid && r.status === 'active'); // is_restaurant_active
+  const findR = (id) => mirror.rows('restaurants').find(r => r.id === id);
+  const active = (rid) => restaurantActive(findR(rid), findR); // is_restaurant_active
   const mine = (rid) => rid != null && rid === home && active(rid);   // restaurant_id = get_user_restaurant_id(uid) AND ativo
   const order = (id) => mirror.rows('orders').find(o => o.id === id);
   const myCouriers = () => mirror.rows('couriers').filter(c => c.user_id === uid).map(c => c.id);
@@ -126,9 +128,9 @@ function policies(h) {
       { cmd: 'UPDATE', using: r => has('waiter') && mine(r.restaurant_id), check: r => has('waiter') && mine(r.restaurant_id) && r.status !== 'free' },
     ],
     restaurants: [
-      { cmd: 'UPDATE', using: r => has('admin') && belongs(r.id) && r.status === 'active' },
+      { cmd: 'UPDATE', using: r => has('admin') && belongs(r.id) && active(r.id) },
       { cmd: 'ALL', using: () => sup() },
-      { cmd: 'SELECT', using: r => belongs(r.id) && r.status === 'active' },
+      { cmd: 'SELECT', using: r => belongs(r.id) && active(r.id) },
     ],
     user_roles: [
       { cmd: 'INSERT', check: r => has('admin') && mine(r.restaurant_id) && !['admin', 'super_admin'].includes(r.role) },

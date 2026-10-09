@@ -12,6 +12,7 @@ Atualizado a cada integração.
 - [x] Revisão de segurança do banco (permissões por restaurante, índices, funções protegidas)
 - [x] Política de Privacidade e Termos de Uso
 - [x] Planos e assinaturas por restaurante (super admin)
+- [x] Teste grátis de 14 dias (/cadastro): cadastro sozinho com tudo liberado, relógio no admin, botão para o WhatsApp da Oxys, bloqueio automático no fim (telas, banco, central e servidor), um teste por CPF/CNPJ e por WhatsApp, e controles no super admin (+7 dias / liberar plano)
 - [x] Planos com as 31 funções do sistema, liga/desliga por plano (por função ou grupo), preço e descrição editáveis e "Aplicar sugestão de mercado"; o plano vale nas telas, na loja online, QR da mesa, totem, avaliação, iFood, WhatsApp, 99Food/Keeta/Rappi, NFC-e, pacote do contador, central offline e servidor dedicado; filiais seguem o plano da matriz
 - [ ] Definir os preços finais e aplicar a sugestão de planos (Essencial R$ 149, Profissional R$ 289, Enterprise R$ 549 + R$ 199 por filial)
 
@@ -100,6 +101,7 @@ Atualizado a cada integração.
 - [x] Versão v1.0.6: app lembra o servidor da loja; servidor com loja online, QR, totem, avaliação, cashback e fotos; central com balanço e totem offline
 - [x] Versão v1.0.7: módulo Fiscal no menu, permissões de ver/editar em todas as telas, menu lateral que recolhe sozinho, delivery como portal independente, aba Delivery no caixa e aba única Delivery no admin
 - [x] Versão v1.0.8: planos com todas as funções do sistema (liga/desliga por plano, preço e sugestão de mercado) valendo também nas telas públicas e integrações; tema claro/escuro
+- [x] Versão v1.0.9: teste grátis de 14 dias com cadastro em /cadastro (CPF/CNPJ único), relógio no admin e bloqueio automático com contato pelo WhatsApp
 - [ ] Instalar o Oxys Servidor numa loja real
 - [x] Loja online e cardápio QR para lojas com servidor dedicado (mesmo endereço de sempre; a nuvem repassa para o servidor da loja com assinatura)
 - [ ] Robô de WhatsApp, iFood, emissão de NFC-e, assistente de IA e marketing no servidor dedicado

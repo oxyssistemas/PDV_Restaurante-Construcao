@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { BrandingProvider } from "@/contexts/BrandingContext";
 
 import Login from "./pages/Login";
+import TrialSignup from "./pages/public/TrialSignup";
 import Setup from "./pages/Setup";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -120,6 +121,7 @@ const App = () => (
           <DedicatedGate>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/cadastro" element={<TrialSignup />} />
             <Route path="/setup" element={<Setup />} />
             <Route path="/" element={<Index />} />
             <Route path="/mesa/:token" element={<TableMenu />} />

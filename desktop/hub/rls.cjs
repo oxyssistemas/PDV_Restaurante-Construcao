@@ -5,6 +5,7 @@
 // mesmas regras da nuvem e acompanha sozinho qualquer mudança nelas.
 //
 // Lógica de três valores como no SQL (true / false / null); uma política só libera quando dá true.
+const { restaurantActive } = require('./trial.cjs');
 
 // ---------- leitura ----------
 function tokenize(src) {
@@ -233,7 +234,7 @@ function helpers(ctx) {
       && (r.role === 'super_admin' || r.restaurant_id === h));
   };
   const belongs = (uid, rid) => rid != null && roles(uid).some(r => r.restaurant_id === rid);
-  const active = (rid) => ctx.db.restaurant(rid)?.status === 'active';
+  const active = (rid) => restaurantActive(ctx.db.restaurant(rid), (id) => ctx.db.restaurant(id));
   const feature = (rid, f) => {
     const r = ctx.db.restaurant(rid);
     const plan = r ? ctx.db.plan(r.plan_code) : null;

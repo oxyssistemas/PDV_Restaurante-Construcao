@@ -6,6 +6,7 @@
 //    (restaurante, plano, equipe). Se a loja tiver um Supabase próprio, cada mudança vai para lá também.
 
 const crypto = require('node:crypto');
+const { restaurantActive } = require('./trial.cjs');
 const { authorizer } = require('./policies.cjs');
 const rls = require('./rls.cjs');
 
@@ -1028,7 +1029,7 @@ class Mirror {
         this.loginAttempts.delete(String(args._email || '').trim().toLowerCase());
         return null;
       case 'is_restaurant_active':
-        return this.rows('restaurants').some(r => r.id === args._restaurant_id && r.status === 'active');
+        return restaurantActive(this.rows('restaurants').find(r => r.id === args._restaurant_id), (id) => this.rows('restaurants').find(r => r.id === id));
       default:
         throw new OfflineError(NEEDS_INTERNET);
     }

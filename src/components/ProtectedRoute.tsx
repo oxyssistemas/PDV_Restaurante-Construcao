@@ -1,6 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import TrialGate from '@/components/TrialGate';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -25,5 +26,5 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
     if (!hasAccess) return <Navigate to="/" replace />;
   }
 
-  return <>{children}</>;
+  return <TrialGate>{children}</TrialGate>;
 }

@@ -193,7 +193,10 @@ export default function Login() {
               {remaining > 0 ? `Bloqueado (${formatTime(remaining)})` : 'Entrar'}
             </Button>
           </form>
-
+          <p className="mt-5 text-center text-sm text-muted-foreground">
+            Ainda não usa o Oxys?{' '}
+            <Link to="/cadastro" className="font-medium text-primary hover:underline">Teste grátis por 14 dias</Link>
+          </p>
         </CardContent>
       </Card>
       <p className="mt-4 text-xs text-muted-foreground">

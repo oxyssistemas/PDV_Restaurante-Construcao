@@ -117,6 +117,7 @@ export default function Restaurants() {
                       <Badge variant={r.status === 'active' ? 'default' : 'destructive'}>
                         {r.status === 'active' ? 'Ativo' : 'Bloqueado'}
                       </Badge>
+                      {r.trial_ends_at && <TrialControls id={r.id} endsAt={r.trial_ends_at} />}
                     </TableCell>
                     <TableCell>
                       {servers?.[r.id]?.enabled ? (
@@ -318,5 +319,35 @@ function BranchLimit({ id, limit, used }: { id: string; limit: number; used: num
       <Input type="number" min={0} value={value} onChange={e => setValue(e.target.value)} onBlur={save}
         onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} className="h-7 w-16 px-2 text-xs" />
     </label>
+  );
+}
+
+/** Teste grátis da loja: tempo restante, mais 7 dias ou liberar de vez (cliente fechou um plano). */
+function TrialControls({ id, endsAt }: { id: string; endsAt: string }) {
+  const queryClient = useQueryClient();
+  const left = new Date(endsAt).getTime() - Date.now();
+  const days = Math.ceil(left / 86_400_000);
+  const save = useMutation({
+    mutationFn: async (trial_ends_at: string | null) => {
+      const { error } = await supabase.from('restaurants').update({ trial_ends_at }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => {
+      queryClient.invalidateQueries({ queryKey: ['super-admin-restaurants'] });
+      toast({ title: v ? 'Teste prorrogado' : 'Teste encerrado: loja liberada sem prazo' });
+    },
+    onError: (e: Error) => toast({ title: 'Erro', description: e.message, variant: 'destructive' }),
+  });
+  const plus7 = new Date(Math.max(Date.now(), new Date(endsAt).getTime()) + 7 * 86_400_000).toISOString();
+  return (
+    <div className="mt-1 space-y-1">
+      <Badge variant="outline" className={left > 0 ? 'border-primary/50 text-primary' : 'border-destructive/50 text-destructive'}>
+        {left > 0 ? `Teste: ${days} dia(s)` : 'Teste vencido'}
+      </Badge>
+      <div className="flex gap-1">
+        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" disabled={save.isPending} onClick={() => save.mutate(plus7)}>+7 dias</Button>
+        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" disabled={save.isPending} onClick={() => save.mutate(null)}>Liberar plano</Button>
+      </div>
+    </div>
   );
 }

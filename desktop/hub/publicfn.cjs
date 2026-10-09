@@ -6,6 +6,7 @@
 // No servidor dedicado, a nuvem repassa as chamadas da internet para cá (x-oxys-relay = HMAC do corpo).
 
 const crypto = require('node:crypto');
+const { restaurantActive } = require('./trial.cjs');
 
 class PublicError extends Error { constructor(message, status = 400) { super(message); this.status = status; } }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -31,7 +32,7 @@ function createPublicFunctions({ mirror, publicBase = () => null, cloudReviewUrl
   const rid = () => mirror.restaurantId;
   const rows = (t) => mirror.rows(t).filter(r => !('restaurant_id' in r) || r.restaurant_id === rid());
   const restaurant = () => mirror.rows('restaurants').find(r => r.id === rid());
-  const active = () => restaurant()?.status === 'active' || restaurant()?.status === undefined;
+  const active = () => restaurant()?.status === undefined || restaurantActive(restaurant(), (id) => mirror.rows('restaurants').find(r => r.id === id));
   const brand = () => {
     const b = rows('branding_settings')[0];
     return { name: (b?.brand_name || '').trim() || restaurant()?.name || 'Restaurante', logo: mediaUrl('menu-images', b?.logo_light_url || b?.logo_dark_url) };
