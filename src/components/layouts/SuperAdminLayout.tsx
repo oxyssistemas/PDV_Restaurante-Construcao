@@ -7,6 +7,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import SideNavShell from './SideNavShell';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const navItems = [
   { to: '/super-admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
@@ -57,6 +58,7 @@ export default function SuperAdminLayout() {
 
       <div className="shrink-0 border-t border-sidebar-border p-4">
         <div className="text-xs text-sidebar-foreground/50 mb-2 truncate">{user?.email}</div>
+        <ThemeToggle />
         <Button
           variant="ghost"
           size="sm"

@@ -33,6 +33,7 @@ import ReviewsPage from './pages/shared/ReviewsPage';
 import AccountantPage from './pages/shared/AccountantPage';
 import FiscalPage from './pages/shared/FiscalPage';
 import ModuleGate from "./components/ModuleGate";
+import FeatureGate from "./components/FeatureGate";
 import StockCountsPage from "./pages/shared/StockCounts";
 import StockCountDetailPage from "./pages/shared/StockCountDetail";
 import SettingsPage from "./pages/admin/Settings";
@@ -160,7 +161,7 @@ const App = () => (
               <Route path="reviews" element={<ModuleGate module="reviews"><ReviewsPage /></ModuleGate>} />
               <Route path="accountant" element={<ModuleGate module="accountant"><AccountantPage /></ModuleGate>} />
               <Route path="kiosks" element={<ModuleGate module="kiosks"><KiosksPage /></ModuleGate>} />
-              <Route path="permissions" element={<RoleGate roles={['admin']}><PermissionsPage /></RoleGate>} />
+              <Route path="permissions" element={<RoleGate roles={['admin']}><FeatureGate feature="permissions"><PermissionsPage /></FeatureGate></RoleGate>} />
               <Route path="history" element={<ModuleGate module="history"><OrdersHistory /></ModuleGate>} />
               <Route path="hr" element={<ModuleGate module="hr"><HrPage /></ModuleGate>} />
               <Route path="dre" element={<ModuleGate module="dre"><DrePage /></ModuleGate>} />
@@ -213,7 +214,7 @@ const App = () => (
               <Route path="orders" element={<WaiterOrders />} />
               <Route path="orders/:orderId" element={<OrderDetail />} />
               <Route path="menu" element={<WaiterMenu />} />
-              <Route path="reservations" element={<WaiterReservations />} />
+              <Route path="reservations" element={<FeatureGate feature="reservations"><WaiterReservations /></FeatureGate>} />
             </Route>
             <Route path="/kitchen" element={
               <ProtectedRoute allowedRoles={['kitchen']}>

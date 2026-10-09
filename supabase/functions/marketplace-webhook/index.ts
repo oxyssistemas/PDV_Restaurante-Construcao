@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { planAllows } from '../_shared/plan.ts';
 
 // Pedidos de 99Food, Keeta e Rappi entrando sozinhos no sistema.
 //   POST /marketplace-webhook/<app>/<chave da loja>   (app = 99food | keeta | rappi)
@@ -91,6 +92,7 @@ Deno.serve(async (req) => {
     return json({ error: 'Assinatura inválida' }, 401);
   }
   if (!integ.enabled) return json({ ok: true, ignored: 'integração desligada' });
+  if (!(await planAllows(sb, integ.restaurant_id, 'marketplaces'))) return json({ ok: true, ignored: 'fora do plano da loja' });
 
   let body: Any;
   try { body = JSON.parse(raw); } catch { return json({ error: 'JSON inválido' }, 400); }

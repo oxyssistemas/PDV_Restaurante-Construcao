@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 
 /** Taxa de serviço e couvert da loja (configurados em Admin → Configurações). */
 export type ServiceSettings = Tables<'service_settings'>;
@@ -11,13 +12,17 @@ export const defaultServiceSettings = (restaurantId: string): ServiceSettings =>
 });
 
 export function useServiceSettings(restaurantId?: string | null) {
+  const { hasFeature } = usePlanFeatures();
+  // fora do plano: taxa e couvert ficam desligados mesmo que estejam configurados
+  const inPlan = hasFeature('service_fee');
   return useQuery({
-    queryKey: ['service-settings', restaurantId],
+    queryKey: ['service-settings', restaurantId, inPlan],
     enabled: !!restaurantId,
     queryFn: async () => {
       const { data, error } = await supabase.from('service_settings').select('*').eq('restaurant_id', restaurantId!).maybeSingle();
       if (error) throw error;
-      return data ?? defaultServiceSettings(restaurantId!);
+      const settings = data ?? defaultServiceSettings(restaurantId!);
+      return inPlan ? settings : { ...settings, service_enabled: false, couvert_enabled: false };
     },
   });
 }

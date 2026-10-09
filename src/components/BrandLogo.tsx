@@ -8,7 +8,7 @@ interface BrandLogoProps {
   fallbackIcon: ComponentType<{ className?: string }>;
   /** Nome padrão do portal, usado quando não há nome de marca definido. */
   fallbackName: string;
-  /** Usa a logo para fundo escuro (sidebar) — padrão. */
+  /** Usa a logo para fundo escuro (padrão: segue o tema claro/escuro em uso). */
   dark?: boolean;
   /** Texto secundário (ex.: "Frente de Caixa"). */
   subtitle?: string;
@@ -22,11 +22,11 @@ interface BrandLogoProps {
  * restaurante configura logo/nome na Identidade visual.
  */
 export default function BrandLogo({
-  fallbackIcon: Icon, fallbackName, dark = true, subtitle,
+  fallbackIcon: Icon, fallbackName, dark, subtitle,
   className, nameClassName, iconWrapperClassName,
 }: BrandLogoProps) {
-  const { branding } = useBranding();
-  const stored = dark
+  const { branding, theme } = useBranding();
+  const stored = (dark ?? theme === 'dark')
     ? branding?.logo_dark_url || branding?.logo_light_url
     : branding?.logo_light_url || branding?.logo_dark_url;
   const { data: logoUrl } = useMenuImageUrl(stored);

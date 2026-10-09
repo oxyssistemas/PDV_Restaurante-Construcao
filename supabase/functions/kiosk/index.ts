@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { planAllows } from '../_shared/plan.ts';
 
 // Autoatendimento (totem / tablet no balcão), sem login: www.oxysrestaurante.app/totem/<chave do totem>
 //   { action: 'menu', token }          → loja, configuração do totem e cardápio
@@ -25,6 +26,7 @@ Deno.serve(async (req) => {
     const restaurant = (kiosk as any)?.restaurants;
     if (!kiosk || !kiosk.enabled || restaurant?.status !== 'active') return json({ error: 'Este totem está desativado no momento.' }, 404);
     const rid = kiosk.restaurant_id;
+    if (!(await planAllows(sb, rid, 'kiosk'))) return json({ error: 'O autoatendimento não está ativo nesta loja.' }, 403);
 
     if (body?.action === 'order') {
       const o = body?.order ?? {};

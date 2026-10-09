@@ -22,6 +22,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import SideNavShell from './SideNavShell';
+import ThemeToggle from '@/components/ThemeToggle';
 import { ModuleKey } from '@/lib/modules';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
 
@@ -108,6 +109,7 @@ export default function CashierLayout() {
 
       <div className="shrink-0 border-t border-sidebar-border p-4">
         <div className="mb-2 truncate text-xs text-sidebar-foreground/50">{user?.email}</div>
+        <ThemeToggle />
         <Button
           variant="ghost"
           className="w-full justify-start gap-2 rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive"

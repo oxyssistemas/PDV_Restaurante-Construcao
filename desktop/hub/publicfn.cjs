@@ -318,6 +318,13 @@ function createPublicFunctions({ mirror, publicBase = () => null, cloudReviewUrl
   }
 
   const HANDLERS = { kiosk, 'order-review': review, 'public-menu': tableMenu, 'delivery-store': onlineStore };
+  // função do plano da loja que cada tela pública precisa (mesma regra da nuvem)
+  const PLAN = {
+    kiosk: ['kiosk', 'O autoatendimento não está ativo nesta loja.'],
+    'order-review': ['reviews', 'A avaliação não está ativa nesta loja.'],
+    'public-menu': ['qr_menu', 'O cardápio pelo QR Code não está ativo nesta loja. Chame o garçom.'],
+    'delivery-store': ['online_store', 'Loja não encontrada.'],
+  };
 
   /** name: função; raw: corpo como veio; headers: cabeçalhos do pedido. */
   function handle(name, raw, headers) {
@@ -326,6 +333,7 @@ function createPublicFunctions({ mirror, publicBase = () => null, cloudReviewUrl
     // na central offline só o totem e o QR da mesa (avaliação e loja online ficam na nuvem)
     if (!dedicated && !['kiosk', 'public-menu'].includes(name)) return null;
     if (!mirror.ready) throw new PublicError('O servidor ainda está carregando os dados da loja.', 503);
+    if (!mirror.hasFeature(PLAN[name][0])) throw new PublicError(PLAN[name][1], name === 'delivery-store' ? 404 : 403);
     let body;
     try { body = raw ? JSON.parse(raw) : {}; } catch { throw new PublicError('JSON inválido'); }
     // repasse da nuvem: cliente da loja online já confirmado lá
@@ -345,6 +353,7 @@ function createPublicFunctions({ mirror, publicBase = () => null, cloudReviewUrl
   function reviewUrl(order) {
     const fs = rows('feedback_settings')[0];
     if (!order?.public_token || fs?.enabled === false || fs?.print_on_receipt === false || !cloudReviewUrl) return null;
+    if (!mirror.hasFeature('reviews')) return null;
     return cloudReviewUrl(order);
   }
 

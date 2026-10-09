@@ -1,4 +1,5 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
+import { planAllows } from './plan.ts';
 import { getAccount, getCredential, graph } from './marketing.ts';
 
 // Robô de atendimento do WhatsApp de cada restaurante.
@@ -86,6 +87,7 @@ export async function handleInbound(admin: SupabaseClient, restaurantId: string,
   if (!conv) return;
   const { settings, store, name, address } = await context(admin, restaurantId);
   if (!settings?.enabled) return;
+  if (!(await planAllows(admin, restaurantId, 'whatsapp'))) return;
   if (conv.bot_paused_until && new Date(conv.bot_paused_until).getTime() > Date.now()) return;
 
   const t = norm(text);
@@ -147,6 +149,7 @@ export async function handleOrderEvent(admin: SupabaseClient, orderId: string, e
   if (!order?.customer_phone) return { skipped: 'sem telefone' };
   const { settings, store } = await context(admin, order.restaurant_id);
   if (!settings?.enabled || !settings.notify_status) return { skipped: 'robô desligado' };
+  if (!(await planAllows(admin, order.restaurant_id, 'whatsapp'))) return { skipped: 'fora do plano' };
 
   const { data: convs } = await admin.from('whatsapp_conversations').select('*')
     .eq('restaurant_id', order.restaurant_id).like('phone', `%${last8(order.customer_phone)}`)

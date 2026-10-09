@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Bike, LogOut, ListOrdered } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import ThemeToggle from '@/components/ThemeToggle';
 import BrandLogo from '@/components/BrandLogo';
 
 const navItems = [
@@ -30,6 +31,7 @@ export default function CourierLayout() {
           nameClassName="text-base"
           iconWrapperClassName="bg-primary text-primary-foreground"
         />
+        <ThemeToggle compact />
         <Button variant="ghost" size="icon" onClick={handleSignOut} aria-label="Sair">
           <LogOut className="h-5 w-5" />
         </Button>

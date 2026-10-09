@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Plus, Loader2, Trash2, Users, QrCode } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableQrDialog from '@/components/TableQrDialog';
+import FeatureGate from '@/components/FeatureGate';
 import { useBranding } from '@/contexts/BrandingContext';
 
 const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' }> = {
@@ -132,11 +133,13 @@ export default function TablesPage() {
       <Dialog open={!!qrTable} onOpenChange={open => !open && setQrTable(null)}>
         <DialogContent>
           {qrTable && (
-            <TableQrDialog
-              tableNumber={qrTable.number}
-              qrToken={qrTable.qr_token}
-              brandName={branding?.brand_name ?? undefined}
-            />
+            <FeatureGate feature="qr_menu">
+              <TableQrDialog
+                tableNumber={qrTable.number}
+                qrToken={qrTable.qr_token}
+                brandName={branding?.brand_name ?? undefined}
+              />
+            </FeatureGate>
           )}
         </DialogContent>
       </Dialog>

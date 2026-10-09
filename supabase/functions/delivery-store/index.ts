@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { dedicatedFor, relay, type DedicatedTarget } from '../_shared/relay.ts';
+import { planAllows } from '../_shared/plan.ts';
 
 // Loja online do restaurante (sem login): www.oxysrestaurante.app/pedir/<slug>
 //   { action: 'store', slug }                       → dados da loja e cardápio
@@ -69,6 +70,8 @@ async function storeBySlug(sb: DB, slug: string) {
   const { data } = await sb.from('delivery_stores').select('*, restaurants!inner(id, name, status)').eq('slug', slug).maybeSingle();
   const r = (data as any)?.restaurants;
   if (!data || !data.enabled || r?.status !== 'active') return null;
+  // loja online fora do plano: fica como se não existisse
+  if (!(await planAllows(sb, data.restaurant_id, 'online_store'))) return null;
   return data as any;
 }
 
@@ -253,6 +256,7 @@ Deno.serve(async (req) => {
     if (action === 'order') {
       const slug = String(body?.slug ?? '').toLowerCase();
       if (!SLUG.test(slug)) return json({ error: 'Loja não encontrada.' }, 404);
+      if (!(await storeBySlug(sb, slug))) return json({ error: 'Loja não encontrada.' }, 404);
       const user = await currentUser(sb, req);
       if (!user) return json({ error: 'Entre na sua conta para fazer o pedido.' }, 401);
       const o = body?.order ?? {};

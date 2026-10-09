@@ -12,11 +12,14 @@ import { useState } from 'react';
 import NotificationsBell from '@/components/NotificationsBell';
 import { ModuleKey } from '@/lib/modules';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
+import type { FeatureKey } from '@/lib/plans';
 import { useCurrentStore } from '@/hooks/useCurrentStore';
 import StoreSwitcher from '@/components/StoreSwitcher';
 import SideNavShell from './SideNavShell';
+import ThemeToggle from '@/components/ThemeToggle';
 
-const navItems: { to: string; icon: typeof Users; label: string; end: boolean; module?: ModuleKey; branches?: true; network?: true; adminOnly?: true }[] = [
+const navItems: { to: string; icon: typeof Users; label: string; end: boolean; module?: ModuleKey; branches?: true; network?: true; adminOnly?: true; feature?: FeatureKey }[] = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true, module: 'dashboard' },
   { to: '/admin/network', icon: LineChart, label: 'Painel da rede', end: false, module: 'network', network: true },
   { to: '/admin/assistant', icon: Sparkles, label: 'Assistente IA', end: false, module: 'ai' },
@@ -37,7 +40,7 @@ const navItems: { to: string; icon: typeof Users; label: string; end: boolean; m
   { to: '/admin/delivery', icon: Bike, label: 'Delivery', end: false, module: 'delivery' },
   { to: '/admin/branches', icon: Network, label: 'Filiais', end: false, module: 'branches', branches: true },
   { to: '/admin/users', icon: Users, label: 'Usuários', end: false, module: 'users' },
-  { to: '/admin/permissions', icon: ShieldCheck, label: 'Permissões', end: false, adminOnly: true },
+  { to: '/admin/permissions', icon: ShieldCheck, label: 'Permissões', end: false, adminOnly: true, feature: 'permissions' },
   { to: '/admin/branding', icon: Palette, label: 'Identidade visual', end: false, module: 'branding' },
   { to: '/admin/settings', icon: Settings, label: 'Configurações', end: false, module: 'settings' },
 ];
@@ -49,12 +52,13 @@ const navItems: { to: string; icon: typeof Users; label: string; end: boolean; m
 export default function AdminLayout() {
   const { signOut, user, stores, roles, isSuperAdmin } = useAuth();
   const { canView, isLoading: accessLoading } = useModuleAccess();
+  const { hasFeature } = usePlanFeatures();
   const location = useLocation();
   const { canManageBranches } = useCurrentStore();
   // Permissões ficam com o dono (o banco só deixa o admin gravar permissões)
   const isOwner = isSuperAdmin || roles.some(r => r.role === 'admin');
   const visibleItems = navItems.filter(i =>
-    (!i.module || canView(i.module)) && (!i.adminOnly || isOwner) &&
+    (!i.module || canView(i.module)) && (!i.adminOnly || isOwner) && (!i.feature || hasFeature(i.feature)) &&
     (!i.branches || canManageBranches) && (!i.network || stores.length > 1));
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -100,6 +104,7 @@ export default function AdminLayout() {
 
       <div className="shrink-0 border-t border-sidebar-border p-4">
         <div className="text-xs text-sidebar-foreground/50 mb-2 truncate">{user?.email}</div>
+        <ThemeToggle />
         <Button
           variant="ghost"
           size="sm"

@@ -21,6 +21,7 @@ import {
 } from '@/lib/printQueue';
 import { getStationActivity, type StationActivity } from '@/components/print/PrintStationRunner';
 import OfflineHubCard from '@/components/print/OfflineHubCard';
+import FeatureGate from '@/components/FeatureGate';
 
 const DEFAULT_DEVICE = '__padrao__';
 const sameDevices = (a: Record<string, string>, b: Record<string, string>) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
@@ -174,7 +175,7 @@ export default function PrintStation() {
         </CardContent>
       </Card>
 
-      {desktop && <OfflineHubCard />}
+      {desktop && <FeatureGate feature="offline" fallback={null}><OfflineHubCard /></FeatureGate>}
 
       {desktop ? (
         <Card>

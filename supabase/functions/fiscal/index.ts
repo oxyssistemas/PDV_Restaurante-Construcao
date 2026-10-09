@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
+import { OFF_PLAN, planAllows } from '../_shared/plan.ts';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { buildNfce } from './build.ts';
 import { archiveXml, buildAccountantPackage, packageLink } from './accountant.ts';
@@ -168,6 +169,10 @@ Deno.serve(async (req) => {
 
     const rid = body.restaurantId;
     const provider = currentProvider();
+    // funções do plano: emissão (fiscal) e pacote do contador (accountant)
+    const needs = String(body.action ?? '').startsWith('accountant') ? 'accountant'
+      : ['emit', 'emit_order'].includes(body.action) ? 'fiscal' : null;
+    if (needs && typeof rid === 'string' && !(await planAllows(admin(), rid, needs))) return json({ error: OFF_PLAN }, 403);
     switch (body.action) {
       case 'config': {
         const { db } = await authorize(req, rid, ['admin', 'finance', 'cashier']);

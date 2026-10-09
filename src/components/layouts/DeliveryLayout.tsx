@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
 import { useState } from 'react';
 import SideNavShell from './SideNavShell';
+import ThemeToggle from '@/components/ThemeToggle';
 import { ModuleKey } from '@/lib/modules';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
 
@@ -57,6 +58,7 @@ export default function DeliveryLayout() {
       </nav>
       <div className="shrink-0 border-t border-sidebar-border p-4">
         <div className="text-xs text-sidebar-foreground/50 mb-2 truncate">{user?.email}</div>
+        <ThemeToggle />
         <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-sidebar-foreground/70" onClick={handleSignOut}>
           <LogOut className="h-4 w-4" /> Sair
         </Button>

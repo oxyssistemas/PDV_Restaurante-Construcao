@@ -35,7 +35,8 @@ export function useModuleAccess() {
 
   const raw = (module: ModuleKey) => {
     if (isSuperAdmin) return { view: true, edit: true };
-    const override = overrides?.[module];
+    // sem "Permissões por pessoa" no plano, vale só o padrão do cargo
+    const override = hasFeature('permissions') ? overrides?.[module] : undefined;
     return override ?? defaultModuleAccess(roleNames, module);
   };
 

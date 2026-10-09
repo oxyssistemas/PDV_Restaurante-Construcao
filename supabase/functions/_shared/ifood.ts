@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { OFF_PLAN, planAllows } from './plan.ts';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 export const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -35,6 +36,7 @@ export async function requireRestaurantAccess(
     .eq('user_id', user.id).eq('restaurant_id', restaurantId);
   const ok = (data || []).some((r: { role: string }) => roles.includes(r.role));
   if (!ok) return json({ error: 'Sem permissão para este restaurante' }, 403);
+  if (!(await planAllows(admin(), restaurantId, 'ifood'))) return json({ error: OFF_PLAN }, 403);
   return { userId: user.id };
 }
 

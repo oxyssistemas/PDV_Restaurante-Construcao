@@ -1,7 +1,9 @@
-import { createContext, ReactNode, useContext, useEffect, useMemo } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
+import { applyTheme, storeTheme, storedTheme, type ThemeMode } from '@/lib/theme';
 
 export interface Branding {
   brand_name: string | null;
@@ -26,8 +28,16 @@ export interface Branding {
   receipt_footer: string | null;
 }
 
-interface Ctx { branding: Branding | null; isLoading: boolean }
-const BrandingContext = createContext<Ctx>({ branding: null, isLoading: false });
+interface Ctx {
+  branding: Branding | null;
+  isLoading: boolean;
+  /** Tema em uso agora. */
+  theme: ThemeMode;
+  /** A pessoa pode escolher claro/escuro (sem white label: com ele, vale o tema da identidade visual). */
+  canChooseTheme: boolean;
+  setTheme: (mode: ThemeMode) => void;
+}
+const BrandingContext = createContext<Ctx>({ branding: null, isLoading: false, theme: 'dark', canChooseTheme: true, setTheme: () => {} });
 
 export const useBranding = () => useContext(BrandingContext);
 
@@ -73,6 +83,15 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   });
 
   const branding = data ?? null;
+  const { hasFeature } = usePlanFeatures();
+  const whiteLabel = hasFeature('branding');
+  const [userTheme, setUserTheme] = useState<ThemeMode>(storedTheme);
+  // com white label configurado, o tema escolhido na identidade visual vale para todos
+  const brandTheme = branding && whiteLabel && (branding.theme_mode === 'light' || branding.theme_mode === 'dark')
+    ? (branding.theme_mode as ThemeMode) : null;
+  const theme = brandTheme ?? userTheme;
+
+  useEffect(() => { applyTheme(theme); }, [theme]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -82,7 +101,8 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
       root.style.setProperty(name, value);
       applied.push(name);
     };
-    if (branding) {
+    // cores, fontes e ícone próprios só com white label no plano
+    if (branding && whiteLabel) {
       setVar('--primary', hexToHsl(branding.primary_color));
       setVar('--secondary', hexToHsl(branding.secondary_color));
       setVar('--accent', hexToHsl(branding.accent_color));
@@ -91,8 +111,6 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
       setVar('--sidebar-background', hexToHsl(branding.sidebar_color));
       setVar('--radius', radiusMap[branding.radius] ?? null);
       setVar('--ui-density', densityMap[branding.density] ?? null);
-      if (branding.theme_mode === 'light') root.classList.remove('dark');
-      if (branding.theme_mode === 'dark') root.classList.add('dark');
       if (branding.favicon_url) {
         const apply = (href: string) => {
           let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
@@ -107,8 +125,11 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
       }
     }
     return () => { applied.forEach(n => root.style.removeProperty(n)); };
-  }, [branding]);
+  }, [branding, whiteLabel]);
 
-  const value = useMemo(() => ({ branding, isLoading }), [branding, isLoading]);
+  const value = useMemo(() => ({
+    branding, isLoading, theme, canChooseTheme: !brandTheme,
+    setTheme: (mode: ThemeMode) => { storeTheme(mode); setUserTheme(mode); },
+  }), [branding, isLoading, theme, brandTheme]);
   return <BrandingContext.Provider value={value}>{children}</BrandingContext.Provider>;
 }

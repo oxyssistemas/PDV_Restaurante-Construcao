@@ -7,6 +7,7 @@ import BrandLogo from '@/components/BrandLogo';
 import { useState } from 'react';
 import NotificationsBell from '@/components/NotificationsBell';
 import SideNavShell from './SideNavShell';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const navItems = [
   { to: '/marketing', icon: LayoutDashboard, label: 'Visão geral', end: true },
@@ -48,6 +49,7 @@ export default function MarketingLayout() {
       </nav>
       <div className="shrink-0 border-t border-sidebar-border p-4">
         <div className="mb-2 truncate text-xs text-sidebar-foreground/50">{user?.email}</div>
+        <ThemeToggle />
         <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-sidebar-foreground/70" onClick={handleSignOut}>
           <LogOut className="h-4 w-4" /> Sair
         </Button>

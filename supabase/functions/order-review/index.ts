@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { dedicatedFor, relay } from '../_shared/relay.ts';
+import { planAllows } from '../_shared/plan.ts';
 
 // Avaliação pós-pedido (pública, sem login): www.oxysrestaurante.app/avaliar/<código do pedido>
 //   { action: 'get', token }                                          → loja, itens e a avaliação já feita
@@ -28,6 +29,9 @@ Deno.serve(async (req) => {
       const target = await dedicatedFor(sb, { restaurantId: body.r });
       if (target) return relay(target, 'order-review', body);
     }
+
+    const { data: ord } = await sb.from('orders').select('restaurant_id').eq('public_token', token).maybeSingle();
+    if (ord && !(await planAllows(sb, ord.restaurant_id, 'reviews'))) return json({ error: 'A avaliação não está ativa nesta loja.' }, 403);
 
     if (body?.action === 'submit') {
       const { error } = await sb.rpc('submit_review', {

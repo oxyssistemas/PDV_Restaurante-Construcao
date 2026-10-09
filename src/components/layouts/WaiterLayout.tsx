@@ -8,16 +8,19 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import SideNavShell from './SideNavShell';
+import ThemeToggle from '@/components/ThemeToggle';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 
 const navItems = [
   { to: '/waiter', icon: Grid3X3, label: 'Mesas', end: true },
   { to: '/waiter/orders', icon: ClipboardList, label: 'Pedidos', end: false },
   { to: '/waiter/menu', icon: BookOpen, label: 'Cardápio', end: false },
-  { to: '/waiter/reservations', icon: CalendarDays, label: 'Reservas', end: false },
+  { to: '/waiter/reservations', icon: CalendarDays, label: 'Reservas', end: false, feature: 'reservations' as const },
 ];
 
 export default function WaiterLayout() {
   const { signOut, user, currentRole } = useAuth();
+  const { hasFeature } = usePlanFeatures();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
@@ -68,7 +71,7 @@ export default function WaiterLayout() {
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-4">
-        {navItems.map(item => (
+        {navItems.filter(i => !('feature' in i) || hasFeature(i.feature)).map(item => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -91,6 +94,7 @@ export default function WaiterLayout() {
 
       <div className="shrink-0 border-t border-sidebar-border p-4">
         <div className="text-xs text-sidebar-foreground/50 mb-2 truncate">{user?.email}</div>
+        <ThemeToggle />
         <Button
           variant="ghost"
           size="sm"

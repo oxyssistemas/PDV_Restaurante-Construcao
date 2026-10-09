@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { dedicatedFor, relay } from '../_shared/relay.ts';
+import { planAllows } from '../_shared/plan.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,6 +47,9 @@ Deno.serve(async (req) => {
     const restaurant = (table as any)?.restaurants;
     if (!table || !table.qr_enabled || restaurant?.status !== 'active') {
       return json({ error: 'Este QR Code não está disponível no momento.' }, 404);
+    }
+    if (!(await planAllows(db, table.restaurant_id, 'qr_menu'))) {
+      return json({ error: 'O cardápio pelo QR Code não está ativo nesta loja. Chame o garçom.' }, 403);
     }
 
     if (action === 'menu') {

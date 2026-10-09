@@ -10,6 +10,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import PrintersCard from '@/components/admin/PrintersCard';
 import ServiceChargeCard from '@/components/admin/ServiceChargeCard';
+import FeatureGate from '@/components/FeatureGate';
 
 export default function SettingsPage() {
   const { currentRole } = useAuth();
@@ -91,7 +92,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {restaurantId && <ServiceChargeCard restaurantId={restaurantId} />}
+      {restaurantId && <FeatureGate feature="service_fee" fallback={null}><ServiceChargeCard restaurantId={restaurantId} /></FeatureGate>}
 
       {restaurantId && (
         <PrintersCard restaurantId={restaurantId} />
