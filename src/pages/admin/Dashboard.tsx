@@ -25,7 +25,7 @@ export default function AdminDashboard() {
       const [tables, orders, menuItems, categories, dailyPayments] = await Promise.all([
         supabase.from('restaurant_tables').select('id, status', { count: 'exact' }).eq('restaurant_id', restaurantId!),
         supabase.from('orders').select('id, status', { count: 'exact' }).eq('restaurant_id', restaurantId!).in('status', ['pending', 'preparing']),
-        supabase.from('menu_items').select('id', { count: 'exact' }).eq('restaurant_id', restaurantId!),
+        supabase.from('menu_items').select('id', { count: 'exact' }).eq('restaurant_id', restaurantId!).eq('is_rodizio_charge', false),
         supabase.from('menu_categories').select('id', { count: 'exact' }).eq('restaurant_id', restaurantId!),
         supabase.from('payments').select('amount').eq('restaurant_id', restaurantId!).gte('created_at', `${today}T00:00:00`).lte('created_at', `${today}T23:59:59`),
       ]);

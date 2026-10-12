@@ -14,9 +14,9 @@ export type FeatureKey =
   // financeiro e fiscal
   | 'fiscal' | 'accountant' | 'reports' | 'crm' | 'dre' | 'hr'
   // clientes
-  | 'loyalty' | 'reviews' | 'marketing'
+  | 'loyalty' | 'reviews' | 'marketing' | 'promotions'
   // gestão
-  | 'permissions' | 'ai' | 'branding' | 'branches';
+  | 'permissions' | 'branding' | 'branches';
 
 type FeatureDef = { label: string; group: string; hint: string };
 
@@ -52,9 +52,9 @@ export const FEATURES: Record<FeatureKey, FeatureDef> = {
   loyalty: { group: 'Clientes', label: 'Fidelidade e cashback', hint: 'Pontos, cashback ou selos; cashback como pagamento.' },
   reviews: { group: 'Clientes', label: 'Avaliações (NPS)', hint: 'QR no recibo, painel de NPS e respostas.' },
   marketing: { group: 'Clientes', label: 'Marketing', hint: 'Publicar no Instagram, Facebook e TikTok.' },
+  promotions: { group: 'Clientes', label: 'Promoções e cupons', hint: 'Happy hour, leve X pague Y e cupons da loja online.' },
 
   permissions: { group: 'Gestão', label: 'Permissões por pessoa', hint: 'Ver/editar por tela; sem isso vale o padrão do cargo.' },
-  ai: { group: 'Gestão', label: 'Assistente de IA', hint: 'Perguntas sobre vendas, estoque e equipe.' },
   branding: { group: 'Gestão', label: 'Identidade visual (white label)', hint: 'Logo, cores e nome próprios.' },
   branches: { group: 'Gestão', label: 'Filiais e painel da rede', hint: 'Várias lojas, gerentes e supervisores.' },
 };
@@ -87,9 +87,9 @@ const ESSENCIAL: FeatureKey[] = [
 const PROFISSIONAL: FeatureKey[] = [
   ...ESSENCIAL,
   'kiosk', 'stock_counts', 'cmv', 'delivery', 'online_store', 'whatsapp', 'ifood',
-  'accountant', 'crm', 'dre', 'hr', 'loyalty', 'reviews', 'permissions',
+  'accountant', 'crm', 'dre', 'hr', 'loyalty', 'reviews', 'permissions', 'promotions',
 ];
-const ENTERPRISE: FeatureKey[] = [...PROFISSIONAL, 'marketplaces', 'marketing', 'ai', 'branding', 'branches'];
+const ENTERPRISE: FeatureKey[] = [...PROFISSIONAL, 'marketplaces', 'marketing', 'branding', 'branches'];
 
 const only = (on: FeatureKey[]) => Object.fromEntries(featureKeys.map(k => [k, on.includes(k)])) as Record<FeatureKey, boolean>;
 
@@ -106,7 +106,7 @@ export const PLAN_SUGGESTION: Record<string, { price: number; description: strin
   },
   enterprise: {
     price: 549,
-    description: 'Tudo do Profissional + filiais e painel da rede, 99Food/Keeta/Rappi, marketing, IA e marca própria. Filial adicional: R$ 199/mês.',
+    description: 'Tudo do Profissional + filiais e painel da rede, 99Food/Keeta/Rappi, marketing e marca própria. Filial adicional: R$ 199/mês.',
     features: only(ENTERPRISE),
   },
 };

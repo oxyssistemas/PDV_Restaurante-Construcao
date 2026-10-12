@@ -1,11 +1,17 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { dedicatedFor, relay, type DedicatedTarget } from '../_shared/relay.ts';
 import { planAllows } from '../_shared/plan.ts';
+import { MENU_ITEM_FIELDS, activePromos, cleanOptions, withOptions } from '../_shared/menu.ts';
+import { geocode, withCity } from '../_shared/geo.ts';
 
 // Loja online do restaurante (sem login): www.oxysrestaurante.app/pedir/<slug>
 //   { action: 'store', slug }                       → dados da loja e cardápio
 //   { action: 'order', slug, order }                → cria o pedido (preço e taxa calculados no banco)
 //   { action: 'status', slug?, orderId, token }     → acompanhamento do pedido
+//   { action: 'coupon', slug, code, subtotal, fee } → confere o cupom e mostra o desconto (prévia da sacola)
+//   { action: 'quote', slug, address }              → taxa de entrega por km (loja com taxa por distância)
+//   { action: 'geocode_store', slug }               → equipe da loja: acha a loja no mapa (taxa por km e mapa do delivery)
+//   { action: 'geocode_orders', restaurantId }       → equipe: põe no mapa os pedidos de entrega em aberto
 //   { action: 'signup', slug, name, phone, email, password } → cria a conta do cliente (já confirmada)
 //   { action: 'me', slug, profile? }                → conta do cliente logado: dados, ficha no CRM e "Meus pedidos"
 // "order" e "me" exigem o cliente logado (token da sessão da loja no Authorization).
@@ -85,7 +91,7 @@ Deno.serve(async (req) => {
     // ---------- loja com servidor dedicado ----------
     const dedicated = await dedicatedStore(sb, String(body?.slug ?? '').toLowerCase());
     if (dedicated) {
-      if (action === 'store' || action === 'status') return relay(dedicated, 'delivery-store', body);
+      if (action === 'store' || action === 'status' || action === 'coupon' || action === 'quote') return relay(dedicated, 'delivery-store', body);
       const user = await currentUser(sb, req);
       if (action === 'signup') {
         // conta do cliente fica na nuvem; a ficha dele no CRM fica no servidor da loja
@@ -153,12 +159,12 @@ Deno.serve(async (req) => {
       const rid = store.restaurant_id;
       const [{ data: categories }, { data: items }, { data: branding }, { data: promos }] = await Promise.all([
         sb.from('menu_categories').select('id, name, sort_order').eq('restaurant_id', rid).order('sort_order'),
-        sb.from('menu_items').select('id, name, description, price, image_url, category_id').eq('restaurant_id', rid).eq('available', true).order('name'),
+        sb.from('menu_items').select(MENU_ITEM_FIELDS).eq('restaurant_id', rid).eq('available', true).order('name'),
         sb.from('branding_settings').select('brand_name, logo_light_url, logo_dark_url').eq('restaurant_id', rid).maybeSingle(),
         sb.from('delivery_promotions').select('id, title, subtitle, image, menu_item_id').eq('restaurant_id', rid).eq('active', true).order('sort_order').order('created_at'),
       ]);
-      const available = new Set((items ?? []).map(i => i.id));
-      const withImages = await Promise.all((items ?? []).map(async i => ({ ...i, price: Number(i.price), image_url: await signed(sb, i.image_url) })));
+      const withImages = await Promise.all((await withOptions(sb, rid, items ?? [])).map(async i => ({ ...i, price: Number(i.price), image_url: await signed(sb, i.image_url) })));
+      const available = new Set(withImages.map(i => i.id));
       return json({
         store: {
           slug: store.slug,
@@ -169,7 +175,8 @@ Deno.serve(async (req) => {
           pickup_enabled: store.pickup_enabled,
           min_order: Number(store.min_order),
           default_fee: Number(store.default_fee),
-          zones: (store.zones ?? []).map((z: any) => ({ name: String(z.name), fee: Number(z.fee) })),
+          zones: store.fee_mode === 'distance' ? [] : (store.zones ?? []).map((z: any) => ({ name: String(z.name), fee: Number(z.fee) })),
+          fee_mode: store.fee_mode, max_km: store.max_km == null ? null : Number(store.max_km),
           eta_minutes: store.eta_minutes,
           pickup_eta_minutes: store.pickup_eta_minutes,
           payment_methods: store.payment_methods,
@@ -191,6 +198,7 @@ Deno.serve(async (req) => {
         })),
         categories: categories ?? [],
         items: withImages,
+        auto_promotions: await activePromos(sb, rid, 'delivery'),
       });
     }
 
@@ -242,7 +250,7 @@ Deno.serve(async (req) => {
       if (profile) await sb.rpc('link_store_customer', { _restaurant_id: store.restaurant_id, _user_id: user.id });
 
       const { data: orders } = await sb.from('orders')
-        .select('id, created_at, delivery_status, order_type, total, delivery_fee, public_token, order_items(quantity, status, menu_items(name))')
+        .select('id, created_at, delivery_status, order_type, total, delivery_fee, discount, public_token, order_items(quantity, status, options_text, menu_items(name))')
         .eq('restaurant_id', store.restaurant_id).eq('customer_user_id', user.id)
         .order('created_at', { ascending: false }).limit(20);
       return json({
@@ -264,6 +272,7 @@ Deno.serve(async (req) => {
         menu_item_id: UUID.test(String(i?.menu_item_id ?? '')) ? String(i.menu_item_id) : '00000000-0000-0000-0000-000000000000',
         quantity: Number(i?.quantity ?? 0),
         notes: typeof i?.notes === 'string' ? i.notes.slice(0, 300) : null,
+        options: cleanOptions(i?.options),
       })) : [];
       const payload = {
         name: String(o.name ?? '').slice(0, 80), phone: String(o.phone ?? '').slice(0, 20),
@@ -273,11 +282,90 @@ Deno.serve(async (req) => {
         notes: String(o.notes ?? '').slice(0, 500), items,
         address_line: String(o.address_line ?? '').slice(0, 200), complement: String(o.complement ?? '').slice(0, 90),
         use_cashback: o.use_cashback === true,
-      };
+        coupon: String(o.coupon ?? '').trim().slice(0, 20),
+      } as Record<string, unknown>;
+      // taxa por km: o endereço vira coordenada aqui no servidor
+      const st = await storeBySlug(sb, slug);
+      if (st?.fee_mode === 'distance' && payload.mode === 'delivery') {
+        const g = await geocode(sb, withCity(String(o.address_line ?? o.address ?? '').slice(0, 200), st.address));
+        if (!g) return json({ error: 'Não encontramos esse endereço no mapa. Confira rua, número, bairro e cidade.' }, 400);
+        payload.geo = { lat: g.lat, lng: g.lng };
+      }
       const { data, error } = await sb.rpc('create_online_order', { _slug: slug, _order: payload, _user_id: user.id });
       if (error) return json({ error: error.message }, 400);
       const row = (data as any[])?.[0];
       return json({ orderId: row.order_id, token: row.public_token });
+    }
+
+    if (action === 'quote') {
+      const slug = String(body?.slug ?? '').toLowerCase();
+      const store = SLUG.test(slug) ? await storeBySlug(sb, slug) : null;
+      if (!store) return json({ error: 'Loja não encontrada.' }, 404);
+      if (store.fee_mode !== 'distance') return json({ mode: 'zones' });
+      const g = await geocode(sb, withCity(String(body?.address ?? '').slice(0, 200), store.address));
+      if (!g) return json({ error: 'Não encontramos esse endereço no mapa. Confira rua, número, bairro e cidade.' }, 400);
+      const { data } = await sb.rpc('delivery_fee_by_km', { _restaurant_id: store.restaurant_id, _lat: g.lat, _lng: g.lng });
+      const r = data as any;
+      if (!r?.ok) return json({ error: r?.error ?? 'Não foi possível calcular a entrega.', km: r?.km ?? null }, 400);
+      return json({ mode: 'distance', km: Number(r.km), fee: Number(r.fee), lat: g.lat, lng: g.lng, label: g.label });
+    }
+
+    if (action === 'geocode_store') {
+      const user = await currentUser(sb, req);
+      if (!user) return json({ error: 'Entre no sistema.' }, 401);
+      const slug = String(body?.slug ?? '').toLowerCase();
+      const { data: st } = await sb.from('delivery_stores').select('restaurant_id, address').eq('slug', slug).maybeSingle();
+      if (!st) return json({ error: 'Loja não encontrada.' }, 404);
+      const { data: roles } = await sb.from('user_roles').select('role').eq('user_id', user.id).eq('restaurant_id', st.restaurant_id);
+      if (!(roles ?? []).some((r: any) => ['admin', 'manager', 'supervisor', 'delivery'].includes(r.role))) return json({ error: 'Sem permissão.' }, 403);
+      if (!st.address) return json({ error: 'Preencha o endereço da loja.' }, 400);
+      const g = await geocode(sb, st.address);
+      if (!g) return json({ error: 'Não encontramos o endereço da loja no mapa. Escreva rua, número, bairro e cidade.' }, 400);
+      await sb.from('delivery_stores').update({ lat: g.lat, lng: g.lng }).eq('restaurant_id', st.restaurant_id);
+      return json({ lat: g.lat, lng: g.lng, label: g.label });
+    }
+
+    if (action === 'geocode_orders') {
+      // equipe: coloca no mapa os pedidos de entrega em aberto que ainda não têm coordenada (até 10 por vez)
+      const user = await currentUser(sb, req);
+      if (!user) return json({ error: 'Entre no sistema.' }, 401);
+      const rid = String(body?.restaurantId ?? '');
+      if (!UUID.test(rid)) return json({ error: 'Loja inválida.' }, 400);
+      const { data: roles } = await sb.from('user_roles').select('role').eq('user_id', user.id).eq('restaurant_id', rid);
+      if (!(roles ?? []).some((r: any) => ['admin', 'manager', 'supervisor', 'delivery', 'cashier'].includes(r.role))) return json({ error: 'Sem permissão.' }, 403);
+      const { data: st } = await sb.from('delivery_stores').select('address, lat, lng').eq('restaurant_id', rid).maybeSingle();
+      const { data: list } = await sb.from('orders').select('id, customer_address')
+        .eq('restaurant_id', rid).eq('order_type', 'delivery').is('archived_at', null).is('delivery_lat', null)
+        .in('delivery_status', ['pending', 'preparing', 'out_for_delivery']).not('customer_address', 'is', null).limit(10);
+      let found = 0;
+      for (const o of list ?? []) {
+        const g = await geocode(sb, withCity(String(o.customer_address).split(' — ')[0].slice(0, 200), st?.address));
+        if (!g) continue;
+        const km = st?.lat != null ? Number((await sb.rpc('road_km', { _lat1: st.lat, _lng1: st.lng, _lat2: g.lat, _lng2: g.lng })).data) : null;
+        await sb.from('orders').update({ delivery_lat: g.lat, delivery_lng: g.lng, delivery_km: km }).eq('id', o.id);
+        found++;
+        await new Promise(r => setTimeout(r, 1100)); // política do OpenStreetMap: 1 consulta por segundo
+      }
+      return json({ checked: list?.length ?? 0, found });
+    }
+
+    if (action === 'coupon') {
+      const slug = String(body?.slug ?? '').toLowerCase();
+      const store = SLUG.test(slug) ? await storeBySlug(sb, slug) : null;
+      if (!store) return json({ error: 'Loja não encontrada.' }, 404);
+      const user = await currentUser(sb, req);
+      const { data: profile } = user
+        ? await sb.from('customer_profiles').select('phone').eq('user_id', user.id).maybeSingle()
+        : { data: null };
+      const { data, error } = await sb.rpc('coupon_check', {
+        _restaurant_id: store.restaurant_id, _code: String(body?.code ?? '').slice(0, 20),
+        _subtotal: Number(body?.subtotal) || 0, _fee: Number(body?.fee) || 0,
+        _user_id: user?.id ?? null, _phone: profile?.phone ?? phone55(body?.phone) ?? '',
+      });
+      if (error) return json({ error: 'Não foi possível conferir o cupom.' }, 400);
+      const r = data as any;
+      if (!r?.ok) return json({ error: r?.error ?? 'Cupom inválido.' }, 400);
+      return json({ code: r.code, label: r.label, discount: Number(r.discount), free_delivery: !!r.free_delivery });
     }
 
     if (action === 'status') {
@@ -285,7 +373,7 @@ Deno.serve(async (req) => {
       const token = String(body?.token ?? '');
       if (!UUID.test(orderId) || !UUID.test(token)) return json({ error: 'Pedido não encontrado.' }, 404);
       const { data: order } = await sb.from('orders')
-        .select('id, restaurant_id, order_type, delivery_status, total, delivery_fee, customer_name, customer_address, payment_hint, change_for, created_at, order_items(quantity, unit_price, status, notes, menu_items(name))')
+        .select('id, restaurant_id, order_type, delivery_status, total, delivery_fee, discount, coupon_code, customer_name, customer_address, payment_hint, change_for, created_at, order_items(quantity, unit_price, status, notes, options_text, menu_items(name))')
         .eq('id', orderId).eq('public_token', token).maybeSingle();
       if (!order) return json({ error: 'Pedido não encontrado.' }, 404);
       const { data: store } = await sb.from('delivery_stores').select('slug, whatsapp, eta_minutes, pickup_eta_minutes').eq('restaurant_id', order.restaurant_id).maybeSingle();

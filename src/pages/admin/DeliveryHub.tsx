@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import {
-  Bike, DoorClosed, DoorOpen, Globe, LayoutGrid, ListOrdered, Loader2, MessageCircle, Settings2, ShoppingBag, Store,
+  Bike, Map as MapIcon, DoorClosed, DoorOpen, Globe, LayoutGrid, ListOrdered, Loader2, MessageCircle, Settings2, ShoppingBag, Store,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -22,6 +22,7 @@ import { brl } from '@/lib/finance';
 const TABS: { to: string; label: string; module: ModuleKey; icon?: typeof Bike; source?: string; end?: boolean }[] = [
   { to: '/admin/delivery', label: 'Visão geral', module: 'delivery', icon: LayoutGrid, end: true },
   { to: '/admin/delivery/pedidos', label: 'Pedidos', module: 'delivery', icon: ListOrdered },
+  { to: '/admin/delivery/mapa', label: 'Mapa e rotas', module: 'delivery', icon: MapIcon },
   { to: '/admin/delivery/loja', label: 'Loja online', module: 'online_store', source: 'site' },
   { to: '/admin/delivery/whatsapp', label: 'WhatsApp', module: 'whatsapp', source: 'whatsapp' },
   { to: '/admin/delivery/ifood', label: 'iFood', module: 'ifood', source: 'ifood' },
@@ -87,7 +88,7 @@ export function DeliveryOverview() {
         supabase.from('whatsapp_bot_settings').select('enabled').eq('restaurant_id', rid!).maybeSingle(),
         supabase.from('ifood_integrations').select('enabled, merchant_id, store_open, sync_store_status').eq('restaurant_id', rid!).maybeSingle(),
         supabase.from('marketplace_integrations').select('channel, enabled, store_ref').eq('restaurant_id', rid!),
-        supabase.from('orders').select('source, total, delivery_fee, delivery_status')
+        supabase.from('orders').select('source, total, delivery_fee, delivery_status, discount')
           .eq('restaurant_id', rid!).in('order_type', ['delivery', 'takeaway'])
           .gte('created_at', startOfDay(new Date()).toISOString()),
         supabase.from('couriers').select('status, active').eq('restaurant_id', rid!).eq('active', true),
@@ -178,7 +179,7 @@ export function DeliveryOverview() {
   const bySource = (s: string) => data.orders.filter(o => (o.source ?? 'internal') === s);
   const active = data.orders.filter(o => !['delivered', 'cancelled'].includes(o.delivery_status ?? ''));
   const revenue = data.orders.filter(o => o.delivery_status !== 'cancelled')
-    .reduce((t, o) => t + Number(o.total) + Number(o.delivery_fee || 0), 0);
+    .reduce((t, o) => t + Number(o.total) + Number(o.delivery_fee || 0) - Number(o.discount || 0), 0);
   const freeCouriers = data.couriers.filter(c => c.status === 'free').length;
   const anyEditable = channels.some(c => c.ready && canEdit(c.module));
   const openCount = channels.filter(c => c.open).length;

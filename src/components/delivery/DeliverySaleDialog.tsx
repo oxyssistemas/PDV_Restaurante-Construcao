@@ -1,4 +1,7 @@
 import { useMemo, useState } from 'react';
+import KmFeeButton, { type KmQuote } from '@/components/delivery/KmFee';
+import OptionPicker, { type PickedItem } from '@/components/OptionPicker';
+import { itemOnNow, useMenuOptions } from '@/lib/menuOptions';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,7 +25,7 @@ const methods = [
   { value: 'pix', label: 'PIX', icon: Smartphone },
 ];
 
-interface CartItem { id: string; name: string; price: number; quantity: number; }
+interface CartItem { id: string; name: string; price: number; quantity: number; menu_item_id?: string; options?: string[]; options_text?: string | null; }
 
 interface Props {
   open: boolean;
@@ -41,6 +44,7 @@ export default function DeliverySaleDialog({ open, onOpenChange, restaurantId, c
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [fee, setFee] = useState('0');
+  const [geo, setGeo] = useState<KmQuote | null>(null);
   const [courierId, setCourierId] = useState<string | null>(null);
   const [method, setMethod] = useState('');
 
@@ -50,7 +54,7 @@ export default function DeliverySaleDialog({ open, onOpenChange, restaurantId, c
     queryFn: async () => {
       const { data } = await supabase
         .from('menu_items')
-        .select('id, name, price')
+        .select('id, name, price, available_days, available_from, available_to')
         .eq('restaurant_id', restaurantId)
         .eq('available', true)
         .order('name');
@@ -73,14 +77,20 @@ export default function DeliverySaleDialog({ open, onOpenChange, restaurantId, c
   });
 
   const filtered = useMemo(
-    () => (menuItems || []).filter(i => i.name.toLowerCase().includes(search.toLowerCase())),
+    () => (menuItems || []).filter(i => itemOnNow(i) && i.name.toLowerCase().includes(search.toLowerCase())),
     [menuItems, search]
   );
 
   const subtotal = cart.reduce((s, c) => s + c.price * c.quantity, 0);
   const total = subtotal + (parseFloat(fee) || 0);
 
-  const add = (item: any) => setCart(prev => {
+  const { data: optionMap } = useMenuOptions(restaurantId);
+  const [picking, setPicking] = useState<any | null>(null);
+  const addPicked = (item: any, p: PickedItem) => setCart(prev => [...prev, {
+    id: `${item.id}-${Date.now()}`, menu_item_id: item.id, name: item.name, price: p.price, quantity: p.quantity,
+    options: p.options, options_text: [p.options_text, p.notes].filter(Boolean).join(' — ') || null,
+  }]);
+  const add = (item: any) => optionMap?.get(item.id)?.length ? setPicking(item) : setCart(prev => {
     const found = prev.find(c => c.id === item.id);
     if (found) return prev.map(c => c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c);
     return [...prev, { id: item.id, name: item.name, price: Number(item.price), quantity: 1 }];
@@ -94,7 +104,7 @@ export default function DeliverySaleDialog({ open, onOpenChange, restaurantId, c
     }));
 
   const reset = () => {
-    setCart([]); setName(''); setPhone(''); setAddress(''); setFee('0');
+    setCart([]); setName(''); setPhone(''); setAddress(''); setFee('0'); setGeo(null);
     setCourierId(null); setMethod(''); setSearch('');
   };
 
@@ -115,6 +125,7 @@ export default function DeliverySaleDialog({ open, onOpenChange, restaurantId, c
           customer_phone: phone.trim() || null,
           customer_address: address.trim(),
           delivery_fee: parseFloat(fee) || 0,
+          ...(geo ? { delivery_lat: geo.lat, delivery_lng: geo.lng, delivery_km: geo.km } : {}),
           total: subtotal,
           courier_id: courierId,
           ...authorFields(user, currentRole?.role),
@@ -126,7 +137,9 @@ export default function DeliverySaleDialog({ open, onOpenChange, restaurantId, c
       const { error: itemsError } = await supabase.from('order_items').insert(
         cart.map(c => ({
           order_id: order.id,
-          menu_item_id: c.id,
+          menu_item_id: c.menu_item_id ?? c.id,
+          options: c.options ?? [],
+          options_text: c.options_text ?? null,
           quantity: c.quantity,
           unit_price: c.price,
           status: 'pending' as const,
@@ -159,6 +172,8 @@ export default function DeliverySaleDialog({ open, onOpenChange, restaurantId, c
   return (
     <Dialog open={open} onOpenChange={o => { onOpenChange(o); if (!o) reset(); }}>
       <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+      <OptionPicker item={picking} groups={picking ? optionMap?.get(picking.id) ?? [] : []}
+        onClose={() => setPicking(null)} onConfirm={p => { addPicked(picking, p); setPicking(null); }} />
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Bike className="h-5 w-5 text-primary" /> Venda cliente delivery</DialogTitle>
         </DialogHeader>
@@ -183,7 +198,7 @@ export default function DeliverySaleDialog({ open, onOpenChange, restaurantId, c
             <div className="space-y-2 border-t border-border pt-3">
               {cart.length ? cart.map(c => (
                 <div key={c.id} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                  <span className="min-w-0 flex-1 truncate">{c.name}{c.options_text ? ` (${c.options_text})` : ''}</span>
                   <div className="flex items-center gap-1">
                     <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => changeQty(c.id, -1)}><Minus className="h-3 w-3" /></Button>
                     <span className="w-5 text-center">{c.quantity}</span>
@@ -206,11 +221,12 @@ export default function DeliverySaleDialog({ open, onOpenChange, restaurantId, c
             </div>
             <div className="space-y-1.5">
               <Label>Endereço *</Label>
-              <Textarea value={address} onChange={e => setAddress(e.target.value)} placeholder="Rua, número, bairro, referência" />
+              <Textarea value={address} onChange={e => { setAddress(e.target.value); setGeo(null); }} placeholder="Rua, número, bairro, referência" />
             </div>
             <div className="space-y-1.5">
               <Label>Taxa de entrega (R$)</Label>
               <Input type="number" min="0" step="0.01" value={fee} onChange={e => setFee(e.target.value)} />
+              <KmFeeButton restaurantId={restaurantId} address={address} onQuote={q => { setGeo(q); setFee(q.fee.toFixed(2)); }} />
             </div>
 
             <div className="space-y-1.5">

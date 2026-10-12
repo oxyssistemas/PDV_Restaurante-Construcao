@@ -186,7 +186,7 @@ export default function KitchenQueue() {
       const kdsItem: KdsItem = {
         id: item.id,
         quantity: item.quantity,
-        notes: item.notes,
+        notes: [item.options_text, item.notes].filter(Boolean).join(' — ') || null,
         status: item.status,
         created_at: item.created_at,
         name: item.menu_items?.name ?? 'Item',

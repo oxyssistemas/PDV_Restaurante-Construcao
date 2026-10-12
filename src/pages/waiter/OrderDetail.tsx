@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Loader2, Plus, Minus, Trash2, Copy, MessageSquarePlus, Send, Users,
-  Clock, Pencil, ShoppingCart, BellRing, ReceiptText, ArrowLeftRight, CheckCircle2, Search, Printer,
+  Clock, Pencil, ShoppingCart, BellRing, ReceiptText, ArrowLeftRight, CheckCircle2, Search, Printer, UtensilsCrossed,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,8 +25,16 @@ import { usePrinterSettings } from '@/hooks/usePrinterSettings';
 import { logAudit } from '@/lib/audit';
 import { percentLabel, serviceFeeOf, useServiceSettings } from '@/lib/serviceCharge';
 import { brl, elapsedSince } from '@/lib/waiter';
+import { useRodizios } from '@/components/admin/RodiziosPanel';
+import OptionPicker, { type PickedItem } from '@/components/OptionPicker';
+import WeightDialog from '@/components/WeightDialog';
+import { itemOnNow, useMenuOptions } from '@/lib/menuOptions';
+import { discountLabel } from '@/lib/promotions';
 
-interface CartItem { key: string; menu_item_id: string; name: string; price: number; quantity: number; notes: string; }
+interface CartItem {
+  key: string; menu_item_id: string; name: string; price: number; quantity: number; notes: string; rodizio?: boolean;
+  options?: string[]; options_text?: string | null; weight_kg?: number;
+}
 
 const itemStatusLabels: Record<string, string> = {
   pending: 'Pedido recebido',
@@ -61,13 +69,18 @@ export default function OrderDetail() {
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferTo, setTransferTo] = useState('');
   const [sent, setSent] = useState(false);
+  const [rodizioForm, setRodizioForm] = useState<{ id: string; adults: number; children: number } | null>(null);
+  const { data: rodizios } = useRodizios(restaurantId);
+  const { data: optionMap } = useMenuOptions(restaurantId);
+  const [picking, setPicking] = useState<any | null>(null);
+  const [weighing, setWeighing] = useState<any | null>(null);
 
   const { data: order, isLoading } = useQuery({
     queryKey: ['order-detail', orderId],
     enabled: !!orderId,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('orders').select('*, restaurant_tables(id, number, capacity)').eq('id', orderId!).single();
+        .from('orders').select('*, restaurant_tables(id, number, capacity, rodizio_id, rodizio_adults, rodizio_children)').eq('id', orderId!).single();
       if (error) throw error;
       return data;
     },
@@ -132,6 +145,9 @@ export default function OrderDetail() {
     return () => { supabase.removeChannel(channel); };
   }, [orderId, queryClient]);
 
+  const inRodizioId = (item: any) => !!(order as any)?.restaurant_tables?.rodizio_id
+    && ((item.rodizio_ids ?? []) as string[]).includes((order as any).restaurant_tables.rodizio_id);
+
   const categories = useMemo(() => {
     const map = new Map<string, string>();
     (menuItems || []).forEach(i => {
@@ -142,23 +158,94 @@ export default function OrderDetail() {
   }, [menuItems]);
 
   const filtered = (menuItems || []).filter(i =>
+    itemOnNow(i) &&
     i.name.toLowerCase().includes(search.toLowerCase()) &&
     (category === 'all' || (i as any).category_id === category)
-  );
+  ).sort((a, b) => Number(inRodizioId(b)) - Number(inRodizioId(a)));
 
   const subtotal = cart.reduce((s, c) => s + c.price * c.quantity, 0);
   const table = (order as any)?.restaurant_tables;
+  // mesa em rodízio: os pratos do rodízio saem sem cobrar; o resto tem o preço normal
+  const rodizio = rodizios?.find(r => r.id === table?.rodizio_id) ?? null;
+  const inRodizio = (item: any) => !!rodizio && ((item.rodizio_ids ?? []) as string[]).includes(rodizio.id);
 
   const addItem = (item: any) => {
+    const free = inRodizio(item);
+    if (item.sold_by_weight) { setWeighing(item); return; }
+    if (optionMap?.get(item.id)?.length) { setPicking(item); return; }
     setCart(prev => {
       const found = prev.find(c => c.menu_item_id === item.id && !c.notes);
       if (found) return prev.map(c => c.key === found.key ? { ...c, quantity: c.quantity + 1 } : c);
       return [...prev, {
         key: `${item.id}-${Date.now()}`, menu_item_id: item.id, name: item.name,
-        price: Number(item.price), quantity: 1, notes: '',
+        price: free ? 0 : Number(item.price), quantity: 1, notes: '', rodizio: free,
       }];
     });
   };
+
+  /** Põe a mesa no rodízio (ou muda as pessoas): a cobrança entra na comanda como "Rodízio <nome>". */
+  const saveRodizio = useMutation({
+    mutationFn: async (f: { id: string; adults: number; children: number }) => {
+      const r = rodizios?.find(x => x.id === f.id);
+      if (!r || !table?.id) throw new Error('Escolha o rodízio.');
+      if (f.adults + f.children < 1) throw new Error('Informe quantas pessoas estão no rodízio.');
+      const chargeIds = (rodizios ?? []).map(x => x.charge_item_id).filter(Boolean) as string[];
+      const old = (orderItems ?? []).filter(i => chargeIds.includes(i.menu_item_id) && i.status !== 'cancelled');
+      const removed = old.reduce((s, i) => s + Number(i.unit_price) * i.quantity, 0);
+      if (old.length) {
+        const { error } = await supabase.from('order_items').delete().in('id', old.map(i => i.id));
+        if (error) throw error;
+      }
+      const lines = [
+        f.adults > 0 && { quantity: f.adults, unit_price: Number(r.price_adult), notes: 'Adulto' },
+        f.children > 0 && { quantity: f.children, unit_price: Number(r.price_child ?? r.price_adult), notes: 'Criança' },
+      ].filter(Boolean) as { quantity: number; unit_price: number; notes: string }[];
+      if (!r.charge_item_id) throw new Error('Rodízio sem item de cobrança. Salve o rodízio de novo no cardápio.');
+      const { error } = await supabase.from('order_items').insert(lines.map(l => ({
+        ...l, order_id: orderId!, menu_item_id: r.charge_item_id!, status: 'delivered' as const,
+      })));
+      if (error) throw error;
+      const added = lines.reduce((s, l) => s + l.unit_price * l.quantity, 0);
+      await supabase.from('orders').update({ total: Math.max(Number(order?.total || 0) - removed + added, 0) }).eq('id', orderId!);
+      const { error: tErr } = await supabase.from('restaurant_tables').update({
+        rodizio_id: r.id, rodizio_adults: f.adults, rodizio_children: f.children,
+        ...(table.rodizio_id ? {} : { rodizio_started_at: new Date().toISOString() }),
+      }).eq('id', table.id);
+      if (tErr) throw tErr;
+      return r.name;
+    },
+    onSuccess: (name) => {
+      setRodizioForm(null);
+      setCart([]);
+      queryClient.invalidateQueries({ queryKey: ['order-items', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['order-detail', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['table-orders'] });
+      toast.success(`Mesa ${table?.number} no rodízio ${name}`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  /** Encerra o rodízio da mesa: a cobrança continua na comanda, os próximos pedidos voltam ao preço normal. */
+  const endRodizio = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from('restaurant_tables').update({
+        rodizio_id: null, rodizio_adults: null, rodizio_children: null, rodizio_started_at: null,
+      }).eq('id', table!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setRodizioForm(null);
+      setCart([]);
+      queryClient.invalidateQueries({ queryKey: ['order-detail', orderId] });
+      toast.success('Rodízio encerrado. A cobrança continua na comanda.');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const addPicked = (item: any, p: PickedItem) => setCart(prev => [...prev, {
+    key: `${item.id}-${Date.now()}`, menu_item_id: item.id, name: item.name, price: p.price, quantity: p.quantity,
+    notes: p.notes, rodizio: inRodizio(item), options: p.options, options_text: p.options_text,
+  }]);
 
   const changeQty = (key: string, delta: number) =>
     setCart(prev => prev.flatMap(c => {
@@ -181,6 +268,7 @@ export default function OrderDetail() {
       const { error } = await supabase.from('order_items').insert(cart.map(c => ({
         order_id: orderId!, menu_item_id: c.menu_item_id, quantity: c.quantity,
         unit_price: c.price, notes: c.notes || null, status: 'pending' as const,
+        options: c.options ?? [], options_text: c.options_text ?? null, weight_kg: c.weight_kg ?? null,
       })));
       if (error) throw error;
       await supabase.from('orders')
@@ -248,12 +336,12 @@ export default function OrderDetail() {
   const handlePrintTicket = (kind: 'full' | 'kitchen') => {
     if (!order) return;
     const list = kind === 'kitchen' && cart.length
-      ? cart.map(c => ({ name: c.name, quantity: c.quantity, unit_price: c.price, notes: c.notes || null }))
+      ? cart.map(c => ({ name: c.name, quantity: c.quantity, unit_price: c.price, notes: [c.options_text, c.notes].filter(Boolean).join(' — ') || null }))
       : (orderItems || []).map(i => ({
         name: (i as any).menu_items?.name || 'Item',
         quantity: i.quantity,
         unit_price: Number(i.unit_price),
-        notes: i.notes,
+        notes: [i.options_text, i.notes].filter(Boolean).join(' — ') || null,
       }));
     if (!list.length) { toast.error('Nenhum item para imprimir.'); return; }
     const subtotal = list.reduce((s, i) => s + i.quantity * i.unit_price, 0);
@@ -313,6 +401,14 @@ export default function OrderDetail() {
           <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" /> {table?.capacity ?? '-'} pessoas</span>
           <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {elapsedSince(order?.created_at)}</span>
         </div>
+        {rodizio && (
+          <div className="mt-3 flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-xs">
+            <UtensilsCrossed className="h-4 w-4 shrink-0 text-primary" />
+            <span className="min-w-0 flex-1">
+              <b>Rodízio {rodizio.name}</b> · {table?.rodizio_adults ?? 0} adulto(s){table?.rodizio_children ? ` · ${table.rodizio_children} criança(s)` : ''}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="pdv-card pdv-scroll min-h-[140px] flex-1 overflow-y-auto p-2">
@@ -329,7 +425,8 @@ export default function OrderDetail() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">{c.name}</div>
-                  <div className="text-[11px] text-muted-foreground">{brl(c.price)} un.</div>
+                  {c.options_text && <div className="text-[11px] text-primary">{c.options_text}</div>}
+                  <div className="text-[11px] text-muted-foreground">{c.rodizio ? 'Incluso no rodízio' : `${brl(c.price)} un.`}</div>
                 </div>
                 <div className="text-sm font-semibold">{brl(c.price * c.quantity)}</div>
               </div>
@@ -358,9 +455,14 @@ export default function OrderDetail() {
         <div className="flex justify-between text-sm text-muted-foreground">
           <span>Novos itens</span><span>{brl(subtotal)}</span>
         </div>
+        {Number((order as any)?.discount) > 0 && (
+          <div className="flex justify-between gap-2 text-sm text-[hsl(var(--success))]">
+            <span className="min-w-0 truncate">Desconto · {discountLabel(order as any)}</span><span>- {brl(Number((order as any).discount))}</span>
+          </div>
+        )}
         <div className="flex items-end justify-between border-t border-border pt-3">
           <span className="text-sm text-muted-foreground">Parcial da mesa</span>
-          <span className="text-3xl font-bold text-primary">{brl(Number(order?.total || 0) + subtotal)}</span>
+          <span className="text-3xl font-bold text-primary">{brl(Number(order?.total || 0) - Number((order as any)?.discount || 0) + subtotal)}</span>
         </div>
 
         <Button
@@ -422,11 +524,21 @@ export default function OrderDetail() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="mr-auto">
-            <h1 className="text-2xl font-bold tracking-tight">Mesa {table?.number ?? '?'}</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Mesa {table?.number ?? '?'}{(order as any)?.card_code ? ` · Cartão #${(order as any).card_code}` : ''}</h1>
             <p className="text-xs text-muted-foreground">
               {(order as any)?.customer_name || 'Sem cliente'} • {elapsedSince(order?.created_at)} • {brl(Number(order?.total || 0))}
             </p>
           </div>
+          {!!rodizios?.some(r => r.active) && table?.id && (
+            <Button variant={rodizio ? 'default' : 'outline'} className="h-12 gap-2 rounded-2xl"
+              onClick={() => setRodizioForm({
+                id: rodizio?.id ?? rodizios.find(r => r.active)!.id,
+                adults: table?.rodizio_adults ?? Math.max(Number(table?.capacity) || 1, 1),
+                children: table?.rodizio_children ?? 0,
+              })}>
+              <UtensilsCrossed className="h-5 w-5" /> {rodizio ? `Rodízio ${rodizio.name}` : 'Rodízio'}
+            </Button>
+          )}
           <div className="relative min-w-[200px] flex-1 md:max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input className="h-12 rounded-2xl pl-9" placeholder="Buscar produto..." value={search} onChange={e => setSearch(e.target.value)} />
@@ -460,7 +572,9 @@ export default function OrderDetail() {
               <div className="p-3">
                 <div className="truncate text-sm font-semibold">{item.name}</div>
                 <div className="line-clamp-1 text-[11px] text-muted-foreground">{item.description || (item as any).menu_categories?.name || ''}</div>
-                <div className="mt-1 text-base font-bold text-primary">{brl(Number(item.price))}</div>
+                {inRodizio(item)
+                  ? <div className="mt-1 flex items-center gap-2"><Badge className="text-[11px]">Incluso no rodízio</Badge><span className="text-xs text-muted-foreground line-through">{brl(Number(item.price))}</span></div>
+                  : <div className="mt-1 text-base font-bold text-primary">{brl(Number(item.price))}{(item as any).sold_by_weight ? '/kg' : ''}</div>}
               </div>
             </motion.button>
           ))}
@@ -473,6 +587,7 @@ export default function OrderDetail() {
             <div key={item.id} className="pdv-card flex items-center justify-between gap-3 p-3">
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium">{item.quantity}x {(item as any).menu_items?.name}</div>
+                {item.options_text && <div className="truncate text-[11px] text-primary">{item.options_text}</div>}
                 {item.notes && <div className="truncate text-[11px] italic text-muted-foreground">Obs: {item.notes}</div>}
               </div>
               <div className="flex shrink-0 items-center gap-2">
@@ -491,6 +606,17 @@ export default function OrderDetail() {
       </div>
 
       <aside className="hidden w-[430px] shrink-0 xl:block">{cartPanel}</aside>
+
+      <WeightDialog item={weighing} onClose={() => setWeighing(null)} onConfirm={(kg, total) => {
+        setCart(prev => [...prev, {
+          key: `${weighing.id}-${Date.now()}`, menu_item_id: weighing.id, name: weighing.name, price: total, quantity: 1,
+          notes: '', weight_kg: kg, options_text: `${kg.toFixed(3).replace('.', ',')} kg`,
+        }]);
+        setWeighing(null);
+      }} />
+
+      <OptionPicker item={picking} groups={picking ? optionMap?.get(picking.id) ?? [] : []} free={picking ? inRodizio(picking) : false}
+        onClose={() => setPicking(null)} onConfirm={p => { addPicked(picking, p); setPicking(null); }} />
 
       <Dialog open={!!noteFor} onOpenChange={o => !o && setNoteFor(null)}>
         <DialogContent className="sm:max-w-sm">
@@ -515,6 +641,60 @@ export default function OrderDetail() {
           <DialogFooter>
             <Button variant="outline" className="rounded-xl" onClick={() => setNameDraft(null)}>Cancelar</Button>
             <Button className="rounded-xl" disabled={renameOrder.isPending} onClick={() => renameOrder.mutate(nameDraft ?? '')}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!rodizioForm} onOpenChange={o => !o && setRodizioForm(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Rodízio • Mesa {table?.number}</DialogTitle></DialogHeader>
+          {rodizioForm && (() => {
+            const r = rodizios?.find(x => x.id === rodizioForm.id);
+            const total = r ? rodizioForm.adults * Number(r.price_adult) + rodizioForm.children * Number(r.price_child ?? r.price_adult) : 0;
+            const counter = (label: string, k: 'adults' | 'children') => (
+              <div className="flex items-center justify-between rounded-xl border p-3">
+                <span className="text-sm font-medium">{label}</span>
+                <div className="flex items-center gap-2">
+                  <Button size="icon" variant="outline" className="h-9 w-9 rounded-lg" aria-label={`Menos ${label}`}
+                    onClick={() => setRodizioForm({ ...rodizioForm, [k]: Math.max(rodizioForm[k] - 1, 0) })}><Minus className="h-4 w-4" /></Button>
+                  <span className="w-8 text-center text-lg font-semibold">{rodizioForm[k]}</span>
+                  <Button size="icon" variant="outline" className="h-9 w-9 rounded-lg" aria-label={`Mais ${label}`}
+                    onClick={() => setRodizioForm({ ...rodizioForm, [k]: rodizioForm[k] + 1 })}><Plus className="h-4 w-4" /></Button>
+                </div>
+              </div>
+            );
+            return (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Rodízio</Label>
+                  <Select value={rodizioForm.id} onValueChange={id => setRodizioForm({ ...rodizioForm, id })}>
+                    <SelectTrigger className="h-12 rounded-xl"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {rodizios?.filter(x => x.active || x.id === rodizio?.id).map(x => (
+                        <SelectItem key={x.id} value={x.id}>{x.name} · {brl(Number(x.price_adult))}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {counter('Adultos', 'adults')}
+                {r?.price_child != null && counter(`Crianças (${brl(Number(r.price_child))})`, 'children')}
+                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Cobrança na comanda</span><b>{brl(total)}</b></div>
+                <p className="text-[11px] text-muted-foreground">
+                  No QR e no tablet da mesa só aparecem os pratos deste rodízio. Para pedir algo por fora, o cliente chama o garçom.
+                </p>
+              </div>
+            );
+          })()}
+          <DialogFooter className="gap-2 sm:justify-between">
+            {rodizio ? (
+              <Button variant="outline" className="rounded-xl text-destructive" disabled={endRodizio.isPending} onClick={() => endRodizio.mutate()}>
+                Encerrar rodízio
+              </Button>
+            ) : <span />}
+            <Button className="rounded-xl" disabled={saveRodizio.isPending} onClick={() => rodizioForm && saveRodizio.mutate(rodizioForm)}>
+              {saveRodizio.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {rodizio ? 'Atualizar' : 'Iniciar rodízio'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

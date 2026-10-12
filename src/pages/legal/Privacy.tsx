@@ -35,7 +35,6 @@ const sections: LegalSection[] = [
         <li>Autenticar usuários, controlar permissões por função e proteger contra acessos indevidos.</li>
         <li>Emitir documentos fiscais quando o restaurante ativa essa função.</li>
         <li>Publicar conteúdo nas redes sociais conectadas, exatamente como o usuário pediu.</li>
-        <li>Gerar respostas do assistente de IA com base nos dados do próprio restaurante, quando o recurso é usado.</li>
         <li>Dar suporte, corrigir falhas, manter a segurança e cumprir obrigações legais.</li>
       </ul>
     ),
@@ -72,7 +71,6 @@ const sections: LegalSection[] = [
           <li><strong>Vercel</strong>: hospedagem do site.</li>
           <li><strong>Meta e TikTok</strong>: somente o conteúdo que o usuário manda publicar, nas contas que ele conectou.</li>
           <li><strong>iFood</strong>: quando o restaurante ativa a integração, para receber e atualizar pedidos.</li>
-          <li><strong>Google (Gemini)</strong>: resumos de dados do restaurante enviados ao assistente de IA, quando o recurso é usado.</li>
           <li><strong>Provedores de emissão fiscal e autoridades</strong>: quando exigido para notas fiscais ou por lei.</li>
         </ul>
         <p>Alguns desses prestadores armazenam dados fora do Brasil. Nesses casos, a transferência internacional ocorre para a execução do contrato e com fornecedores que adotam medidas de segurança compatíveis com a LGPD.</p>

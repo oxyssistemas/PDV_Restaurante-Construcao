@@ -217,9 +217,9 @@ function FeedbackSettingsCard({ restaurantId }: { restaurantId: string }) {
       return data;
     },
   });
-  const [form, setForm] = useState({ enabled: true, print_on_receipt: true, alert_score: '6', thank_you: '' });
+  const [form, setForm] = useState({ enabled: true, print_on_receipt: true, alert_score: '6', thank_you: '', google_review_url: '', google_min_score: '9' });
   useEffect(() => {
-    if (data) setForm({ enabled: data.enabled, print_on_receipt: data.print_on_receipt, alert_score: String(data.alert_score), thank_you: data.thank_you ?? '' });
+    if (data) setForm({ enabled: data.enabled, print_on_receipt: data.print_on_receipt, alert_score: String(data.alert_score), thank_you: data.thank_you ?? '', google_review_url: data.google_review_url ?? '', google_min_score: String(data.google_min_score ?? 9) });
   }, [data]);
 
   const save = useMutation({
@@ -228,6 +228,8 @@ function FeedbackSettingsCard({ restaurantId }: { restaurantId: string }) {
       const { error } = await supabase.from('feedback_settings').upsert({
         restaurant_id: restaurantId, enabled: form.enabled, print_on_receipt: form.print_on_receipt, alert_score: alert,
         thank_you: form.thank_you.trim() || null,
+        google_review_url: form.google_review_url.trim() || null,
+        google_min_score: Math.min(10, Math.max(0, parseInt(form.google_min_score) || 9)),
       });
       if (error) throw error;
     },
@@ -256,7 +258,19 @@ function FeedbackSettingsCard({ restaurantId }: { restaurantId: string }) {
           <Label>Mensagem de agradecimento</Label>
           <Input value={form.thank_you} maxLength={160} placeholder="Obrigado! Volte sempre." onChange={e => setForm({ ...form, thank_you: e.target.value })} />
         </div>
-        <Button className="w-fit" onClick={() => save.mutate()} disabled={save.isPending}>Salvar</Button>
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label>Link para avaliar no Google (opcional)</Label>
+          <Input value={form.google_review_url} placeholder="https://g.page/r/..." onChange={e => setForm({ ...form, google_review_url: e.target.value })} />
+          <p className="text-xs text-muted-foreground">No Perfil da Empresa no Google: "Pedir avaliações" → copie o link. Quem der nota alta é convidado a avaliar no Google também.</p>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Convidar para o Google a partir da nota</Label>
+          <Input type="number" min="0" max="10" value={form.google_min_score} onChange={e => setForm({ ...form, google_min_score: e.target.value })} />
+        </div>
+        <Button className="w-fit" onClick={() => {
+          if (form.google_review_url.trim() && !/^https:\/\//.test(form.google_review_url.trim())) { toast.error('O link do Google deve começar com https://'); return; }
+          save.mutate();
+        }} disabled={save.isPending}>Salvar</Button>
       </CardContent>
     </Card>
   );

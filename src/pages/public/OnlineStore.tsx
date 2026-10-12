@@ -16,9 +16,13 @@ import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { brl, callStore, PAYMENT_LABELS, waLink, type CustomerAccount, type StoreData, type StoreItem } from '@/lib/deliveryStore';
+import OptionPicker, { type PickedItem } from '@/components/OptionPicker';
+import { startingPrice } from '@/lib/menuOptions';
+import { promoBadge, promoDiscount } from '@/lib/promotions';
 import { formatPhone, StoreAccountSheet, StoreAuthDialog, useStoreSession } from '@/components/store/StoreAccount';
 
-type CartLine = { qty: number; notes: string };
+/** Linha da sacola: a chave é o id do prato ou, com opções escolhidas, um id próprio da linha. */
+type CartLine = { qty: number; notes: string; item_id?: string; options?: string[]; options_text?: string | null; price?: number };
 type Saved = { name: string; phone: string; address: string; complement: string; zone: string };
 
 const SAVED_KEY = 'oxys.delivery.customer';
@@ -40,8 +44,9 @@ const categoryIcon = (name: string) => CATEGORY_ICONS.find(([re]) => re.test(nor
 
 const SECTION_LIMIT = 8;
 
-function ProductCard({ item, qty, disabled, onAdd, onRemove }: {
+function ProductCard({ item, qty, disabled, onAdd, onRemove, badge }: {
   item: StoreItem; qty: number; disabled: boolean; onAdd: () => void; onRemove: () => void;
+  badge?: string | null;
 }) {
   return (
     <article className="group flex flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-card shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-all duration-200 hover:-translate-y-1 hover:border-white/15 hover:shadow-[0_18px_40px_-18px_rgba(225,29,42,0.45)]">
@@ -55,12 +60,18 @@ function ProductCard({ item, qty, disabled, onAdd, onRemove }: {
         {qty > 0 && (
           <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground shadow-lg">{qty} na sacola</span>
         )}
+        {badge && (
+          <span className="absolute right-2 top-2 max-w-[70%] truncate rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-bold text-white shadow-lg">{badge}</span>
+        )}
       </div>
       <div className="flex flex-1 flex-col p-3 sm:p-4">
         <h3 className="line-clamp-2 text-sm font-bold leading-snug sm:text-[15px]">{item.name}</h3>
         {item.description && <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{item.description}</p>}
         <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-3">
-          <span className="text-[15px] font-extrabold tracking-tight sm:text-base">{brl(item.price)}</span>
+          <span className="text-[15px] font-extrabold tracking-tight sm:text-base">
+            {startingPrice(item.price, item.option_groups).from && <span className="mr-1 text-xs font-medium text-muted-foreground">a partir de</span>}
+            {brl(startingPrice(item.price, item.option_groups).price)}
+          </span>
           {qty > 0 ? (
             <div className="ml-auto flex animate-in zoom-in-95 items-center gap-0.5 rounded-full bg-white/[0.06] p-0.5 duration-200">
               <button type="button" aria-label="Menos" onClick={onRemove}
@@ -114,6 +125,9 @@ export default function OnlineStore() {
   const [zone, setZone] = useState(saved.zone ?? '');
   const [payment, setPayment] = useState('');
   const [useCashback, setUseCashback] = useState(true);
+  const [couponInput, setCouponInput] = useState('');
+  const [coupon, setCoupon] = useState<{ code: string; label: string; discount: number; free_delivery: boolean } | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
   const [changeFor, setChangeFor] = useState('');
   const [notes, setNotes] = useState('');
   const sections = useRef<Record<string, HTMLElement | null>>({});
@@ -176,20 +190,79 @@ export default function OnlineStore() {
   }, [account]);
 
   const items = data?.items ?? [];
-  const lines = Object.entries(cart).map(([id, l]) => ({ item: items.find(i => i.id === id), ...l })).filter(l => l.item);
+  const lines = Object.entries(cart).map(([key, l]) => ({ key, item: items.find(i => i.id === (l.item_id ?? key)), ...l })).filter(l => l.item);
   const count = lines.reduce((s, l) => s + l.qty, 0);
-  const subtotal = lines.reduce((s, l) => s + l.item!.price * l.qty, 0);
-  const fee = mode === 'pickup' || !store ? 0 : store.zones.length ? (store.zones.find(z => z.name === zone)?.fee ?? 0) : store.default_fee;
-  const total = subtotal + fee;
+  const unitOf = (l: (typeof lines)[number]) => l.price ?? l.item!.price;
+  const subtotal = lines.reduce((s, l) => s + unitOf(l) * l.qty, 0);
+  const qtyOf = (id: string) => lines.filter(l => l.item!.id === id).reduce((s, l) => s + l.qty, 0);
+  // taxa por distância: calculada no servidor pelo endereço digitado
+  const byKm = store?.fee_mode === 'distance';
+  const [kmQuote, setKmQuote] = useState<{ address: string; km: number; fee: number } | null>(null);
+  const [kmError, setKmError] = useState<string | null>(null);
+  const [kmLoading, setKmLoading] = useState(false);
+  useEffect(() => {
+    if (!byKm || mode !== 'delivery') return;
+    const a = address.trim();
+    if (a.length < 8) { setKmQuote(null); setKmError(null); return; }
+    if (kmQuote?.address === a) return;
+    setKmLoading(true);
+    const t = window.setTimeout(() => {
+      callStore<{ km: number; fee: number }>({ action: 'quote', slug, address: a })
+        .then(r => { setKmQuote({ address: a, km: r.km, fee: r.fee }); setKmError(null); })
+        .catch((e: Error) => { setKmQuote(null); setKmError(e.message); })
+        .finally(() => setKmLoading(false));
+    }, 900);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [byKm, mode, address, slug]);
+  const fee = mode === 'pickup' || !store ? 0 : byKm ? (kmQuote?.fee ?? 0)
+    : store.zones.length ? (store.zones.find(z => z.name === zone)?.fee ?? 0) : store.default_fee;
+  // promoções automáticas (happy hour, leve X pague Y): prévia do mesmo cálculo que o banco faz no pedido
+  const autoPromos = data?.auto_promotions ?? [];
+  const promo = promoDiscount(lines.map(l => ({
+    id: l.key, menu_item_id: l.item!.id, category_id: l.item!.category_id, unit_price: unitOf(l), quantity: l.qty,
+  })), autoPromos, 'delivery');
+  const feeToPay = coupon?.free_delivery ? 0 : fee;
+  const discount = Math.min(subtotal, promo.discount + (coupon?.discount ?? 0));
+  const total = Math.max(0, subtotal + feeToPay - discount);
   const belowMin = !!store && subtotal < store.min_order;
 
   const setQty = (id: string, delta: number) => setCart(prev => {
     const qty = Math.min(50, Math.max(0, (prev[id]?.qty ?? 0) + delta));
     const next = { ...prev };
-    if (qty === 0) delete next[id]; else next[id] = { qty, notes: prev[id]?.notes ?? '' };
+    if (qty === 0) delete next[id]; else next[id] = { ...prev[id], qty, notes: prev[id]?.notes ?? '' };
     return next;
   });
-  const add = (id: string) => { setQty(id, 1); setBump(b => b + 1); };
+  const [picking, setPicking] = useState<StoreItem | null>(null);
+  const add = (id: string) => {
+    const item = items.find(i => i.id === id);
+    if (item?.option_groups?.length) { setPicking(item); return; }
+    setQty(id, 1); setBump(b => b + 1);
+  };
+  const addPicked = (item: StoreItem, p: PickedItem) => {
+    setCart(prev => ({ ...prev, [`${item.id}::${Date.now()}`]: { qty: p.quantity, notes: p.notes, item_id: item.id, options: p.options, options_text: p.options_text, price: p.price } }));
+    setBump(b => b + 1);
+  };
+  /** "−" no card do prato: tira da última linha desse prato. */
+  const removeOne = (id: string) => {
+    const last = [...lines].reverse().find(l => l.item!.id === id);
+    if (last) setQty(last.key, -1);
+  };
+
+  const checkCoupon = useMutation({
+    mutationFn: (code: string) => callStore<{ code: string; label: string; discount: number; free_delivery: boolean }>({
+      action: 'coupon', slug, code, subtotal, fee, phone,
+    }),
+    onSuccess: (c) => { setCoupon(c); setCouponError(null); },
+    onError: (e: Error) => { setCoupon(null); setCouponError(e.message); },
+  });
+  // o desconto do cupom depende do valor da sacola: confere de novo quando ela muda
+  useEffect(() => {
+    if (!coupon) return;
+    const t = window.setTimeout(() => checkCoupon.mutate(coupon.code), 400);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subtotal, fee]);
 
   const submit = useMutation({
     mutationFn: () => callStore<{ orderId: string; token: string }>({
@@ -201,7 +274,8 @@ export default function OnlineStore() {
         address_line: address.trim(), complement: complement.trim(),
         zone: mode === 'delivery' ? zone : '',
         use_cashback: cashbackUse > 0,
-        items: lines.map(l => ({ menu_item_id: l.item!.id, quantity: l.qty, notes: l.notes || null })),
+        coupon: coupon?.code ?? '',
+        items: lines.map(l => ({ menu_item_id: l.item!.id, quantity: l.qty, notes: l.notes || null, options: l.options ?? [] })),
       },
     }),
     onSuccess: ({ orderId, token }) => {
@@ -259,7 +333,7 @@ export default function OnlineStore() {
   const cashbackUse = userId && useCashback && samePhone && cashbackBalance >= 0.01 ? Math.min(cashbackBalance, total) : 0;
   const toPay = Math.max(0, total - cashbackUse);
   const canSubmit = store.is_open && count > 0 && !belowMin && name.trim().length >= 2 && phoneOk && !!payment
-    && (mode === 'pickup' || (address.trim().length >= 5 && (!store.zones.length || !!zone)));
+    && (mode === 'pickup' || (address.trim().length >= 5 && (byKm ? !!kmQuote && kmQuote.address === address.trim() : (!store.zones.length || !!zone))));
 
   const logo = store.logo ? (
     <img src={store.logo} alt={store.name} className="h-10 w-10 shrink-0 rounded-xl bg-white/5 object-contain sm:h-11 sm:w-11" />
@@ -278,6 +352,8 @@ export default function OnlineStore() {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background pb-[calc(env(safe-area-inset-bottom)+5.5rem)] text-foreground md:pb-28">
+      <OptionPicker item={picking} groups={picking?.option_groups ?? []}
+        onClose={() => setPicking(null)} onConfirm={p => { if (picking) addPicked(picking, p); setPicking(null); }} />
       {/* ---------- Header ---------- */}
       <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-background/85 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:h-[72px] lg:px-6">
@@ -430,7 +506,7 @@ export default function OnlineStore() {
               action={<Button size="sm" variant="outline" className="rounded-full border-white/10" onClick={() => setQuery('')}>Limpar</Button>} />
             {results.length ? (
               <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-                {results.map(item => <ProductCard key={item.id} item={item} qty={cart[item.id]?.qty ?? 0} disabled={!store.is_open} onAdd={() => add(item.id)} onRemove={() => setQty(item.id, -1)} />)}
+                {results.map(item => <ProductCard key={item.id} item={item} qty={qtyOf(item.id)} badge={promoBadge(item, autoPromos, 'delivery')} disabled={!store.is_open} onAdd={() => add(item.id)} onRemove={() => removeOne(item.id)} />)}
               </div>
             ) : <p className="rounded-2xl border border-white/[0.06] bg-card p-8 text-center text-sm text-muted-foreground">Nada encontrado. Tente outro nome.</p>}
           </section>
@@ -441,7 +517,7 @@ export default function OnlineStore() {
               <section className="mt-8">
                 <SectionTitle icon={Flame} title="Destaques do cardápio" subtitle="Os favoritos da casa" />
                 <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:gap-4 lg:grid-cols-4">
-                  {highlights.map(item => <ProductCard key={item.id} item={item} qty={cart[item.id]?.qty ?? 0} disabled={!store.is_open} onAdd={() => add(item.id)} onRemove={() => setQty(item.id, -1)} />)}
+                  {highlights.map(item => <ProductCard key={item.id} item={item} qty={qtyOf(item.id)} badge={promoBadge(item, autoPromos, 'delivery')} disabled={!store.is_open} onAdd={() => add(item.id)} onRemove={() => removeOne(item.id)} />)}
                 </div>
               </section>
             )}
@@ -474,7 +550,7 @@ export default function OnlineStore() {
                               <button type="button" disabled={!!linked && !store.is_open}
                                 onClick={() => (linked ? add(linked.id) : goTo(menuRef.current))}
                                 className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-black transition-transform hover:scale-[1.03] active:scale-95 disabled:opacity-50">
-                                {linked ? (cart[linked.id] ? `Na sacola (${cart[linked.id].qty}) · adicionar` : 'Aproveitar agora') : 'Ver cardápio'} <ArrowRight className="h-4 w-4" />
+                                {linked ? (qtyOf(linked.id) ? `Na sacola (${qtyOf(linked.id)}) · adicionar` : 'Aproveitar agora') : 'Ver cardápio'} <ArrowRight className="h-4 w-4" />
                               </button>
                             </div>
                           </div>
@@ -500,7 +576,7 @@ export default function OnlineStore() {
                     ) : undefined} />
                   <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
                     {(showAll ? cat.items : cat.items.slice(0, SECTION_LIMIT)).map(item => (
-                      <ProductCard key={item.id} item={item} qty={cart[item.id]?.qty ?? 0} disabled={!store.is_open} onAdd={() => add(item.id)} onRemove={() => setQty(item.id, -1)} />
+                      <ProductCard key={item.id} item={item} qty={qtyOf(item.id)} badge={promoBadge(item, autoPromos, 'delivery')} disabled={!store.is_open} onAdd={() => add(item.id)} onRemove={() => removeOne(item.id)} />
                     ))}
                   </div>
                 </section>
@@ -584,23 +660,24 @@ export default function OnlineStore() {
             {!!lines.length && (
               <ul className="space-y-3">
                 {lines.map(l => (
-                  <li key={l.item!.id} className="rounded-2xl border border-white/[0.06] bg-card p-3">
+                  <li key={l.key} className="rounded-2xl border border-white/[0.06] bg-card p-3">
                     <div className="flex items-center gap-3">
                       {l.item!.image_url
                         ? <img src={l.item!.image_url} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
                         : <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-muted"><ImageIcon className="h-5 w-5 text-muted-foreground" /></span>}
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{l.item!.name}</p>
-                        <p className="text-sm font-bold">{brl(l.item!.price * l.qty)}</p>
+                        {l.options_text && <p className="text-xs text-muted-foreground">{l.options_text}</p>}
+                        <p className="text-sm font-bold">{brl(unitOf(l) * l.qty)}</p>
                       </div>
                       <div className="flex items-center gap-1 rounded-full bg-white/[0.06] p-0.5">
-                        <button type="button" aria-label="Menos" onClick={() => setQty(l.item!.id, -1)} className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"><Minus className="h-3.5 w-3.5" /></button>
+                        <button type="button" aria-label="Menos" onClick={() => setQty(l.key, -1)} className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"><Minus className="h-3.5 w-3.5" /></button>
                         <span className="w-5 text-center text-sm font-bold">{l.qty}</span>
-                        <button type="button" aria-label="Mais" onClick={() => setQty(l.item!.id, 1)} className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground"><Plus className="h-3.5 w-3.5" /></button>
+                        <button type="button" aria-label="Mais" onClick={() => setQty(l.key, 1)} className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground"><Plus className="h-3.5 w-3.5" /></button>
                       </div>
                     </div>
                     <Input value={l.notes} maxLength={300} placeholder="Observação (ex.: sem cebola)" className="mt-2 h-9 rounded-xl border-white/10 bg-white/[0.03] text-xs"
-                      onChange={e => setCart(prev => ({ ...prev, [l.item!.id]: { ...prev[l.item!.id], notes: e.target.value } }))} />
+                      onChange={e => setCart(prev => ({ ...prev, [l.key]: { ...prev[l.key], notes: e.target.value } }))} />
                   </li>
                 ))}
               </ul>
@@ -690,7 +767,33 @@ export default function OnlineStore() {
             <div className="space-y-1 text-sm">
               <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{brl(subtotal)}</span></div>
               {mode === 'delivery' && (
-                <div className="flex justify-between text-muted-foreground"><span>Entrega</span><span>{store.zones.length && !zone ? 'escolha o bairro' : fee > 0 ? brl(fee) : 'grátis'}</span></div>
+                <div className="flex justify-between text-muted-foreground"><span>Entrega</span><span>{byKm
+                  ? (kmLoading ? 'calculando…' : kmError ? <span className="text-red-400">{kmError}</span> : kmQuote ? `${feeToPay > 0 ? brl(feeToPay) : 'grátis'} · ${kmQuote.km.toFixed(1).replace('.', ',')} km` : 'digite o endereço')
+                  : store.zones.length && !zone ? 'escolha o bairro' : feeToPay > 0 ? brl(feeToPay) : 'grátis'}</span></div>
+              )}
+              {promo.discount > 0 && (
+                <div className="flex justify-between text-emerald-400"><span>{promo.labels.join(' · ')}</span><span>−{brl(promo.discount)}</span></div>
+              )}
+              {coupon ? (
+                <div className="flex items-center justify-between gap-2 text-emerald-400">
+                  <span>Cupom {coupon.code} · {coupon.label}
+                    <button type="button" className="ml-2 text-xs text-muted-foreground underline" onClick={() => { setCoupon(null); setCouponInput(''); }}>remover</button>
+                  </span>
+                  {coupon.discount > 0 && <span>−{brl(coupon.discount)}</span>}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="flex gap-2">
+                    <Input value={couponInput} maxLength={20} placeholder="Cupom de desconto" aria-label="Cupom de desconto"
+                      className="h-9 rounded-xl border-white/10 bg-white/[0.03] font-mono uppercase"
+                      onChange={e => { setCouponInput(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '')); setCouponError(null); }} />
+                    <Button type="button" variant="outline" className="h-9 rounded-xl" disabled={couponInput.length < 3 || checkCoupon.isPending}
+                      onClick={() => checkCoupon.mutate(couponInput)}>
+                      {checkCoupon.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Aplicar'}
+                    </Button>
+                  </div>
+                  {couponError && <p className="text-xs text-red-400">{couponError}</p>}
+                </div>
               )}
               {userId && samePhone && cashbackBalance >= 0.01 && (
                 <label className="flex cursor-pointer items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-emerald-400">

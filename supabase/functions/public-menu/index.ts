@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { dedicatedFor, relay } from '../_shared/relay.ts';
 import { planAllows } from '../_shared/plan.ts';
+import { MENU_ITEM_FIELDS, activePromos, cleanOptions, withOptions } from '../_shared/menu.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -40,7 +41,7 @@ Deno.serve(async (req) => {
 
     const { data: table } = await db
       .from('restaurant_tables')
-      .select('id, number, restaurant_id, qr_enabled, restaurants!inner(id, name, status)')
+      .select('id, number, restaurant_id, qr_enabled, rodizio_id, restaurants!inner(id, name, status)')
       .eq('qr_token', token)
       .maybeSingle();
 
@@ -53,16 +54,22 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'menu') {
-      const [{ data: categories }, { data: items }, { data: branding }] = await Promise.all([
+      let itemsQuery = db.from('menu_items').select(MENU_ITEM_FIELDS)
+        .eq('restaurant_id', table.restaurant_id).eq('available', true).order('name');
+      // mesa em rodízio: só os pratos do rodízio, sem preço; o resto é pedido ao garçom
+      if (table.rodizio_id) itemsQuery = itemsQuery.contains('rodizio_ids', [table.rodizio_id]);
+      const [{ data: categories }, { data: items }, { data: branding }, { data: rodizio }] = await Promise.all([
         db.from('menu_categories').select('id, name, sort_order')
           .eq('restaurant_id', table.restaurant_id).order('sort_order'),
-        db.from('menu_items').select('id, name, description, price, image_url, category_id')
-          .eq('restaurant_id', table.restaurant_id).eq('available', true).order('name'),
+        itemsQuery,
         db.from('branding_settings').select('brand_name, logo_light_url, logo_dark_url')
           .eq('restaurant_id', table.restaurant_id).maybeSingle(),
+        table.rodizio_id
+          ? db.from('rodizios').select('name, description').eq('id', table.rodizio_id).maybeSingle()
+          : Promise.resolve({ data: null }),
       ]);
 
-      const withImages = await Promise.all((items ?? []).map(async (item) => {
+      const withImages = await Promise.all((await withOptions(db, table.restaurant_id, items ?? [])).map(async (item) => {
         let image: string | null = null;
         const path = item.image_url;
         if (path) {
@@ -72,7 +79,7 @@ Deno.serve(async (req) => {
             image = data?.signedUrl ?? null;
           }
         }
-        return { ...item, image_url: image };
+        return table.rodizio_id ? { ...item, image_url: image, price: 0, in_rodizio: true } : { ...item, image_url: image };
       }));
 
       let logo: string | null = null;
@@ -88,8 +95,10 @@ Deno.serve(async (req) => {
       return json({
         restaurant: { name: branding?.brand_name?.trim() || restaurant.name, logo },
         table: { number: table.number },
+        rodizio: rodizio ?? null,
         categories: categories ?? [],
         items: withImages,
+        auto_promotions: table.rodizio_id ? [] : await activePromos(db, table.restaurant_id, 'salon'),
       });
     }
 
@@ -100,6 +109,7 @@ Deno.serve(async (req) => {
         menu_item_id: String(i?.menu_item_id ?? ''),
         quantity: Number(i?.quantity ?? 0),
         notes: typeof i?.notes === 'string' ? i.notes.slice(0, 300) : null,
+        options: cleanOptions(i?.options),
       }));
 
       const { data, error } = await db.rpc('create_qr_order', {
@@ -112,10 +122,28 @@ Deno.serve(async (req) => {
       return json({ orderId: data });
     }
 
+    if (action === 'call_waiter' || action === 'bill') {
+      // botão "Chamar garçom" / "Pedir a conta" da mesa (no máximo um a cada 45 s)
+      const type = action === 'bill' ? 'bill_request' : 'waiter_call';
+      const { count } = await db.from('notifications').select('id', { count: 'exact', head: true })
+        .eq('table_id', table.id).eq('type', type).gte('created_at', new Date(Date.now() - 45_000).toISOString());
+      if (!count) {
+        const reason = typeof body?.reason === 'string' ? body.reason.trim().slice(0, 140) : '';
+        const { error } = await db.from('notifications').insert({
+          restaurant_id: table.restaurant_id, table_id: table.id, type,
+          title: type === 'bill_request' ? `Mesa ${table.number} pediu a conta` : `Mesa ${table.number} chamou o garçom`,
+          message: reason || (type === 'bill_request' ? 'O cliente pediu a conta pelo QR da mesa.' : 'O cliente chamou pelo QR da mesa.'),
+          target_roles: type === 'bill_request' ? ['waiter', 'cashier', 'admin'] : ['waiter'],
+        });
+        if (error) return json({ error: 'Não foi possível chamar o garçom.' }, 500);
+      }
+      return json({ ok: true });
+    }
+
     if (action === 'status') {
       const { data: orders } = await db
         .from('orders')
-        .select('id, status, total, customer_name, created_at, order_items(quantity, status, menu_items(name))')
+        .select('id, status, total, customer_name, created_at, order_items(quantity, status, options_text, menu_items(name))')
         .eq('table_id', table.id)
         .eq('source', 'qr')
         .is('archived_at', null)

@@ -2,7 +2,7 @@ import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-route
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
-  LineChart, LogOut, Menu, FileBarChart, Package, Building2, History, Briefcase, PieChart, Gift, ClipboardCheck, Calculator, MessageSquareHeart, FileArchive, Receipt } from 'lucide-react';
+  LineChart, LogOut, Menu, FileBarChart, Package, Building2, History, Briefcase, PieChart, Gift, ClipboardCheck, Calculator, MessageSquareHeart, FileArchive, Receipt, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
 import { useState } from 'react';
@@ -22,6 +22,7 @@ const navItems: { to: string; icon: typeof LineChart; label: string; end: boolea
   { to: '/finance/loyalty', icon: Gift, label: 'Fidelidade', end: false, module: 'loyalty' },
   { to: '/finance/reports', icon: FileBarChart, label: 'Relatórios', end: false, module: 'reports' },
   { to: '/finance/inventory', icon: Package, label: 'Estoque', end: false, module: 'inventory' },
+  { to: '/finance/compras', icon: ShoppingCart, label: 'Compras', end: false, module: 'inventory' },
   { to: '/finance/stock-counts', icon: ClipboardCheck, label: 'Balanço de estoque', end: false, module: 'stock_counts' },
   { to: '/finance/cmv', icon: Calculator, label: 'Custo do prato (CMV)', end: false, module: 'cmv' },
   { to: '/finance/reviews', icon: MessageSquareHeart, label: 'Avaliações (NPS)', end: false, module: 'reviews' },

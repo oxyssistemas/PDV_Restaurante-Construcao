@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { planAllows } from '../_shared/plan.ts';
+import { MENU_ITEM_FIELDS, activePromos, cleanOptions, withOptions } from '../_shared/menu.ts';
 
 // Autoatendimento (totem / tablet no balcão), sem login: www.oxysrestaurante.app/totem/<chave do totem>
 //   { action: 'menu', token }          → loja, configuração do totem e cardápio
@@ -34,6 +35,7 @@ Deno.serve(async (req) => {
         menu_item_id: UUID.test(String(i?.menu_item_id ?? '')) ? String(i.menu_item_id) : '',
         quantity: Number(i?.quantity ?? 0),
         notes: typeof i?.notes === 'string' ? i.notes.slice(0, 200) : null,
+        options: cleanOptions(i?.options),
       })) : [];
       const { data, error } = await sb.rpc('create_kiosk_order', {
         _token: token,
@@ -48,7 +50,7 @@ Deno.serve(async (req) => {
     await sb.from('kiosks').update({ last_seen_at: new Date().toISOString() }).eq('id', kiosk.id);
     const [{ data: categories }, { data: items }, { data: branding }, { data: store }] = await Promise.all([
       sb.from('menu_categories').select('id, name, sort_order').eq('restaurant_id', rid).order('sort_order'),
-      sb.from('menu_items').select('id, name, description, price, image_url, category_id').eq('restaurant_id', rid).eq('available', true).order('name'),
+      sb.from('menu_items').select(MENU_ITEM_FIELDS).eq('restaurant_id', rid).eq('available', true).order('name'),
       sb.from('branding_settings').select('brand_name, logo_light_url, logo_dark_url').eq('restaurant_id', rid).maybeSingle(),
       sb.from('delivery_stores').select('featured_item_ids').eq('restaurant_id', rid).maybeSingle(),
     ]);
@@ -58,7 +60,7 @@ Deno.serve(async (req) => {
       const { data } = await sb.storage.from('menu-images').createSignedUrl(path, 60 * 60 * 12);
       return data?.signedUrl ?? null;
     };
-    const withImages = await Promise.all((items ?? []).map(async i => ({ ...i, price: Number(i.price), image_url: await signed(i.image_url) })));
+    const withImages = await Promise.all((await withOptions(sb, rid, items ?? [])).map(async i => ({ ...i, price: Number(i.price), image_url: await signed(i.image_url) })));
     const available = new Set(withImages.map(i => i.id));
     return json({
       restaurant: { name: branding?.brand_name?.trim() || restaurant.name, logo: await signed(branding?.logo_light_url || branding?.logo_dark_url) },
@@ -69,6 +71,7 @@ Deno.serve(async (req) => {
       featured: ((store?.featured_item_ids ?? []) as string[]).filter(id => available.has(id)),
       categories: categories ?? [],
       items: withImages,
+      auto_promotions: await activePromos(sb, rid, 'counter'),
     });
   } catch (e) {
     console.error('kiosk', e);

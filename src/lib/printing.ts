@@ -83,6 +83,11 @@ export interface PrintOrder {
   couvert_label?: string | null;
   /** mesmos dados vindos do banco (fila de impressão) */
   couvert_total?: number | null;
+  /** desconto das promoções/cupom (o total informado é antes do desconto) */
+  discount?: number | null;
+  discount_label?: string | null;
+  min_consumption_total?: number | null;
+  card_code?: string | null;
   service_percent?: number | null;
   people_count?: number | null;
   total?: number | null;
@@ -189,6 +194,8 @@ function extrasBlock(order: PrintOrder) {
   const couvert = Number(order.couvert ?? order.couvert_total ?? 0);
   if (Number(order.service_fee || 0) > 0) out.push(`<div class="row"><span>${esc(svcLabel)}</span><span>${money(Number(order.service_fee))}</span></div>`);
   if (couvert > 0) out.push(`<div class="row"><span>${esc(order.couvert_label || 'Couvert')}${order.people_count ? ` x${order.people_count}` : ''}</span><span>${money(couvert)}</span></div>`);
+  if (Number(order.min_consumption_total || 0) > 0) out.push(`<div class="row"><span>Consumacao minima</span><span>${money(Number(order.min_consumption_total))}</span></div>`);
+  if (Number(order.discount || 0) > 0) out.push(`<div class="row"><span>Desconto${order.discount_label ? ` (${esc(order.discount_label)})` : ''}</span><span>-${money(Number(order.discount))}</span></div>`);
   return out.join('');
 }
 
@@ -274,7 +281,7 @@ function receiptBody(opts: ReceiptOptions, reviewQr?: string | null) {
   const { restaurantName, order, items, payments, change = 0 } = opts;
   const subtotal = items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
   const fee = Number(order.delivery_fee || 0);
-  const total = Math.max(Number(order.total ?? 0), subtotal + fee + Number(order.service_fee || 0) + Number(order.couvert ?? order.couvert_total ?? 0));
+  const total = Math.max(Number(order.total ?? 0), subtotal + fee + Number(order.service_fee || 0) + Number(order.couvert ?? order.couvert_total ?? 0) + Number(order.min_consumption_total || 0)) - Number(order.discount || 0);
   const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
   const body = [
     header(restaurantName, 'Recibo de pagamento', order),

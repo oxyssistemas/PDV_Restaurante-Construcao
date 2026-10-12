@@ -215,7 +215,7 @@ function RewardsTab({ restaurantId }: { restaurantId: string }) {
     queryKey: ['loyalty-menu-items', restaurantId],
     queryFn: async () => {
       const { data, error } = await supabase.from('menu_items').select('id, name')
-        .eq('restaurant_id', restaurantId).order('name');
+        .eq('restaurant_id', restaurantId).eq('is_rodizio_charge', false).order('name');
       if (error) throw error;
       return data || [];
     },

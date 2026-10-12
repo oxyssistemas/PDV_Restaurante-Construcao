@@ -30,6 +30,7 @@ export default function TableMap() {
   const [newOpen, setNewOpen] = useState(false);
   const [newTableId, setNewTableId] = useState('');
   const [newCustomer, setNewCustomer] = useState('');
+  const [newCard, setNewCard] = useState('');
   const [mergeMode, setMergeMode] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
@@ -51,7 +52,7 @@ export default function TableMap() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, table_id, total, status, created_at, customer_name, created_by_name')
+        .select('id, table_id, total, status, created_at, customer_name, created_by_name, card_code')
         .eq('restaurant_id', restaurantId!)
         .in('status', ['pending', 'preparing', 'ready'])
         .order('created_at');
@@ -93,9 +94,9 @@ export default function TableMap() {
     queryFn: async () => {
       const { data } = await supabase
         .from('notifications')
-        .select('id, type, message, read, created_at')
+        .select('id, type, message, read, created_at, table_id')
         .eq('restaurant_id', restaurantId!)
-        .in('type', ['bill_request', 'manager_call'])
+        .in('type', ['bill_request', 'manager_call', 'waiter_call'])
         .eq('read', false);
       return data || [];
     },
@@ -129,7 +130,7 @@ export default function TableMap() {
       const totals = tableOrders.reduce((s, o) => s + Number(o.total), 0);
       const itemCount = tableItems.reduce((s, i) => s + i.quantity, 0);
       const openedAt = tableOrders[0]?.created_at ?? null;
-      const calling = (alerts || []).some(a => (a.message || '').includes(`Mesa ${table.number} `));
+      const calling = (alerts || []).some(a => (a.table_id && groupIds.includes(a.table_id)) || (a.message || '').includes(`Mesa ${table.number} `));
       const capacity = groupTables.reduce((s, t) => s + t.capacity, 0);
 
       let status: TableUiStatus = 'free';
@@ -151,11 +152,11 @@ export default function TableMap() {
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return String(c.table.number).includes(q) ||
-      c.tableOrders.some(o => (o.customer_name || '').toLowerCase().includes(q));
+      c.tableOrders.some(o => (o.customer_name || '').toLowerCase().includes(q) || (o.card_code || '').toLowerCase() === q);
   });
 
   const openOrder = useMutation({
-    mutationFn: async ({ tableId, customer }: { tableId: string; customer?: string }) => {
+    mutationFn: async ({ tableId, customer, card }: { tableId: string; customer?: string; card?: string }) => {
       const table = tables?.find(t => t.id === tableId);
       if (table?.status === 'free') {
         await supabase.from('restaurant_tables').update({ status: 'occupied' as const }).eq('id', tableId);
@@ -174,13 +175,14 @@ export default function TableMap() {
         status: 'pending' as const,
         order_type: 'dine_in',
         customer_name: customer?.trim() || null,
+        card_code: card?.trim().toUpperCase() || null,
         ...authorFields(user, currentRole?.role),
       }).select().single();
-      if (error) throw error;
+      if (error) throw new Error(/orders_open_card_uniq/.test(error.message) ? `O cartão ${card} já está em uma comanda aberta.` : error.message);
       return data;
     },
     onSuccess: (order) => {
-      setNewOpen(false); setNewCustomer(''); setNewTableId('');
+      setNewOpen(false); setNewCustomer(''); setNewCard(''); setNewTableId('');
       queryClient.invalidateQueries({ queryKey: ['waiter-tables'] });
       queryClient.invalidateQueries({ queryKey: ['table-orders'] });
       navigate(`/waiter/orders/${order.id}`);
@@ -261,7 +263,7 @@ export default function TableMap() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             className="h-12 rounded-2xl pl-9"
-            placeholder="Buscar mesa ou cliente..."
+            placeholder="Buscar mesa, cliente ou cartão..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -386,7 +388,7 @@ export default function TableMap() {
                         onClick={e => { e.stopPropagation(); navigate(`/waiter/orders/${o.id}`); }}
                       >
                         <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        <span className="truncate">{o.customer_name || 'Comanda sem nome'}</span>
+                        <span className="truncate">{o.card_code ? `#${o.card_code} · ` : ''}{o.customer_name || 'Comanda sem nome'}</span>
                         <span className="ml-auto shrink-0 text-xs text-muted-foreground">{brl(Number(o.total))}</span>
                       </button>
                       <Button
@@ -473,13 +475,18 @@ export default function TableMap() {
               <Label className="text-xs">Nome da comanda (opcional)</Label>
               <Input className="h-12 rounded-xl" placeholder="Ex.: João / Conta 1" value={newCustomer} onChange={e => setNewCustomer(e.target.value)} />
             </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Nº do cartão / pulseira (opcional)</Label>
+              <Input className="h-12 rounded-xl" inputMode="numeric" maxLength={12} placeholder="Ex.: 042" value={newCard}
+                onChange={e => setNewCard(e.target.value.replace(/[^A-Za-z0-9-]/g, ''))} />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" className="rounded-xl" onClick={() => setNewOpen(false)}>Cancelar</Button>
             <Button
               className="rounded-xl"
               disabled={!newTableId || openOrder.isPending}
-              onClick={() => openOrder.mutate({ tableId: newTableId, customer: newCustomer })}
+              onClick={() => openOrder.mutate({ tableId: newTableId, customer: newCustomer, card: newCard })}
             >
               {openOrder.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Abrir comanda
             </Button>

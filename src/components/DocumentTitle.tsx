@@ -16,6 +16,9 @@ const TITLES: { match: RegExp; title: string }[] = [
   { match: /^\/admin\/inventory/, title: "Estoque" },
   { match: /^\/admin\/users/, title: "Usuários" },
   { match: /^\/admin\/settings/, title: "Configurações" },
+  { match: /^\/admin\/promotions/, title: "Promoções" },
+  { match: /^\/(admin|finance)\/compras/, title: "Compras" },
+  { match: /^\/(waiter|admin)\/fila/, title: "Fila de espera" },
   { match: /^\/admin/, title: "Painel do Restaurante" },
   { match: /^\/waiter\/orders\//, title: "Comanda" },
   { match: /^\/waiter\/orders/, title: "Pedidos" },
@@ -31,6 +34,7 @@ const TITLES: { match: RegExp; title: string }[] = [
   { match: /^\/finance\/inventory/, title: "Estoque" },
   { match: /^\/finance/, title: "Financeiro" },
   { match: /^\/delivery\/new/, title: "Novo Pedido Delivery" },
+  { match: /^\/delivery\/mapa/, title: "Mapa do delivery" },
   { match: /^\/delivery/, title: "Delivery" },
   { match: /^\/$/, title: "Sistema PDV para Restaurantes" },
 

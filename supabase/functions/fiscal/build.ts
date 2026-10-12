@@ -23,23 +23,27 @@ export async function buildNfce(admin: SupabaseClient, invoice: any): Promise<Nf
 
   if (invoice.order_id) {
     const [{ data: order }, { data: rows }, { data: pays }] = await Promise.all([
-      admin.from('orders').select('delivery_fee, service_fee, couvert_total').eq('id', invoice.order_id).maybeSingle(),
+      admin.from('orders').select('delivery_fee, service_fee, couvert_total, min_consumption_total').eq('id', invoice.order_id).maybeSingle(),
       admin.from('order_items')
-        .select('quantity, unit_price, status, menu_item_id, menu_items(id, name, ncm, cfop, csosn, origin, commercial_unit)')
+        .select('quantity, unit_price, status, menu_item_id, weight_kg, options_text, menu_items(id, name, ncm, cfop, csosn, origin, commercial_unit)')
         .eq('order_id', invoice.order_id).neq('status', 'cancelled').order('created_at'),
       admin.from('payments').select('method, amount, change_amount').eq('order_id', invoice.order_id).order('created_at'),
     ]);
-    // taxa de entrega, taxa de serviço e couvert entram como "outras despesas"
-    deliveryFee = round2(Number(order?.delivery_fee ?? 0) + Number(order?.service_fee ?? 0) + Number(order?.couvert_total ?? 0));
+    // taxa de entrega, taxa de serviço, couvert e consumação mínima entram como "outras despesas"
+    deliveryFee = round2(Number(order?.delivery_fee ?? 0) + Number(order?.service_fee ?? 0) + Number(order?.couvert_total ?? 0) + Number(order?.min_consumption_total ?? 0));
     items = (rows ?? []).map((r: any) => {
       const m = r.menu_items ?? {};
-      const q = Number(r.quantity), price = Number(r.unit_price);
+      const lineTotal = round2(Number(r.quantity) * Number(r.unit_price));
+      // vendido por quilo: quantidade em KG e preço do kg
+      const w = Number(r.weight_kg || 0);
+      const q = w > 0 ? Number(r.quantity) * w : Number(r.quantity);
+      const price = w > 0 ? Math.round((lineTotal / q) * 10000) / 10000 : Number(r.unit_price);
       return {
         code: String(m.id ?? r.menu_item_id ?? 'ITEM').slice(0, 8).toUpperCase(),
-        description: String(m.name ?? 'Item').slice(0, 120),
+        description: `${String(m.name ?? 'Item')}${r.options_text ? ` (${r.options_text})` : ''}`.slice(0, 120),
         ncm: m.ncm || defaults.ncm, cfop: m.cfop || defaults.cfop, tax_code: m.csosn || defaults.tax_code,
-        origin: String(m.origin ?? defaults.origin), unit: m.commercial_unit || defaults.unit,
-        quantity: q, unit_price: price, total: round2(q * price),
+        origin: String(m.origin ?? defaults.origin), unit: w > 0 ? 'KG' : (m.commercial_unit || defaults.unit),
+        quantity: q, unit_price: price, total: lineTotal,
       };
     });
     payments = (pays ?? []).map((x: any) => ({ code: PAYMENT_CODES[x.method] ?? '99', amount: Number(x.amount) }));

@@ -14,6 +14,8 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowDown, ArrowUp, Copy, Download, ExternalLink, Flame, ImageIcon, Loader2, Plus, Sparkles, Store, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { brl, PAYMENT_LABELS, SLUG_RE, slugify, storeUrl, type StoreZone } from '@/lib/deliveryStore';
+import { cn } from '@/lib/utils';
+import { edgeErrorMessage } from '@/lib/functionError';
 import MenuImage from '@/components/MenuImage';
 import StoreImagePicker from '@/components/delivery/StoreImagePicker';
 import PromotionsManager from '@/components/delivery/PromotionsManager';
@@ -21,6 +23,7 @@ import PromotionsManager from '@/components/delivery/PromotionsManager';
 type Form = {
   slug: string; enabled: boolean; is_open: boolean; delivery_enabled: boolean; pickup_enabled: boolean;
   min_order: string; default_fee: string; zones: { name: string; fee: string }[];
+  fee_mode: 'zones' | 'distance'; fee_base: string; fee_per_km: string; fee_free_km: string; max_km: string;
   eta_minutes: string; pickup_eta_minutes: string; payment_methods: string[];
   whatsapp: string; address: string; hours_text: string; notice: string;
   hero_title: string; hero_highlight: string; hero_subtitle: string; hero_image: string | null; featured_item_ids: string[];
@@ -30,6 +33,7 @@ const MAX_FEATURED = 8;
 const blank = (slug: string): Form => ({
   slug, enabled: false, is_open: true, delivery_enabled: true, pickup_enabled: true,
   min_order: '0', default_fee: '0', zones: [], eta_minutes: '45', pickup_eta_minutes: '20',
+  fee_mode: 'zones', fee_base: '5', fee_per_km: '1.5', fee_free_km: '2', max_km: '8',
   payment_methods: ['cash', 'credit_card', 'debit_card', 'pix'], whatsapp: '', address: '', hours_text: '', notice: '',
   hero_title: '', hero_highlight: '', hero_subtitle: '', hero_image: null, featured_item_ids: [],
 });
@@ -62,6 +66,8 @@ export default function StoreSettings() {
       min_order: String(store.min_order), default_fee: String(store.default_fee),
       eta_minutes: String(store.eta_minutes), pickup_eta_minutes: String(store.pickup_eta_minutes),
       zones: ((store.zones as StoreZone[]) || []).map(z => ({ name: z.name, fee: String(z.fee) })),
+      fee_mode: (store.fee_mode as Form['fee_mode']) ?? 'zones', fee_base: String(store.fee_base ?? 0), fee_per_km: String(store.fee_per_km ?? 0),
+      fee_free_km: String(store.fee_free_km ?? 0), max_km: store.max_km == null ? '' : String(store.max_km),
       whatsapp: store.whatsapp ?? '', address: store.address ?? '', hours_text: store.hours_text ?? '', notice: store.notice ?? '',
       hero_title: store.hero_title ?? '', hero_highlight: store.hero_highlight ?? '', hero_subtitle: store.hero_subtitle ?? '',
       hero_image: store.hero_image ?? null, featured_item_ids: store.featured_item_ids ?? [],
@@ -74,7 +80,7 @@ export default function StoreSettings() {
     enabled: !!restaurantId,
     queryFn: async () => {
       const { data, error } = await supabase.from('menu_items').select('id, name, price, image_url, available')
-        .eq('restaurant_id', restaurantId!).order('name');
+        .eq('restaurant_id', restaurantId!).eq('is_rodizio_charge', false).order('name');
       if (error) throw error;
       return (data || []).map(m => ({ ...m, price: Number(m.price) }));
     },
@@ -109,6 +115,8 @@ export default function StoreSettings() {
         restaurant_id: restaurantId!, slug: f.slug, enabled: f.enabled, is_open: f.is_open,
         delivery_enabled: f.delivery_enabled, pickup_enabled: f.pickup_enabled,
         min_order: num(f.min_order), default_fee: num(f.default_fee), zones,
+        fee_mode: f.fee_mode, fee_base: num(f.fee_base), fee_per_km: num(f.fee_per_km), fee_free_km: num(f.fee_free_km),
+        max_km: f.max_km.trim() ? num(f.max_km) : null,
         eta_minutes: Math.round(num(f.eta_minutes)) || 45, pickup_eta_minutes: Math.round(num(f.pickup_eta_minutes)) || 20,
         payment_methods: f.payment_methods, whatsapp: f.whatsapp.replace(/\D/g, '') || null,
         address: f.address.trim() || null, hours_text: f.hours_text.trim() || null, notice: f.notice.trim() || null,
@@ -117,6 +125,15 @@ export default function StoreSettings() {
       };
       const { error } = await supabase.from('delivery_stores').upsert(row, { onConflict: 'restaurant_id' });
       if (error) throw new Error(error.code === '23505' ? 'Esse endereço de loja já está em uso. Escolha outro.' : error.message);
+      // taxa por km e mapa do delivery: acha a loja no mapa pelo endereço
+      if (row.address && (f.fee_mode === 'distance' || row.address !== store?.address || store?.lat == null)) {
+        // com a sessão da equipe (a função confere se a pessoa é da loja)
+        const { data: geo, error: geoErr } = await supabase.functions.invoke('delivery-store', { body: { action: 'geocode_store', slug: f.slug } });
+        const msg = geoErr ? await edgeErrorMessage(geoErr) : (geo as { error?: string })?.error;
+        if (msg && f.fee_mode === 'distance') throw new Error(`Loja salva, mas: ${msg}`);
+      } else if (f.fee_mode === 'distance' && !row.address) {
+        throw new Error('Loja salva. Para cobrar por km, preencha o endereço da loja.');
+      }
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['delivery-store', restaurantId] }); toast.success('Loja online salva'); },
     onError: (e: Error) => toast.error(e.message),
@@ -285,7 +302,7 @@ export default function StoreSettings() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Entrega e retirada</CardTitle>
-          <CardDescription>Com bairros cadastrados, o cliente escolhe o bairro e a taxa sai certa. Sem bairros, vale a taxa padrão.</CardDescription>
+          <CardDescription>Cobre a entrega por bairro (o cliente escolhe o bairro) ou por distância (a taxa sai pelo endereço, em km da loja).</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
@@ -294,10 +311,31 @@ export default function StoreSettings() {
           </div>
           <div className="grid gap-4 sm:grid-cols-4">
             <div className="space-y-1.5"><Label>Pedido mínimo (R$)</Label><Input inputMode="decimal" value={form.min_order} onChange={e => set('min_order', e.target.value)} /></div>
-            <div className="space-y-1.5"><Label>Taxa padrão (R$)</Label><Input inputMode="decimal" value={form.default_fee} disabled={form.zones.length > 0} onChange={e => set('default_fee', e.target.value)} /></div>
+            <div className="space-y-1.5"><Label>Taxa padrão (R$)</Label><Input inputMode="decimal" value={form.default_fee} disabled={form.zones.length > 0 || form.fee_mode === 'distance'} onChange={e => set('default_fee', e.target.value)} /></div>
             <div className="space-y-1.5"><Label>Tempo de entrega (min)</Label><Input inputMode="numeric" value={form.eta_minutes} onChange={e => set('eta_minutes', e.target.value)} /></div>
             <div className="space-y-1.5"><Label>Tempo p/ retirada (min)</Label><Input inputMode="numeric" value={form.pickup_eta_minutes} onChange={e => set('pickup_eta_minutes', e.target.value)} /></div>
           </div>
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1 sm:max-w-md">
+            {([['zones', 'Por bairro'], ['distance', 'Por distância (km)']] as const).map(([k, l]) => (
+              <button key={k} type="button" aria-pressed={form.fee_mode === k} onClick={() => set('fee_mode', k)}
+                className={cn('rounded-lg py-2 text-sm font-medium', form.fee_mode === k ? 'bg-background shadow' : 'text-muted-foreground')}>{l}</button>
+            ))}
+          </div>
+          {form.fee_mode === 'distance' ? (
+            <div className="space-y-3">
+              <div className="grid gap-4 sm:grid-cols-4">
+                <div className="space-y-1.5"><Label>Taxa base (R$)</Label><Input inputMode="decimal" value={form.fee_base} onChange={e => set('fee_base', e.target.value)} /></div>
+                <div className="space-y-1.5"><Label>Km inclusos na base</Label><Input inputMode="decimal" value={form.fee_free_km} onChange={e => set('fee_free_km', e.target.value)} /></div>
+                <div className="space-y-1.5"><Label>Valor por km extra (R$)</Label><Input inputMode="decimal" value={form.fee_per_km} onChange={e => set('fee_per_km', e.target.value)} /></div>
+                <div className="space-y-1.5"><Label>Raio máximo (km)</Label><Input inputMode="decimal" placeholder="Sem limite" value={form.max_km} onChange={e => set('max_km', e.target.value)} /></div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Exemplo: a {num(form.fee_free_km) + 3} km, a taxa fica {`R$ ${(num(form.fee_base) + 3 * num(form.fee_per_km)).toFixed(2).replace('.', ',')}`}.
+                A distância é calculada pelo endereço do cliente no mapa (ruas, aproximado). Preencha o endereço completo da loja em "Sobre a loja".
+                {store?.lat != null ? ' ✓ Loja encontrada no mapa.' : ' A loja ainda não está no mapa: salve com o endereço preenchido.'}
+              </p>
+            </div>
+          ) : (
           <div className="space-y-2">
             <Label>Bairros atendidos</Label>
             {form.zones.map((z, i) => (
@@ -311,6 +349,7 @@ export default function StoreSettings() {
             ))}
             <Button size="sm" variant="outline" className="gap-2" onClick={() => set('zones', [...form.zones, { name: '', fee: '' }])}><Plus className="h-4 w-4" /> Adicionar bairro</Button>
           </div>
+          )}
         </CardContent>
       </Card>
 

@@ -37,6 +37,7 @@ export default function SideNavShell({ open, onClose, widthClass = 'w-64', child
       {/* reserva o espaço do menu recolhido no computador */}
       <div className="hidden w-16 shrink-0 lg:block" aria-hidden />
       <aside
+        data-tour="sidebar"
         onMouseEnter={enter}
         onMouseLeave={leave}
         onFocus={() => { window.clearTimeout(timer.current); setHover(true); }}

@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { Megaphone, Share2, LogOut, Menu, LayoutDashboard, Send, ListChecks } from 'lucide-react';
+import { Megaphone, Share2, LogOut, Menu, LayoutDashboard, Send, ListChecks, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
 import { useState } from 'react';
@@ -15,6 +15,7 @@ const navItems = [
   { to: '/marketing/posts', icon: ListChecks, label: 'Publicações', end: false },
   { to: '/marketing/connections', icon: Share2, label: 'Conexões', end: false },
   { to: '/marketing/campaigns', icon: Megaphone, label: 'Campanhas', end: false },
+  { to: '/marketing/whatsapp', icon: MessageCircle, label: 'WhatsApp em massa', end: false },
 ];
 
 export default function MarketingLayout() {

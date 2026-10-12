@@ -100,14 +100,17 @@ export default function OrderTracking() {
           <ul className="space-y-1">
             {items.map((i, idx) => (
               <li key={idx} className="flex justify-between gap-2">
-                <span>{i.quantity}x {i.menu_items?.name}{i.notes && <span className="text-muted-foreground"> · {i.notes}</span>}</span>
+                <span>{i.quantity}x {i.menu_items?.name}{i.options_text && <span className="text-muted-foreground"> ({i.options_text})</span>}{i.notes && <span className="text-muted-foreground"> · {i.notes}</span>}</span>
                 <span>{brl(i.quantity * Number(i.unit_price))}</span>
               </li>
             ))}
           </ul>
           <div className="space-y-1 border-t border-border pt-2">
             {!pickup && <div className="flex justify-between"><span>Entrega</span><span>{Number(order.delivery_fee) > 0 ? brl(Number(order.delivery_fee)) : 'grátis'}</span></div>}
-            <div className="flex justify-between text-base font-extrabold"><span>Total</span><span>{brl(Number(order.total) + Number(order.delivery_fee || 0))}</span></div>
+            {Number(order.discount) > 0 && (
+              <div className="flex justify-between text-sm text-[hsl(var(--success))]"><span>Desconto{order.coupon_code ? ` (cupom ${order.coupon_code})` : ''}</span><span>-{brl(Number(order.discount))}</span></div>
+            )}
+            <div className="flex justify-between text-base font-extrabold"><span>Total</span><span>{brl(Number(order.total) + Number(order.delivery_fee || 0) - Number(order.discount || 0))}</span></div>
           </div>
           {order.payment_hint && (
             <p className="text-muted-foreground">

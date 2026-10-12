@@ -197,7 +197,7 @@ export function StoreAccountSheet({ open, onOpenChange, side, slug, account, loa
                         </div>
                         <p className="mt-0.5 truncate text-xs text-muted-foreground">{items.map(i => `${i.quantity}x ${i.menu_items?.name ?? ''}`).join(', ')}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          {new Date(o.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} · <b className="text-foreground">{brl(Number(o.total) + Number(o.delivery_fee || 0))}</b>
+                          {new Date(o.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} · <b className="text-foreground">{brl(Number(o.total) + Number(o.delivery_fee || 0) - Number(o.discount || 0))}</b>
                         </p>
                       </div>
                       {o.public_token && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}

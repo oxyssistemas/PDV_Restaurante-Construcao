@@ -8,6 +8,7 @@
 const crypto = require('node:crypto');
 const { restaurantActive } = require('./trial.cjs');
 const { authorizer } = require('./policies.cjs');
+const promo = require('./promo.cjs');
 const rls = require('./rls.cjs');
 
 // O que pode ser gravado sem internet (o mesmo que a offline_apply_row aceita no banco).
@@ -534,6 +535,10 @@ class Mirror {
 
   updateRows(table, rows, patch, ctx) {
     if (!rows.length) return [];
+    // table_clear_rodizio: mesa liberada sai do rodízio
+    if (table === 'restaurant_tables' && patch.status === 'free') {
+      patch = { ...patch, rodizio_id: null, rodizio_adults: null, rodizio_children: null, rodizio_started_at: null };
+    }
     // a linha alterada também precisa passar nas regras (WITH CHECK), antes de mexer em qualquer uma
     if (ctx.authz && rows.some(r => !ctx.authz.checkUpdate(table, { ...r, ...patch }))) throw rlsError(table);
     this.checkWrite(table, 'update');
@@ -589,7 +594,9 @@ class Mirror {
       customer_name: o.customer_name, customer_phone: o.customer_phone, customer_address: o.customer_address,
       notes: o.notes, delivery_fee: o.delivery_fee, total: o.total,
       service_fee: o.service_fee ?? null, couvert_total: o.couvert_total ?? null, people_count: o.people_count ?? null,
+      min_consumption_total: o.min_consumption_total ?? null, card_code: o.card_code ?? null,
       service_percent: svc?.service_percent ?? null, couvert_label: svc?.couvert_label ?? null,
+      discount: o.discount ?? 0, discount_label: [o.promo_labels, o.coupon_code ? `Cupom ${o.coupon_code}` : null].filter(Boolean).join(' · ') || null,
       created_by_name: o.created_by_name, created_by_role: o.created_by_role, source: o.source,
     };
   }
@@ -623,6 +630,13 @@ class Mirror {
 
   /** enforce_table_reservation: mesa reservada (30 min antes até o fim) só para o titular da reserva. */
   beforeInsert(table, row) {
+    // orders_open_card_uniq: o mesmo cartão/pulseira não pode estar em duas comandas abertas
+    if (table === 'orders' && row.card_code) {
+      const code = String(row.card_code).toUpperCase();
+      if (this.rows('orders').some(o => o.restaurant_id === row.restaurant_id && !o.archived_at && o.status !== 'cancelled' && String(o.card_code ?? '').toUpperCase() === code)) {
+        throw new OfflineError('duplicate key value violates unique constraint "orders_open_card_uniq"', 409, '23505');
+      }
+    }
     if (table !== 'orders' || !row.table_id) return;
     const now = this.localNow();
     const sec = (t) => { const [h, m, x] = String(t).split(':').map(Number); return h * 3600 + m * 60 + (x || 0); };
@@ -697,23 +711,32 @@ class Mirror {
     }, null);
   }
 
-  afterUpdate(table, row, old) {
+  afterUpdate(table, row, old, ctx) {
+    // desconto das promoções: na hora, também na central offline (a nuvem refaz igual ao sincronizar)
+    if (table === 'order_items' && (row.quantity !== old.quantity || Number(row.unit_price) !== Number(old.unit_price) || row.status !== old.status || row.order_id !== old.order_id)) {
+      promo.refreshDiscount(this, row.order_id, ctx?.who ?? null);
+      if (row.order_id !== old.order_id) promo.refreshDiscount(this, old.order_id, ctx?.who ?? null);
+    }
     if (!this.dedicated) return; // na central offline a nuvem faz isso ao sincronizar
     if (table === 'inventory' && (Number(row.quantity) !== Number(old.quantity) || Number(row.minimum_stock) !== Number(old.minimum_stock))) this.lowStock(row, old);
   }
   afterDelete(table, row, ctx) {
+    if (table === 'order_items') promo.refreshDiscount(this, row.order_id, ctx?.who ?? null);
     if (!this.dedicated) return;
     if (table === 'order_items') this.consumeInventory(row, 1, ctx.who);
   }
 
   afterInsert(table, row, ctx) {
     if (this.dedicated && table === 'order_items') this.consumeInventory(row, -1, ctx.who);
+    if (table === 'order_items') promo.refreshDiscount(this, row.order_id, ctx?.who ?? null);
     if (this.dedicated && table === 'inventory') this.lowStock(row, null);
     if (table === 'order_items') {
       // via da cozinha: um trabalho por impressora e por envio (vários itens juntos)
       const order = this.rows('orders').find(o => o.id === row.order_id);
       if (!order) return;
-      const item = { name: this.rows('menu_items').find(m => m.id === row.menu_item_id)?.name || 'Item', quantity: row.quantity, notes: row.notes ?? null };
+      const mi = this.rows('menu_items').find(m => m.id === row.menu_item_id);
+      if (mi?.is_rodizio_charge) return; // cobrança do rodízio não vai para a cozinha
+      const item = { name: mi?.name || 'Item', quantity: row.quantity, notes: [row.options_text, row.notes].filter(Boolean).join(' — ') || null };
       for (const p of this.printers('kitchen')) {
         const job = this.prints.find(j => j.printer_id === p.id && j.order_id === order.id && j.purpose === 'kitchen'
           && j.status === 'queued' && j.document?.txid === ctx.txid);
@@ -731,15 +754,15 @@ class Mirror {
       const pays = this.rows('payments').filter(p => p.order_id === order.id);
       const itemsTotal = items.reduce((s, i) => s + Number(i.quantity) * Number(i.unit_price), 0);
       const paid = pays.reduce((s, p) => s + Number(p.amount), 0);
-      const extras = Number(order.delivery_fee || 0) + Number(order.service_fee || 0) + Number(order.couvert_total || 0);
-      if (paid + 0.009 < Math.max(itemsTotal + extras, Number(order.total || 0))) return;
+      const extras = Number(order.delivery_fee || 0) + Number(order.service_fee || 0) + Number(order.couvert_total || 0) + Number(order.min_consumption_total || 0);
+      if (paid + 0.009 < Math.max(itemsTotal + extras, Number(order.total || 0)) - Number(order.discount || 0)) return;
       const sorted = [...pays].sort((a, b) => compare(a.created_at, b.created_at));
       for (const p of this.printers('receipt')) {
         if (this.prints.some(j => j.printer_id === p.id && j.order_id === order.id && j.purpose === 'receipt')) continue;
         this.addPrintJob(p, 'receipt', order.id, {
           kind: 'receipt', restaurant_name: this.restaurantName(), order: this.orderHeader(order.id),
           items: [...items].sort((a, b) => compare(a.created_at, b.created_at)).map(i => ({
-            name: this.rows('menu_items').find(m => m.id === i.menu_item_id)?.name || 'Item', quantity: i.quantity, unit_price: i.unit_price, notes: i.notes ?? null,
+            name: `${this.rows('menu_items').find(m => m.id === i.menu_item_id)?.name || 'Item'}${i.options_text ? ` (${i.options_text})` : ''}`, quantity: i.quantity, unit_price: i.unit_price, notes: i.notes ?? null,
           })),
           payments: sorted.map(x => ({ method: x.method, amount: x.amount })),
           change: round2(sorted.reduce((s, x) => s + Number(x.change_amount || 0), 0)),

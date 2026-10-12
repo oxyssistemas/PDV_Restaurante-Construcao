@@ -1,6 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import { storeClient } from '@/integrations/supabase/storeClient';
 import { publicOrigin } from '@/lib/native';
+import type { OptionGroup } from '@/lib/menuOptions';
+import type { Promotion } from '@/lib/promotions';
 
 /** Loja online (delivery próprio): www.oxysrestaurante.app/pedir/<slug> */
 
@@ -12,22 +14,32 @@ export type PublicStore = {
   whatsapp: string | null; address: string | null; hours_text: string | null; notice: string | null;
   hero: { title: string | null; highlight: string | null; subtitle: string | null; image: string | null };
   featured_item_ids: string[];
+  /** taxa por bairro (zones) ou por distância (km, calculada pelo endereço no servidor) */
+  fee_mode?: 'zones' | 'distance'; max_km?: number | null;
 };
 export type StorePromotion = { id: string; title: string; subtitle: string | null; image: string | null; menu_item_id: string | null };
-export type StoreItem = { id: string; name: string; description: string | null; price: number; image_url: string | null; category_id: string | null };
-export type StoreData = { store: PublicStore; promotions: StorePromotion[]; categories: { id: string; name: string }[]; items: StoreItem[] };
+export type StoreItem = {
+  id: string; name: string; description: string | null; price: number; image_url: string | null; category_id: string | null;
+  /** Tamanho, sabores (meio a meio) e adicionais do prato */
+  option_groups?: OptionGroup[];
+};
+export type StoreData = {
+  store: PublicStore; promotions: StorePromotion[]; categories: { id: string; name: string }[]; items: StoreItem[];
+  /** happy hour e leve X pague Y que valem no delivery (selos e prévia do desconto) */
+  auto_promotions?: Promotion[];
+};
 
 export type CustomerProfile = { name: string; phone: string; address: string | null; complement: string | null };
 export type MyOrder = {
-  id: string; code: string; created_at: string; delivery_status: string; order_type: string; total: number; delivery_fee: number; public_token: string | null;
-  order_items: { quantity: number; status: string; menu_items: { name: string } | null }[];
+  id: string; code: string; created_at: string; delivery_status: string; order_type: string; total: number; delivery_fee: number; discount?: number; public_token: string | null;
+  order_items: { quantity: number; status: string; options_text?: string | null; menu_items: { name: string } | null }[];
 };
 export type CustomerAccount = { email: string | null; profile: CustomerProfile | null; orders: MyOrder[]; cashback?: { balance: number; percent: number } | null };
 
 export type TrackedOrder = {
-  id: string; code: string; order_type: string; delivery_status: string; total: number; delivery_fee: number;
+  id: string; code: string; order_type: string; delivery_status: string; total: number; delivery_fee: number; discount?: number; coupon_code?: string | null;
   customer_name: string | null; customer_address: string | null; payment_hint: string | null; change_for: number | null; created_at: string;
-  order_items: { quantity: number; unit_price: number; status: string; notes: string | null; menu_items: { name: string } | null }[];
+  order_items: { quantity: number; unit_price: number; status: string; notes: string | null; options_text?: string | null; menu_items: { name: string } | null }[];
 };
 export type TrackData = { order: TrackedOrder; store: { slug: string; whatsapp: string | null; eta_minutes: number; pickup_eta_minutes: number } | null; review_ref?: string };
 

@@ -423,8 +423,6 @@ Segredos das Edge Functions (Supabase → Project Settings → Edge Functions �
 
 | Segredo | Usado por |
 | --- | --- |
-| `AI_API_KEY` | Assistente de IA (`restaurant-assistant`). Chave do Google AI Studio (Gemini) |
-| `AI_API_URL` / `AI_MODEL` | Opcionais: outro provedor compatível com a API da OpenAI e o modelo |
 | `IFOOD_CLIENT_ID` / `IFOOD_CLIENT_SECRET` | Integração iFood |
 | `FISCAL_PROVIDER` | Emissor de NFC-e da plataforma: `simulado` (padrão, só testes) ou `focus` |
 | `FOCUS_NFE_TOKEN` | Token de revenda da Focus NFe (cadastra os restaurantes como empresas) |
@@ -568,7 +566,7 @@ Para lojas que contratam: os dados da operação daquela loja ficam num **servid
 - **Cópias de segurança:** uma por dia (guarda 7), mais "Fazer cópia agora" no painel.
 - **Depois de conferir:** super admin → Servidor → **Apagar da nuvem** (digitando o nome da loja) remove os dados da operação da nuvem compartilhada.
 - Arquivos: `desktop/server-main.cjs` (app), `desktop/servidor.html` (painel), `desktop/hub/dedicated.cjs` (servidor), `store.cjs` (SQLite), `tunnel.cjs`, `ownsupabase.cjs`, função `dedicated-server`, migrações `20261004000000_dedicated_servers.sql` e `…000100_dedicated_primary_keys.sql`. Instaladores: `desktop/electron-builder.server.json` (gerados no mesmo workflow do app de computador).
-- **Ainda não no servidor dedicado** (aparece "ainda não disponível no servidor dedicado"): loja online/cardápio QR, robô de WhatsApp, iFood, emissão de NFC-e, assistente de IA, marketing e envio de fotos.
+- **Ainda não no servidor dedicado** (aparece "ainda não disponível no servidor dedicado"): loja online/cardápio QR, robô de WhatsApp, iFood, emissão de NFC-e, marketing e envio de fotos.
 
 ## 💻📱 Apps de computador e celular
 

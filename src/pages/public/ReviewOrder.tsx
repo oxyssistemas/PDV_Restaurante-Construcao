@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 type ReviewInfo = {
   code: string; created_at: string; order_type: string | null; customer_name: string | null;
   restaurant: string; logo: string | null; enabled: boolean; thank_you: string | null;
+  google_review_url?: string | null; google_min_score?: number;
   review: { score: number; comment: string | null; reply: string | null } | null;
   items: { name: string; quantity: number }[];
 };
@@ -105,6 +106,15 @@ export default function ReviewOrder() {
             <p className="text-sm text-muted-foreground">{data.thank_you || 'Sua opinião ajuda a gente a melhorar a cada pedido.'}</p>
             <p className="text-sm">Sua nota: <b>{data.review.score}</b></p>
             {data.review.comment && <p className="text-sm italic text-muted-foreground">“{data.review.comment}”</p>}
+            {data.google_review_url && data.review.score >= (data.google_min_score ?? 9) && (
+              <div className="space-y-2 rounded-xl border border-primary/40 bg-primary/5 p-3">
+                <p className="text-sm font-medium">Que bom que você gostou! Pode contar isso no Google também? Ajuda muito a gente 💛</p>
+                <a href={data.google_review_url} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground">
+                  Avaliar no Google
+                </a>
+              </div>
+            )}
             {data.review.reply && (
               <div className="rounded-xl bg-muted/40 p-3 text-left text-sm">
                 <div className="mb-1 text-xs font-semibold text-primary">Resposta de {data.restaurant}</div>

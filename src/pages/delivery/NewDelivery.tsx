@@ -1,4 +1,7 @@
 import { useMemo, useState } from 'react';
+import KmFeeButton, { type KmQuote } from '@/components/delivery/KmFee';
+import OptionPicker, { type PickedItem } from '@/components/OptionPicker';
+import { itemOnNow, useMenuOptions } from '@/lib/menuOptions';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,7 +21,7 @@ import { paymentMethodLabel } from '@/lib/finance';
 import SourceBadge, { MANUAL_SOURCES, ORDER_SOURCES } from '@/components/delivery/SourceBadge';
 
 
-interface CartItem { id: string; name: string; price: number; quantity: number; }
+interface CartItem { id: string; name: string; price: number; quantity: number; menu_item_id?: string; options?: string[]; options_text?: string | null; }
 
 export default function NewDelivery() {
   const { user, currentRole } = useAuth();
@@ -33,6 +36,7 @@ export default function NewDelivery() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [fee, setFee] = useState('0');
+  const [geo, setGeo] = useState<KmQuote | null>(null);
   const [courierId, setCourierId] = useState<string | null>(null);
   const [payMethod, setPayMethod] = useState<string | null>(null);
   const [source, setSource] = useState<string>('internal');
@@ -68,14 +72,20 @@ export default function NewDelivery() {
   });
 
   const filtered = useMemo(
-    () => (menuItems || []).filter(i => i.name.toLowerCase().includes(search.toLowerCase())),
+    () => (menuItems || []).filter(i => itemOnNow(i) && i.name.toLowerCase().includes(search.toLowerCase())),
     [menuItems, search]
   );
 
   const subtotal = cart.reduce((s, c) => s + c.price * c.quantity, 0);
   const total = subtotal + (parseFloat(fee) || 0);
 
-  const add = (item: any) => setCart(prev => {
+  const { data: optionMap } = useMenuOptions(restaurantId);
+  const [picking, setPicking] = useState<any | null>(null);
+  const addPicked = (item: any, p: PickedItem) => setCart(prev => [...prev, {
+    id: `${item.id}-${Date.now()}`, menu_item_id: item.id, name: item.name, price: p.price, quantity: p.quantity,
+    options: p.options, options_text: [p.options_text, p.notes].filter(Boolean).join(' — ') || null,
+  }]);
+  const add = (item: any) => optionMap?.get(item.id)?.length ? setPicking(item) : setCart(prev => {
     const found = prev.find(c => c.id === item.id);
     if (found) return prev.map(c => c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c);
     return [...prev, { id: item.id, name: item.name, price: Number(item.price), quantity: 1 }];
@@ -104,6 +114,7 @@ export default function NewDelivery() {
           customer_phone: phone.trim() || null,
           customer_address: address.trim(),
           delivery_fee: parseFloat(fee) || 0,
+          ...(geo ? { delivery_lat: geo.lat, delivery_lng: geo.lng, delivery_km: geo.km } : {}),
           total: subtotal,
           courier_id: courierId,
           source,
@@ -116,7 +127,9 @@ export default function NewDelivery() {
       const { error: itemsError } = await supabase.from('order_items').insert(
         cart.map(c => ({
           order_id: order.id,
-          menu_item_id: c.id,
+          menu_item_id: c.menu_item_id ?? c.id,
+          options: c.options ?? [],
+          options_text: c.options_text ?? null,
           quantity: c.quantity,
           unit_price: c.price,
           status: 'pending' as const,
@@ -153,6 +166,8 @@ export default function NewDelivery() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Novo Pedido Delivery</h1>
+      <OptionPicker item={picking} groups={picking ? optionMap?.get(picking.id) ?? [] : []}
+        onClose={() => setPicking(null)} onConfirm={p => { addPicked(picking, p); setPicking(null); }} />
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <Card>
@@ -212,11 +227,12 @@ export default function NewDelivery() {
             </div>
             <div className="space-y-2">
               <Label>Endereço *</Label>
-              <Textarea value={address} onChange={e => setAddress(e.target.value)} placeholder="Rua, número, bairro, referência" />
+              <Textarea value={address} onChange={e => { setAddress(e.target.value); setGeo(null); }} placeholder="Rua, número, bairro, referência" />
             </div>
             <div className="space-y-2">
               <Label>Taxa de entrega (R$)</Label>
               <Input type="number" step="0.01" min="0" value={fee} onChange={e => setFee(e.target.value)} />
+              <KmFeeButton restaurantId={restaurantId} address={address} onQuote={q => { setGeo(q); setFee(q.fee.toFixed(2)); }} />
             </div>
             <div className="space-y-2">
               <Label>Entregador</Label>
@@ -265,7 +281,7 @@ export default function NewDelivery() {
             <div className="space-y-2 border-t pt-3">
               {cart.length ? cart.map(c => (
                 <div key={c.id} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                  <span className="min-w-0 flex-1 truncate">{c.name}{c.options_text ? ` (${c.options_text})` : ''}</span>
                   <div className="flex items-center gap-1">
                     <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => changeQty(c.id, -1)}><Minus className="h-3 w-3" /></Button>
                     <span className="w-5 text-center">{c.quantity}</span>

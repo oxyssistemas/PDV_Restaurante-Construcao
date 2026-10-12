@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { Bike, LogOut, Menu, ListOrdered, MessageCircle, PlusCircle, ShoppingBag, Store } from 'lucide-react';
+import { Bike, LogOut, Menu, ListOrdered, MessageCircle, PlusCircle, ShoppingBag, Store, Map as MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
 import { useState } from 'react';
@@ -13,6 +13,7 @@ import { useModuleAccess } from '@/hooks/useModuleAccess';
 const navItems: { to: string; icon: typeof Bike; label: string; end: boolean; module: ModuleKey }[] = [
   { to: '/delivery', icon: ListOrdered, label: 'Pedidos', end: true, module: 'delivery' },
   { to: '/delivery/new', icon: PlusCircle, label: 'Novo Pedido', end: false, module: 'delivery' },
+  { to: '/delivery/mapa', icon: MapIcon, label: 'Mapa e rotas', end: false, module: 'delivery' },
   { to: '/delivery/ifood', icon: ShoppingBag, label: 'iFood', end: false, module: 'ifood' },
   { to: '/delivery/loja', icon: Store, label: 'Loja online', end: false, module: 'online_store' },
   { to: '/delivery/whatsapp', icon: MessageCircle, label: 'WhatsApp', end: false, module: 'whatsapp' },

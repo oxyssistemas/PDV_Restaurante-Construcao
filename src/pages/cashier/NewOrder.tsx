@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import OptionPicker, { type PickedItem } from '@/components/OptionPicker';
+import WeightDialog from '@/components/WeightDialog';
+import { itemOnNow, useMenuOptions } from '@/lib/menuOptions';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,7 +23,7 @@ import { authorFields } from '@/lib/orders';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 
-interface CartItem { id: string; name: string; price: number; quantity: number; }
+interface CartItem { id: string; name: string; price: number; quantity: number; menu_item_id?: string; options?: string[]; options_text?: string | null; weight_kg?: number; }
 
 export default function CashierNewOrder() {
   const { user, currentRole } = useAuth();
@@ -87,7 +90,7 @@ export default function CashierNewOrder() {
   }, [menuItems]);
 
   const filtered = useMemo(
-    () => (menuItems || []).filter(i =>
+    () => (menuItems || []).filter(i => itemOnNow(i) &&
       i.name.toLowerCase().includes(search.toLowerCase()) &&
       (category === 'all' || (i as any).category_id === category)
     ),
@@ -98,7 +101,14 @@ export default function CashierNewOrder() {
   const total = subtotal;
   const selectedTable = tables?.find(t => t.id === tableId);
 
-  const add = (item: any) => setCart(prev => {
+  const { data: optionMap } = useMenuOptions(restaurantId);
+  const [picking, setPicking] = useState<any | null>(null);
+  const addPicked = (item: any, p: PickedItem) => setCart(prev => [...prev, {
+    id: `${item.id}-${Date.now()}`, menu_item_id: item.id, name: item.name, price: p.price, quantity: p.quantity,
+    options: p.options, options_text: [p.options_text, p.notes].filter(Boolean).join(' — ') || null,
+  }]);
+  const [weighing, setWeighing] = useState<any | null>(null);
+  const add = (item: any) => item.sold_by_weight ? setWeighing(item) : optionMap?.get(item.id)?.length ? setPicking(item) : setCart(prev => {
     const found = prev.find(c => c.id === item.id);
     if (found) return prev.map(c => c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c);
     return [...prev, { id: item.id, name: item.name, price: Number(item.price), quantity: 1 }];
@@ -141,7 +151,10 @@ export default function CashierNewOrder() {
       const { error: itemsError } = await supabase.from('order_items').insert(
         cart.map(c => ({
           order_id: targetOrderId,
-          menu_item_id: c.id,
+          menu_item_id: c.menu_item_id ?? c.id,
+          options: c.options ?? [],
+          options_text: c.options_text ?? null,
+          weight_kg: c.weight_kg ?? null,
           quantity: c.quantity,
           unit_price: c.price,
           notes: notes.trim() || null,
@@ -244,7 +257,7 @@ export default function CashierNewOrder() {
                 <Button size="icon" variant="outline" className="h-7 w-7 rounded-lg" onClick={() => changeQty(c.id, 1)}><Plus className="h-3 w-3" /></Button>
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{c.name}</div>
+                <div className="truncate text-sm font-medium">{c.name}{c.options_text ? ` (${c.options_text})` : ''}</div>
                 <div className="text-[11px] text-muted-foreground">R$ {c.price.toFixed(2)} un.</div>
               </div>
               <div className="text-sm font-semibold">R$ {(c.price * c.quantity).toFixed(2)}</div>
@@ -302,6 +315,13 @@ export default function CashierNewOrder() {
 
   return (
     <div className="-m-4 flex h-[calc(100%+2rem)] gap-4 p-4 md:-m-6 md:h-[calc(100%+3rem)] md:p-6">
+      <WeightDialog item={weighing} onClose={() => setWeighing(null)} onConfirm={(kg, total) => {
+        setCart(prev => [...prev, { id: `${weighing.id}-${Date.now()}`, menu_item_id: weighing.id, name: weighing.name, price: total, quantity: 1,
+          weight_kg: kg, options_text: `${kg.toFixed(3).replace('.', ',')} kg` }]);
+        setWeighing(null);
+      }} />
+      <OptionPicker item={picking} groups={picking ? optionMap?.get(picking.id) ?? [] : []}
+        onClose={() => setPicking(null)} onConfirm={p => { addPicked(picking, p); setPicking(null); }} />
       <div className="pdv-scroll flex min-w-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
         <div className="flex flex-wrap items-center gap-3">
           <div className="mr-auto">

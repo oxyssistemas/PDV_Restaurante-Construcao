@@ -8,16 +8,23 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Loader2, Minus, Plus, ShoppingBag, UtensilsCrossed, ImageIcon, CheckCircle2 } from 'lucide-react';
+import { Loader2, Minus, Plus, ShoppingBag, UtensilsCrossed, ImageIcon, CheckCircle2, BellRing, ReceiptText } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import OptionPicker from '@/components/OptionPicker';
+import { startingPrice, type OptionGroup } from '@/lib/menuOptions';
+import { promoBadge, promoDiscount, type Promotion } from '@/lib/promotions';
 
 interface MenuItem {
   id: string; name: string; description: string | null; price: number;
-  image_url: string | null; category_id: string | null;
+  image_url: string | null; category_id: string | null; in_rodizio?: boolean; option_groups?: OptionGroup[];
 }
+/** Prato com opções escolhidas (tamanho, sabores, adicionais): cada escolha vira uma linha. */
+type CustomLine = { key: string; item_id: string; qty: number; options: string[]; options_text: string | null; price: number; notes: string };
 interface MenuData {
   restaurant: { name: string; logo: string | null };
   table: { number: number };
+  rodizio?: { name: string; description: string | null } | null;
+  auto_promotions?: Promotion[];
   categories: { id: string; name: string }[];
   items: MenuItem[];
 }
@@ -42,6 +49,8 @@ export default function TableMenu() {
   const { token = '' } = useParams();
   const queryClient = useQueryClient();
   const [cart, setCart] = useState<Record<string, number>>({});
+  const [custom, setCustom] = useState<CustomLine[]>([]);
+  const [picking, setPicking] = useState<MenuItem | null>(null);
   const [notes, setNotes] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [cartOpen, setCartOpen] = useState(false);
@@ -50,18 +59,34 @@ export default function TableMenu() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['public-menu', token],
     retry: false,
+    // o tablet fica aberto na mesa: percebe sozinho quando o garçom liga ou encerra o rodízio
+    refetchInterval: 30000,
     queryFn: () => callPublic<MenuData>({ action: 'menu', token }),
+  });
+
+  const call = useMutation({
+    mutationFn: (action: 'call_waiter' | 'bill') => callPublic<{ ok: boolean }>({ action, token }),
+    onSuccess: (_d, action) => toast({
+      title: action === 'bill' ? 'Conta solicitada!' : 'Garçom chamado!',
+      description: 'Já avisamos a equipe. Em instantes alguém vem até a sua mesa.',
+    }),
+    onError: (e: Error) => toast({ title: 'Não foi possível chamar', description: e.message, variant: 'destructive' }),
   });
 
   const submit = useMutation({
     mutationFn: async () => {
-      const items = Object.entries(cart)
-        .filter(([, q]) => q > 0)
-        .map(([menu_item_id, quantity]) => ({ menu_item_id, quantity, notes: notes || null }));
+      const items = [
+        ...Object.entries(cart)
+          .filter(([id, q]) => q > 0 && data?.items.some(i => i.id === id))
+          .map(([menu_item_id, quantity]) => ({ menu_item_id, quantity, notes: notes || null, options: [] as string[] })),
+        ...custom.filter(c => data?.items.some(i => i.id === c.item_id))
+          .map(c => ({ menu_item_id: c.item_id, quantity: c.qty, notes: [c.notes, notes].filter(Boolean).join(' — ') || null, options: c.options })),
+      ];
       return callPublic<{ orderId: string }>({ action: 'order', token, customerName, items });
     },
     onSuccess: () => {
       setCart({});
+      setCustom([]);
       setNotes('');
       setCartOpen(false);
       setSent(true);
@@ -84,10 +109,24 @@ export default function TableMenu() {
     () => Object.entries(cart).reduce((sum, [id, qty]) => {
       const item = data?.items.find(i => i.id === id);
       return sum + (item ? item.price * qty : 0);
-    }, 0),
-    [cart, data],
+    }, 0) + custom.reduce((sum, c) => sum + (data?.items.some(i => i.id === c.item_id) ? c.price * c.qty : 0), 0),
+    [cart, custom, data],
   );
-  const count = Object.values(cart).reduce((a, b) => a + b, 0);
+  const count = Object.entries(cart).reduce((a, [id, q]) => a + (data?.items.some(i => i.id === id) ? q : 0), 0)
+    + custom.reduce((a, c) => a + (data?.items.some(i => i.id === c.item_id) ? c.qty : 0), 0);
+  // happy hour / leve X pague Y: prévia do desconto que o banco aplica no pedido
+  const promo = promoDiscount([
+    ...Object.entries(cart).map(([id, q]) => {
+      const it = data?.items.find(i => i.id === id);
+      return { id, menu_item_id: id, category_id: it?.category_id, unit_price: Number(it?.price ?? 0), quantity: q };
+    }),
+    ...custom.map(c => ({ id: c.key, menu_item_id: c.item_id, category_id: data?.items.find(i => i.id === c.item_id)?.category_id, unit_price: c.price, quantity: c.qty })),
+  ], data?.auto_promotions ?? [], 'salon');
+  const changeCustom = (key: string, d: number) => setCustom(list => list.flatMap(c => {
+    if (c.key !== key) return [c];
+    const q = Math.min(20, c.qty + d);
+    return q > 0 ? [{ ...c, qty: q }] : [];
+  }));
 
   const setQty = (id: string, delta: number) =>
     setCart(prev => {
@@ -136,7 +175,25 @@ export default function TableMenu() {
           <h1 className="truncate text-base font-bold">{data.restaurant.name}</h1>
           <p className="text-xs text-muted-foreground">Mesa {data.table.number}</p>
         </div>
+        <Button size="sm" variant="outline" className="gap-1.5" disabled={call.isPending} onClick={() => call.mutate('call_waiter')}>
+          <BellRing className="h-4 w-4" /> Chamar garçom
+        </Button>
       </header>
+
+      {data.rodizio && (
+        <section className="mx-4 mt-4 rounded-2xl border border-primary/40 bg-primary/10 p-4">
+          <div className="flex items-center gap-2 font-semibold">
+            <UtensilsCrossed className="h-4 w-4 text-primary" /> Mesa no rodízio {data.rodizio.name}
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {data.rodizio.description ? `${data.rodizio.description} ` : ''}
+            Peça à vontade os pratos abaixo, já inclusos. Quer algo fora do rodízio? Chame o garçom.
+          </p>
+          <Button size="sm" variant="secondary" className="mt-3 gap-1.5" disabled={call.isPending} onClick={() => call.mutate('call_waiter')}>
+            <BellRing className="h-4 w-4" /> Pedir algo por fora
+          </Button>
+        </section>
+      )}
 
       {sent && status?.orders?.length ? (
         <section className="mx-4 mt-4 rounded-2xl border border-border bg-card p-4">
@@ -176,12 +233,24 @@ export default function TableMenu() {
                   )}
                   <div className="min-w-0 flex-1">
                     <h3 className="font-semibold leading-tight">{item.name}</h3>
+                    {promoBadge(item, data.auto_promotions ?? [], 'salon') && (
+                      <Badge className="mt-1 bg-[hsl(var(--success))] text-white">{promoBadge(item, data.auto_promotions ?? [], 'salon')}</Badge>
+                    )}
                     {item.description && (
                       <p className="line-clamp-2 text-xs text-muted-foreground">{item.description}</p>
                     )}
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      <span className="font-bold text-primary">{brl(Number(item.price))}</span>
-                      {cart[item.id] ? (
+                      {item.in_rodizio
+                        ? <Badge>Incluso</Badge>
+                        : <span className="font-bold text-primary">
+                          {startingPrice(item.price, item.option_groups).from && <span className="mr-1 text-xs font-medium text-muted-foreground">a partir de</span>}
+                          {brl(startingPrice(item.price, item.option_groups).price)}
+                        </span>}
+                      {item.option_groups?.length ? (
+                        <Button size="sm" onClick={() => setPicking(item)} className="gap-1">
+                          <Plus className="h-4 w-4" /> Escolher
+                        </Button>
+                      ) : cart[item.id] ? (
                         <div className="flex items-center gap-2">
                           <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => setQty(item.id, -1)}>
                             <Minus className="h-4 w-4" />
@@ -203,7 +272,23 @@ export default function TableMenu() {
             </div>
           </section>
         ))}
+        {!data.items.length && (
+          <p className="py-10 text-center text-sm text-muted-foreground">Nenhum prato disponível agora. Chame o garçom.</p>
+        )}
+
+        <div className="flex justify-center pt-2">
+          <Button variant="outline" className="gap-2" disabled={call.isPending} onClick={() => call.mutate('bill')}>
+            <ReceiptText className="h-4 w-4" /> Pedir a conta
+          </Button>
+        </div>
       </main>
+
+      <OptionPicker item={picking} groups={picking?.option_groups ?? []} free={!!picking?.in_rodizio}
+        onClose={() => setPicking(null)}
+        onConfirm={p => {
+          if (picking) setCustom(list => [...list, { key: `${picking.id}-${Date.now()}`, item_id: picking.id, qty: p.quantity, options: p.options, options_text: p.options_text, price: p.price, notes: p.notes }]);
+          setPicking(null);
+        }} />
 
       {count > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 p-4 backdrop-blur">
@@ -213,7 +298,7 @@ export default function TableMenu() {
                 <span className="flex items-center gap-2">
                   <ShoppingBag className="h-5 w-5" /> Ver pedido ({count})
                 </span>
-                <span>{brl(total)}</span>
+                <span>{data.rodizio && total === 0 ? 'Incluso' : brl(total)}</span>
               </Button>
             </SheetTrigger>
             <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-3xl">
@@ -226,8 +311,24 @@ export default function TableMenu() {
                     return (
                       <li key={id} className="flex items-center justify-between gap-3 text-sm">
                         <span className="min-w-0 flex-1 truncate">{qty}x {item.name}</span>
-                        <span className="font-medium">{brl(item.price * qty)}</span>
+                        <span className="font-medium">{item.in_rodizio ? 'Incluso' : brl(item.price * qty)}</span>
                         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setQty(id, -1)}>
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                      </li>
+                    );
+                  })}
+                  {custom.map(c => {
+                    const item = data.items.find(i => i.id === c.item_id);
+                    if (!item) return null;
+                    return (
+                      <li key={c.key} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate">{c.qty}x {item.name}</span>
+                          {c.options_text && <span className="block text-xs text-muted-foreground">{c.options_text}</span>}
+                        </span>
+                        <span className="font-medium">{item.in_rodizio ? 'Incluso' : brl(c.price * c.qty)}</span>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" aria-label={`Tirar ${item.name}`} onClick={() => changeCustom(c.key, -1)}>
                           <Minus className="h-4 w-4" />
                         </Button>
                       </li>
@@ -244,8 +345,13 @@ export default function TableMenu() {
                   <Textarea id="qr-notes" value={notes} maxLength={300}
                     onChange={e => setNotes(e.target.value)} placeholder="Ex.: sem cebola" />
                 </div>
+                {promo.discount > 0 && (
+                  <div className="flex items-center justify-between text-sm text-[hsl(var(--success))]">
+                    <span>{promo.labels.join(' · ')}</span><span>-{brl(promo.discount)}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-base font-bold">
-                  <span>Total</span><span>{brl(total)}</span>
+                  <span>Total</span><span>{brl(Math.max(0, total - promo.discount))}</span>
                 </div>
                 <Button
                   size="lg"

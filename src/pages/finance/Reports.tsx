@@ -10,6 +10,7 @@ import { Loader2, Download } from 'lucide-react';
 import { format, startOfWeek, startOfMonth, subDays, subMonths, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, endOfWeek, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { brl, downloadCsv, paymentMethodLabel } from '@/lib/finance';
+import AdvancedReports from '@/components/finance/AdvancedReports';
 
 type Period = 'daily' | 'weekly' | 'monthly';
 
@@ -203,6 +204,7 @@ export default function FinanceReports() {
           </Card>
         </div>
       )}
+      {restaurantId && <AdvancedReports restaurantId={restaurantId} />}
     </div>
   );
 }

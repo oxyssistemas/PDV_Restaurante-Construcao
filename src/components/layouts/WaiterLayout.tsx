@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { Grid3X3, ClipboardList, BookOpen, CalendarDays, LogOut, Menu, Bell } from 'lucide-react';
+import { Grid3X3, ClipboardList, BookOpen, CalendarDays, LogOut, Menu, Bell, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
 import { useState, useEffect } from 'react';
@@ -10,12 +10,14 @@ import { useToast } from '@/hooks/use-toast';
 import SideNavShell from './SideNavShell';
 import ThemeToggle from '@/components/ThemeToggle';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
+import WaiterCallAlert from '@/components/WaiterCallAlert';
 
 const navItems = [
   { to: '/waiter', icon: Grid3X3, label: 'Mesas', end: true },
   { to: '/waiter/orders', icon: ClipboardList, label: 'Pedidos', end: false },
   { to: '/waiter/menu', icon: BookOpen, label: 'Cardápio', end: false },
   { to: '/waiter/reservations', icon: CalendarDays, label: 'Reservas', end: false, feature: 'reservations' as const },
+  { to: '/waiter/fila', icon: Users, label: 'Fila de espera', end: false, feature: 'reservations' as const },
 ];
 
 export default function WaiterLayout() {
@@ -110,6 +112,7 @@ export default function WaiterLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden">
+      <WaiterCallAlert restaurantId={restaurantId} />
       <SideNavShell open={sidebarOpen} onClose={() => setSidebarOpen(false)}>
         {sidebar}
       </SideNavShell>

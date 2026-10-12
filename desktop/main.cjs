@@ -84,6 +84,17 @@ function createWindow() {
     },
   });
 
+  // Balança na porta serial/USB (vendas por quilo): escolhe a primeira porta e libera só para as telas do app
+  const ses = win.webContents.session;
+  ses.on('select-serial-port', (event, ports, _wc, callback) => {
+    event.preventDefault();
+    const usb = ports.find(p => p.vendorId) || ports[0];
+    callback(usb ? usb.portId : '');
+  });
+  const serialOk = (origin) => isAppUrl(origin) || /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(origin || '');
+  ses.setPermissionCheckHandler((_wc, permission, origin) => (permission === 'serial' ? serialOk(origin) : true));
+  ses.setDevicePermissionHandler((details) => details.deviceType === 'serial' && serialOk(details.origin));
+
   win.once('ready-to-show', () => { win.maximize(); win.show(); });
   win.loadURL(APP_URL);
 

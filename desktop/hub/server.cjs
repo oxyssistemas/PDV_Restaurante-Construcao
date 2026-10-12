@@ -174,7 +174,7 @@ function createServer({ state, getConfig, uiDir, getStatus, mirror, auth, mode =
           if (publicFns && req.method === 'POST') {
             const raw = (await readRaw(req)).toString('utf8');
             try {
-              const out = publicFns.handle(name, raw, req.headers);
+              const out = await publicFns.handle(name, raw, req.headers);
               if (out !== null) return send(res, 200, out);
             } catch (e) {
               return send(res, e.status || 500, { error: e.message || 'Erro' });

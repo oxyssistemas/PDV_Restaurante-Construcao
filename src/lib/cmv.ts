@@ -71,7 +71,7 @@ export function useCostData(restaurantId?: string | null) {
     queryFn: async () => {
       const rid = restaurantId!;
       const [items, ingredients, components, inventory] = await Promise.all([
-        supabase.from('menu_items').select('id, name, price, is_combo, available, category_id, menu_categories(name)').eq('restaurant_id', rid).order('name'),
+        supabase.from('menu_items').select('id, name, price, is_combo, available, category_id, menu_categories(name)').eq('restaurant_id', rid).eq('is_rodizio_charge', false).order('name'),
         supabase.from('menu_item_ingredients').select('menu_item_id, inventory_id, quantity').eq('restaurant_id', rid),
         supabase.from('menu_item_components').select('parent_item_id, component_item_id, quantity').eq('restaurant_id', rid),
         supabase.from('inventory').select('id, name, unit, cost_per_unit').eq('restaurant_id', rid),

@@ -6,9 +6,9 @@ import { isAdminLike } from './roles';
  * hr, dre, loyalty, marketing, branding e ai também são conferidas no banco (has_module_access).
  */
 export type ModuleKey =
-  | 'dashboard' | 'network' | 'ai' | 'crm' | 'menu' | 'tables' | 'kiosks'
+  | 'dashboard' | 'network' | 'crm' | 'menu' | 'tables' | 'kiosks'
   | 'inventory' | 'stock_counts' | 'cmv' | 'reports' | 'history'
-  | 'hr' | 'dre' | 'loyalty' | 'reviews' | 'fiscal' | 'accountant'
+  | 'hr' | 'dre' | 'loyalty' | 'reviews' | 'promotions' | 'fiscal' | 'accountant'
   | 'marketing' | 'delivery' | 'online_store' | 'whatsapp' | 'couriers' | 'ifood' | 'marketplaces'
   | 'branches' | 'users' | 'branding' | 'settings';
 
@@ -24,7 +24,6 @@ type ModuleDef = {
 export const MODULES: Record<ModuleKey, ModuleDef> = {
   dashboard: { label: 'Dashboard e faturamento', group: 'Gestão', roles: ['finance'] },
   network: { label: 'Painel da rede (filiais)', group: 'Gestão', feature: 'branches' },
-  ai: { label: 'Assistente de IA', group: 'Gestão', feature: 'ai' },
   reports: { label: 'Relatórios', group: 'Gestão', feature: 'reports', roles: ['finance'] },
   history: { label: 'Histórico de pedidos', group: 'Gestão', roles: ['finance'] },
 
@@ -43,6 +42,7 @@ export const MODULES: Record<ModuleKey, ModuleDef> = {
 
   loyalty: { label: 'Programa de fidelidade e cashback', group: 'Clientes', feature: 'loyalty', roles: ['finance'] },
   reviews: { label: 'Avaliações (NPS)', group: 'Clientes', feature: 'reviews', roles: ['finance'] },
+  promotions: { label: 'Promoções e cupons', group: 'Clientes', feature: 'promotions', roles: ['marketing'] },
   marketing: { label: 'Marketing', group: 'Clientes', feature: 'marketing', roles: ['marketing'] },
 
   delivery: { label: 'Pedidos de delivery (no admin: só acompanhar)', group: 'Delivery', feature: 'delivery', roles: ['delivery', 'cashier'] },

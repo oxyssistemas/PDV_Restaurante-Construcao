@@ -37,7 +37,7 @@ export default function OrdersHistory() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('*, restaurant_tables(number), order_items(id, quantity, unit_price, menu_items(name))')
+        .select('*, restaurant_tables(number), order_items(id, quantity, unit_price, options_text, menu_items(name))')
         .eq('restaurant_id', restaurantId!)
         .not('archived_at', 'is', null)
         .order('archived_at', { ascending: false })
@@ -65,8 +65,8 @@ export default function OrdersHistory() {
         orderTypeLabels[o.order_type] || o.order_type,
         o.customer_name || `Mesa ${(o as any).restaurant_tables?.number ?? '-'}`,
         authorLabel(o as any),
-        ((o as any).order_items || []).map((i: any) => `${i.quantity}x ${i.menu_items?.name}`).join(' | '),
-        (Number(o.total) + Number(o.delivery_fee || 0)).toFixed(2).replace('.', ','),
+        ((o as any).order_items || []).map((i: any) => `${i.quantity}x ${i.menu_items?.name}${i.options_text ? ` (${i.options_text})` : ''}`).join(' | '),
+        (Number(o.total) + Number(o.delivery_fee || 0) - Number(o.discount || 0)).toFixed(2).replace('.', ','),
       ]),
     ]);
   };
@@ -121,11 +121,11 @@ export default function OrdersHistory() {
                 <span className="text-xs text-muted-foreground">
                   {format(new Date(o.archived_at as string), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                 </span>
-                <span className="ml-auto font-bold">{brl(Number(o.total) + Number(o.delivery_fee || 0))}</span>
+                <span className="ml-auto font-bold">{brl(Number(o.total) + Number(o.delivery_fee || 0) - Number(o.discount || 0))}</span>
               </div>
               <ul className="mt-1 text-xs text-muted-foreground">
                 {((o as any).order_items || []).map((i: any) => (
-                  <li key={i.id}>{i.quantity}x {i.menu_items?.name}</li>
+                  <li key={i.id}>{i.quantity}x {i.menu_items?.name}{i.options_text ? ` (${i.options_text})` : ''}</li>
                 ))}
               </ul>
               <p className="mt-1 text-[11px] text-muted-foreground">Lançado por {authorLabel(o as any)}</p>

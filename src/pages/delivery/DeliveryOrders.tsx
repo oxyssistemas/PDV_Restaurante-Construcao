@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import ThirdPartyDelivery from '@/components/delivery/ThirdPartyDelivery';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { pushIfoodStatus } from '@/lib/ifood';
@@ -60,7 +61,7 @@ export default function DeliveryOrders({ readOnly = false, newOrderPath }: Props
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('*, order_items(id, quantity, unit_price, status, menu_items(name))')
+        .select('*, order_items(id, quantity, unit_price, status, notes, options_text, menu_items(name))')
         .eq('restaurant_id', restaurantId!)
         .in('order_type', ['delivery', 'takeaway'])
         .neq('delivery_status', 'cancelled')
@@ -98,8 +99,8 @@ export default function DeliveryOrders({ readOnly = false, newOrderPath }: Props
   // valor já pago por pedido (o cliente pode ter usado cashback na loja online)
   const paidByOrder = new Map<string, number>();
   (payments || []).forEach(p => paidByOrder.set(p.order_id, (paidByOrder.get(p.order_id) ?? 0) + Number(p.amount)));
-  const dueOf = (o: { id: string; total: number | string; delivery_fee?: number | string | null }) =>
-    Math.max(0, Math.round((Number(o.total) + Number(o.delivery_fee || 0) - (paidByOrder.get(o.id) ?? 0)) * 100) / 100);
+  const dueOf = (o: { id: string; total: number | string; delivery_fee?: number | string | null; discount?: number | string | null }) =>
+    Math.max(0, Math.round((Number(o.total) + Number(o.delivery_fee || 0) - Number(o.discount || 0) - (paidByOrder.get(o.id) ?? 0)) * 100) / 100);
   const paidOrderIds = new Set((payments || []).map(p => p.order_id).filter(id => {
     const o = (orders || []).find(x => x.id === id);
     return !o || dueOf(o) < 0.01;
@@ -244,7 +245,7 @@ export default function DeliveryOrders({ readOnly = false, newOrderPath }: Props
                     const isReady = activeItems.length > 0 && activeItems.every((i: any) => ['ready', 'delivered'].includes(i.status));
                     const courierId = (o as any).courier_id as string | null;
                     const pickup = o.order_type === 'takeaway';
-                    const blockRoute = col.next === 'out_for_delivery' && (!isReady || (!pickup && !courierId));
+                    const blockRoute = col.next === 'out_for_delivery' && (!isReady || (!pickup && !courierId && !(o as any).third_party_provider));
                     const nextLabel = pickup && col.next === 'out_for_delivery' ? 'Pronto p/ retirada' : pickup && col.next === 'delivered' ? 'Retirado' : col.nextLabel;
                     const hint = (o as any).payment_hint as string | null;
                     const changeFor = Number((o as any).change_for || 0);
@@ -279,7 +280,7 @@ export default function DeliveryOrders({ readOnly = false, newOrderPath }: Props
                         )}
                         <ul className="mt-2 space-y-0.5 text-xs">
                           {items.map((i: any) => (
-                            <li key={i.id}>{i.quantity}x {i.menu_items?.name}{i.notes && <span className="text-muted-foreground"> · {i.notes}</span>}</li>
+                            <li key={i.id}>{i.quantity}x {i.menu_items?.name}{i.options_text ? ` (${i.options_text})` : ''}{i.notes && <span className="text-muted-foreground"> · {i.notes}</span>}</li>
                           ))}
                         </ul>
                         {o.notes && (
@@ -295,7 +296,7 @@ export default function DeliveryOrders({ readOnly = false, newOrderPath }: Props
                         )}
                         <div className="mt-2 flex items-center justify-between text-sm font-bold">
                           <span>Total</span>
-                          <span>R$ {(Number(o.total) + Number(o.delivery_fee || 0)).toFixed(2)}</span>
+                          <span>R$ {(Number(o.total) + Number(o.delivery_fee || 0) - Number(o.discount || 0)).toFixed(2)}{Number(o.discount) > 0 && <span className="ml-1 text-[11px] font-normal text-[hsl(var(--success))]">(-{Number(o.discount).toFixed(2)} {o.coupon_code ? `cupom ${o.coupon_code}` : 'promoção'})</span>}</span>
                         </div>
                         <div className="mt-1 text-[10px] text-muted-foreground">
                           Lançado por {authorLabel(o as any)} · {deliveryStatusLabels[o.delivery_status]}
@@ -305,7 +306,8 @@ export default function DeliveryOrders({ readOnly = false, newOrderPath }: Props
                             <Bike className="h-3 w-3" /> {(couriers || []).find(c => c.id === courierId)?.name ?? 'Sem entregador'}
                           </div>
                         )}
-                        {!pickup && !readOnly && <Select
+                        {!pickup && !readOnly && <ThirdPartyDelivery order={o as any} />}
+                        {!pickup && !readOnly && !(o as any).third_party_provider && <Select
                           value={(o as any).courier_id || undefined}
                           onValueChange={v => assignCourier.mutate({ id: o.id, courierId: v })}
                         >

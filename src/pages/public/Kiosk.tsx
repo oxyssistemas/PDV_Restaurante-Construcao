@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import OptionPicker from '@/components/OptionPicker';
+import { startingPrice, type OptionGroup } from '@/lib/menuOptions';
+import { promoBadge, promoDiscount, type Promotion } from '@/lib/promotions';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,13 +10,16 @@ import { Input } from '@/components/ui/input';
 import { Check, ChevronLeft, Loader2, Maximize, Minus, Plus, ShoppingBag, Trash2, Utensils, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type KioskItem = { id: string; name: string; description: string | null; price: number; image_url: string | null; category_id: string | null };
+type KioskItem = { id: string; name: string; description: string | null; price: number; image_url: string | null; category_id: string | null; option_groups?: OptionGroup[] };
+/** Prato com opções escolhidas (tamanho, sabores, adicionais): cada escolha vira uma linha. */
+type CustomLine = { key: string; item_id: string; qty: number; options: string[]; options_text: string | null; price: number; notes: string };
 type KioskData = {
   restaurant: { name: string; logo: string | null };
   kiosk: { name: string; eat_in: boolean; takeaway: boolean; ask_phone: boolean; welcome: string | null; idle_seconds: number };
   featured: string[];
   categories: { id: string; name: string }[];
   items: KioskItem[];
+  auto_promotions?: Promotion[];
 };
 type Step = 'welcome' | 'menu' | 'checkout' | 'done';
 
@@ -36,6 +42,8 @@ export default function Kiosk() {
   const [step, setStep] = useState<Step>('welcome');
   const [mode, setMode] = useState<'eat_in' | 'takeaway'>('takeaway');
   const [cart, setCart] = useState<Record<string, number>>({});
+  const [custom, setCustom] = useState<CustomLine[]>([]);
+  const [picking, setPicking] = useState<KioskItem | null>(null);
   const [category, setCategory] = useState<string>('all');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -55,7 +63,7 @@ export default function Kiosk() {
   });
 
   const reset = useCallback(() => {
-    setStep('welcome'); setCart({}); setCategory('all'); setName(''); setPhone(''); setDetail(null); setDone(null);
+    setStep('welcome'); setCart({}); setCustom([]); setPicking(null); setCategory('all'); setName(''); setPhone(''); setDetail(null); setDone(null);
   }, []);
 
   // sem toque por um tempo: volta ao início (o próximo cliente não vê o pedido do anterior)
@@ -80,9 +88,24 @@ export default function Kiosk() {
     }
     return items.filter(i => i.category_id === category);
   }, [items, category, data?.featured]);
-  const cartLines = Object.entries(cart).map(([id, qty]) => ({ item: items.find(i => i.id === id)!, qty })).filter(l => l.item);
+  const cartLines = [
+    ...Object.entries(cart).map(([id, qty]) => {
+      const item = items.find(i => i.id === id)!;
+      return { key: id, custom: false, item, qty, price: item?.price ?? 0, options: [] as string[], options_text: null as string | null, notes: '' };
+    }),
+    ...custom.map(c => ({ key: c.key, custom: true, item: items.find(i => i.id === c.item_id)!, qty: c.qty, price: c.price, options: c.options, options_text: c.options_text, notes: c.notes })),
+  ].filter(l => l.item);
   const count = cartLines.reduce((s, l) => s + l.qty, 0);
-  const total = cartLines.reduce((s, l) => s + l.qty * l.item.price, 0);
+  const gross = cartLines.reduce((s, l) => s + l.qty * l.price, 0);
+  // happy hour / leve X pague Y: prévia do desconto que o banco aplica no pedido
+  const promo = promoDiscount(cartLines.map(l => ({ id: l.key, menu_item_id: l.item.id, category_id: l.item.category_id, unit_price: l.price, quantity: l.qty })), data?.auto_promotions ?? [], 'counter');
+  const total = Math.max(0, gross - promo.discount);
+  const countOf = (id: string) => (cart[id] ?? 0) + custom.filter(c => c.item_id === id).reduce((s, c) => s + c.qty, 0);
+  const changeCustom = (key: string, d: number) => setCustom(list => list.flatMap(c => {
+    if (c.key !== key) return [c];
+    const q = Math.min(20, c.qty + d);
+    return q > 0 ? [{ ...c, qty: q }] : [];
+  }));
   const add = (id: string, d = 1) => setCart(c => {
     const q = Math.max(0, Math.min(20, (c[id] ?? 0) + d));
     const next = { ...c };
@@ -93,7 +116,7 @@ export default function Kiosk() {
   const send = useMutation({
     mutationFn: () => callKiosk<{ ticket: number; total: number }>({
       action: 'order', token,
-      order: { name: name.trim(), phone: phone.trim(), mode, items: cartLines.map(l => ({ menu_item_id: l.item.id, quantity: l.qty })) },
+      order: { name: name.trim(), phone: phone.trim(), mode, items: cartLines.map(l => ({ menu_item_id: l.item.id, quantity: l.qty, options: l.options, notes: l.notes || null })) },
     }),
     onSuccess: (r) => { setDone(r); setStep('done'); },
   });
@@ -185,14 +208,20 @@ export default function Kiosk() {
           </nav>
           <section className="grid flex-1 auto-rows-max grid-cols-2 gap-4 overflow-y-auto p-4 xl:grid-cols-3">
             {visible.map(i => (
-              <button key={i.id} onClick={() => setDetail(i)} className="relative flex flex-col overflow-hidden rounded-3xl border border-border bg-card text-left transition active:scale-[0.98]">
+              <button key={i.id} onClick={() => (i.option_groups?.length ? setPicking(i) : setDetail(i))} className="relative flex flex-col overflow-hidden rounded-3xl border border-border bg-card text-left transition active:scale-[0.98]">
                 {i.image_url ? <img src={i.image_url} alt="" className="h-40 w-full object-cover" /> : <div className="flex h-40 items-center justify-center bg-muted/40"><Utensils className="h-10 w-10 text-muted-foreground/40" /></div>}
                 <div className="flex flex-1 flex-col p-4">
                   <div className="text-lg font-bold leading-tight">{i.name}</div>
+                  {promoBadge(i, data?.auto_promotions ?? [], 'counter') && (
+                    <span className="mt-1 w-fit rounded-full bg-[hsl(var(--success))] px-2 py-0.5 text-sm font-bold text-white">{promoBadge(i, data?.auto_promotions ?? [], 'counter')}</span>
+                  )}
                   {i.description && <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">{i.description}</div>}
-                  <div className="mt-auto pt-2 text-xl font-extrabold text-primary">{brl(i.price)}</div>
+                  <div className="mt-auto pt-2 text-xl font-extrabold text-primary">
+                    {startingPrice(i.price, i.option_groups).from && <span className="mr-1 text-sm font-medium text-muted-foreground">a partir de</span>}
+                    {brl(startingPrice(i.price, i.option_groups).price)}
+                  </div>
                 </div>
-                {cart[i.id] && <span className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-lg font-bold text-primary-foreground">{cart[i.id]}</span>}
+                {countOf(i.id) > 0 && <span className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-lg font-bold text-primary-foreground">{countOf(i.id)}</span>}
               </button>
             ))}
           </section>
@@ -202,14 +231,15 @@ export default function Kiosk() {
           <h2 className="text-3xl font-bold">Seu pedido</h2>
           <ul className="space-y-3">
             {cartLines.map(l => (
-              <li key={l.item.id} className="flex items-center gap-3 rounded-2xl border border-border p-3">
+              <li key={l.key} className="flex items-center gap-3 rounded-2xl border border-border p-3">
                 <div className="min-w-0 flex-1">
                   <div className="text-lg font-semibold">{l.item.name}</div>
-                  <div className="text-muted-foreground">{brl(l.item.price)}</div>
+                  {l.options_text && <div className="text-sm text-primary">{l.options_text}</div>}
+                  <div className="text-muted-foreground">{brl(l.price)}</div>
                 </div>
-                <Button size="icon" variant="outline" className="h-12 w-12 rounded-xl" onClick={() => add(l.item.id, -1)}>{l.qty === 1 ? <Trash2 className="h-5 w-5" /> : <Minus className="h-5 w-5" />}</Button>
+                <Button size="icon" variant="outline" className="h-12 w-12 rounded-xl" onClick={() => (l.custom ? changeCustom(l.key, -1) : add(l.item.id, -1))}>{l.qty === 1 ? <Trash2 className="h-5 w-5" /> : <Minus className="h-5 w-5" />}</Button>
                 <span className="w-8 text-center text-xl font-bold">{l.qty}</span>
-                <Button size="icon" variant="outline" className="h-12 w-12 rounded-xl" onClick={() => add(l.item.id)}><Plus className="h-5 w-5" /></Button>
+                <Button size="icon" variant="outline" className="h-12 w-12 rounded-xl" onClick={() => (l.custom ? changeCustom(l.key, 1) : add(l.item.id))}><Plus className="h-5 w-5" /></Button>
               </li>
             ))}
           </ul>
@@ -228,7 +258,10 @@ export default function Kiosk() {
       )}
 
       <footer className="flex items-center gap-4 border-t border-border px-6 py-4">
-        <div className="text-xl">{count} item(ns) · <b className="text-2xl">{brl(total)}</b></div>
+        <div className="text-xl">
+          {count} item(ns) · <b className="text-2xl">{brl(total)}</b>
+          {promo.discount > 0 && <span className="ml-2 text-base text-[hsl(var(--success))]">({promo.labels.join(' · ')}: −{brl(promo.discount)})</span>}
+        </div>
         {step === 'menu' ? (
           <Button size="lg" className="ml-auto h-16 rounded-2xl px-10 text-xl" disabled={!count} onClick={() => setStep('checkout')}>Finalizar pedido</Button>
         ) : (
@@ -237,6 +270,13 @@ export default function Kiosk() {
           </Button>
         )}
       </footer>
+
+      <OptionPicker item={picking} groups={picking?.option_groups ?? []}
+        onClose={() => setPicking(null)}
+        onConfirm={p => {
+          if (picking) setCustom(list => [...list, { key: `${picking.id}-${Date.now()}`, item_id: picking.id, qty: p.quantity, options: p.options, options_text: p.options_text, price: p.price, notes: p.notes }]);
+          setPicking(null);
+        }} />
 
       {detail && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" onClick={() => setDetail(null)}>

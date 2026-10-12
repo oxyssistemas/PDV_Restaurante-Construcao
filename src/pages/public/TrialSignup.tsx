@@ -10,6 +10,8 @@ import { edgeErrorMessage } from '@/lib/functionError';
 import { OXYS_WHATSAPP_LABEL, TRIAL_DAYS, trialWhatsappLink } from '@/lib/trial';
 import oxysLogo from '@/assets/oxys-logo.png';
 import { isValidDocument, maskDocument } from '@/lib/document';
+import OxyBot from '@/components/oxy/OxyBot';
+import { motion } from 'framer-motion';
 
 const maskPhone = (v: string) => {
   const d = v.replace(/\D/g, '').slice(0, 11);
@@ -43,6 +45,19 @@ export default function TrialSignup() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+      {/* Oxy recebe a pessoa e comemora quando a conta fica pronta */}
+      <div className="mb-3 flex w-full max-w-md items-end gap-3">
+        <OxyBot size={done ? 84 : 72} mood={done ? 'celebrate' : 'wave'} className="shrink-0" />
+        <motion.div
+          key={done ? 'done' : 'form'}
+          initial={{ opacity: 0, y: 8, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+          className="relative mb-6 rounded-2xl rounded-bl-sm border bg-card px-4 py-3 text-sm shadow-md"
+        >
+          {done
+            ? <>Prontinho! 🎉 Clique em <b>Ir para o login</b> que eu te espero lá dentro para mostrar tudo.</>
+            : <>Oi! Eu sou o <b>Oxy</b>, o robô chef da Oxys. Crie sua conta e, no primeiro acesso, eu te mostro como tudo funciona.</>}
+        </motion.div>
+      </div>
       <Card className="w-full max-w-md border-0 shadow-xl">
         <CardHeader className="space-y-3 pb-2 text-center">
           <img src={oxysLogo} alt="Oxys Restaurante" className="mx-auto h-20 w-auto object-contain" />

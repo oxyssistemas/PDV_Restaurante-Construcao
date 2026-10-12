@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { discountLabel } from '@/lib/promotions';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,7 @@ import {
   Loader2, ReceiptText, Banknote, CreditCard, Smartphone, Users, Search, MoreHorizontal, Wallet, Bike, Printer, Plus, Trash2, Gift,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { authorLabel } from '@/lib/orders';
@@ -18,7 +19,8 @@ import { printReceipt } from '@/lib/printing';
 import { usePrinterSettings } from '@/hooks/usePrinterSettings';
 import { logAudit } from '@/lib/audit';
 import DeliverySaleDialog from '@/components/delivery/DeliverySaleDialog';
-import { couvertOf, percentLabel, serviceFeeOf, useServiceSettings } from '@/lib/serviceCharge';
+import { couvertOf, minConsumptionOf, percentLabel, serviceFeeOf, useServiceSettings } from '@/lib/serviceCharge';
+import SplitBillDialog from '@/components/cashier/SplitBillDialog';
 import { PUBLIC_ORIGIN } from '@/lib/native';
 import { IS_DEDICATED } from '@/lib/central';
 
@@ -113,7 +115,7 @@ export default function Payments() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, table_id, total, status, customer_name, created_at, created_by_name, created_by_role, service_fee, couvert_total, people_count, customer_phone, public_token')
+        .select('id, table_id, total, status, customer_name, created_at, created_by_name, created_by_role, service_fee, couvert_total, people_count, customer_phone, public_token, discount, promo_labels, coupon_code, min_consumption_total, card_code')
         .eq('restaurant_id', restaurantId!)
         .is('archived_at', null)
         .in('status', ['pending', 'preparing', 'ready', 'delivered'])
@@ -140,7 +142,7 @@ export default function Payments() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('order_items')
-        .select('id, order_id, quantity, unit_price, status, menu_items(name)')
+        .select('id, order_id, quantity, unit_price, status, options_text, menu_items(name)')
         .in('order_id', orderIds);
       if (error) throw error;
       return (data || []).filter(i => i.status !== 'cancelled');
@@ -153,10 +155,12 @@ export default function Payments() {
   // taxa de serviço e couvert: o valor gravado na comanda vale; sem valor gravado, calcula com as opções do caixa
   const couvertOrderId = tableOrders.find(o => o.couvert_total != null)?.id ?? tableOrders[0]?.id;
   const peopleCount = people === '' ? (tables?.find(t => t.id === selectedTableId)?.capacity ?? 0) : Math.max(0, parseInt(people) || 0);
+  // desconto das promoções (happy hour, leve X pague Y, cupom), calculado no banco
+  const discountOf = (id: string) => Number(tableOrders.find(x => x.id === id)?.discount || 0);
   const serviceOf = (id: string) => {
     const o = tableOrders.find(x => x.id === id);
     if (o?.service_fee != null) return Number(o.service_fee);
-    return serviceOn ? serviceFeeOf(itemsTotal(id), service) : 0;
+    return serviceOn ? serviceFeeOf(Math.max(0, itemsTotal(id) - discountOf(id)), service) : 0;
   };
   const couvertFor = (id: string) => {
     if (id !== couvertOrderId) return 0;
@@ -164,7 +168,15 @@ export default function Payments() {
     if (o?.couvert_total != null) return Number(o.couvert_total);
     return couvertOn ? couvertOf(peopleCount, service) : 0;
   };
-  const orderTotal = (id: string) => round2(itemsTotal(id) + serviceOf(id) + couvertFor(id));
+  // consumação mínima da mesa (por pessoa): cobrada na mesma comanda do couvert
+  const minConsumptionFor = (id: string) => {
+    if (id !== couvertOrderId) return 0;
+    const o = tableOrders.find(x => x.id === id);
+    if (o?.min_consumption_total != null) return Number(o.min_consumption_total);
+    const consumed = tableOrders.reduce((sum, x) => sum + itemsTotal(x.id) - discountOf(x.id), 0);
+    return minConsumptionOf(peopleCount, consumed, service);
+  };
+  const orderTotal = (id: string) => round2(itemsTotal(id) + serviceOf(id) + couvertFor(id) + minConsumptionFor(id) - discountOf(id));
 
   /** Comandas com saldo em aberto na mesa. */
   const pendingOrders = useMemo(
@@ -182,6 +194,8 @@ export default function Payments() {
 
   // seleciona automaticamente todas as comandas com saldo ao trocar de mesa
   useEffect(() => {
+    // comanda achada pelo cartão: só ela fica marcada
+    if (pendingCard.current && tableOrders.some(o => o.id === pendingCard.current)) { setSelectedOrderIds([pendingCard.current]); pendingCard.current = null; return; }
     setSelectedOrderIds(tableOrders.filter(o => orderTotal(o.id) - o.paid > 0.009).map(o => o.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTableId, items]);
@@ -204,6 +218,9 @@ export default function Payments() {
   const selectedTotal = round2(selectedOrders.reduce((s, o) => s + orderTotal(o.id), 0));
   const selectedItems = round2(selectedOrders.reduce((s, o) => s + itemsTotal(o.id), 0));
   const selectedService = round2(selectedOrders.reduce((s, o) => s + serviceOf(o.id), 0));
+  const selectedDiscount = round2(selectedOrders.reduce((s, o) => s + discountOf(o.id), 0));
+  const selectedMinimum = round2(selectedOrders.reduce((s, o) => s + minConsumptionFor(o.id), 0));
+  const selectedDiscountLabel = Array.from(new Set(selectedOrders.filter(o => Number(o.discount) > 0).map(o => discountLabel(o)))).join(' · ');
   const selectedCouvert = round2(selectedOrders.reduce((s, o) => s + couvertFor(o.id), 0));
   const serviceLocked = selectedOrders.some(o => o.service_fee != null);
   const couvertLocked = selectedOrders.some(o => o.id === couvertOrderId && o.couvert_total != null);
@@ -217,11 +234,16 @@ export default function Payments() {
   const cashLinesTotal = round2(lines.filter(l => l.method === 'cash').reduce((s, l) => s + (parseFloat(l.amount) || 0), 0));
   const change = hasCash && received > 0 ? round2(Math.max(0, received - cashLinesTotal)) : 0;
 
+  // divisão da conta: o próximo pagamento usa o valor da parte escolhida
+  const [splitOpen, setSplitOpen] = useState(false);
+  const [nextAmount, setNextAmount] = useState<{ amount: number; label: string } | null>(null);
   const addLine = (m: string) => {
     const rest = round2(dueNow - linesTotal);
+    const amount = nextAmount ? Math.min(nextAmount.amount, rest) : rest;
+    setNextAmount(null);
     setLines(prev => [
       ...prev,
-      { id: crypto.randomUUID(), method: m, amount: rest > 0 ? rest.toFixed(2) : '' },
+      { id: crypto.randomUUID(), method: m, amount: amount > 0 ? amount.toFixed(2) : '' },
     ]);
   };
 
@@ -263,9 +285,10 @@ export default function Payments() {
 
       // grava a taxa de serviço e o couvert da conta (ficam fixos a partir do primeiro pagamento)
       for (const o of selectedOrders) {
-        const patch: { service_fee?: number; couvert_total?: number; people_count?: number } = {};
+        const patch: { service_fee?: number; couvert_total?: number; people_count?: number; min_consumption_total?: number } = {};
         if (o.service_fee == null) patch.service_fee = serviceOf(o.id);
         if (o.id === couvertOrderId && o.couvert_total == null) { patch.couvert_total = couvertFor(o.id); patch.people_count = peopleCount; }
+        if (o.id === couvertOrderId && o.min_consumption_total == null) patch.min_consumption_total = minConsumptionFor(o.id);
         if (Object.keys(patch).length) {
           const { error } = await supabase.from('orders').update(patch).eq('id', o.id);
           if (error) throw error;
@@ -373,7 +396,17 @@ export default function Payments() {
   }
 
   const selectedTable = tables?.find(t => t.id === selectedTableId);
-  const visibleTables = (tables || []).filter(t => String(t.number).includes(search.trim()));
+  // busca por mesa ou pelo número do cartão/pulseira da comanda
+  const cardHit = search.trim() ? (openOrders || []).find(o => (o.card_code || '').toUpperCase() === search.trim().toUpperCase()) : undefined;
+  const visibleTables = (tables || []).filter(t => String(t.number).includes(search.trim()) || t.id === cardHit?.table_id);
+  const pendingCard = useRef<string | null>(null);
+  useEffect(() => {
+    if (!cardHit?.table_id) return;
+    pendingCard.current = cardHit.id;
+    setSelectedTableId(cardHit.table_id);
+    setSelectedOrderIds([cardHit.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardHit?.id]);
 
   const handlePrintReceipt = (width: '58mm' | '80mm' = '80mm') => {
     if (!selectedOrders.length) return;
@@ -386,7 +419,10 @@ export default function Payments() {
         created_at: first.created_at,
         customer_name: selectedOrders.map((o: any, i) => o.customer_name || `Comanda ${i + 1}`).join(' / '),
         table_number: selectedTable?.number ?? null,
-        total: selectedTotal,
+        total: round2(selectedTotal + selectedDiscount),
+        discount: selectedDiscount,
+        discount_label: selectedDiscountLabel,
+        min_consumption_total: selectedMinimum,
         service_fee: selectedService,
         service_label: service?.service_enabled ? `Servico (${percentLabel(service.service_percent)})` : 'Servico',
         couvert: selectedCouvert,
@@ -397,7 +433,7 @@ export default function Payments() {
       items: (items || [])
         .filter(i => selectedOrderIds.includes(i.order_id))
         .map(i => ({
-          name: (i as any).menu_items?.name || 'Item',
+          name: `${(i as any).menu_items?.name || 'Item'}${i.options_text ? ` (${i.options_text})` : ''}`,
           quantity: i.quantity,
           unit_price: Number(i.unit_price),
         })),
@@ -471,7 +507,7 @@ export default function Payments() {
                       <label className="flex min-w-0 items-center gap-2">
                         <Checkbox checked={checked} onCheckedChange={() => toggleOrder(order.id)} />
                         <span className="truncate text-sm font-semibold">
-                          {order.customer_name || `Comanda ${idx + 1}`}
+                          {order.card_code ? `#${order.card_code} · ` : ''}{order.customer_name || `Comanda ${idx + 1}`}
                         </span>
                       </label>
                       <span className="shrink-0 rounded-lg bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
@@ -490,7 +526,7 @@ export default function Payments() {
                       <ul className="space-y-1 text-sm">
                         {orderItems.map(i => (
                           <li key={i.id} className="flex justify-between gap-2">
-                            <span className="truncate">{i.quantity}x {(i as any).menu_items?.name}</span>
+                            <span className="truncate">{i.quantity}x {(i as any).menu_items?.name}{i.options_text ? ` (${i.options_text})` : ''}</span>
                             <span className="shrink-0 text-muted-foreground">
                               R$ {(Number(i.unit_price) * i.quantity).toFixed(2)}
                             </span>
@@ -538,6 +574,14 @@ export default function Payments() {
               <span>R$ {selectedCouvert.toFixed(2)}</span>
             </div>
           )}
+          {selectedMinimum > 0 && (
+            <div className="flex justify-between text-muted-foreground"><span>Consumação mínima (complemento)</span><span>R$ {selectedMinimum.toFixed(2)}</span></div>
+          )}
+          {selectedDiscount > 0 && (
+            <div className="flex justify-between gap-2 text-[hsl(var(--success))]">
+              <span className="min-w-0 truncate">Desconto · {selectedDiscountLabel}</span><span className="shrink-0">- R$ {selectedDiscount.toFixed(2)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-muted-foreground"><span>Já pago</span><span>R$ {selectedPaid.toFixed(2)}</span></div>
         </div>
 
@@ -571,7 +615,15 @@ export default function Payments() {
         </div>
 
         <div>
-          <Label className="text-xs">Adicionar forma de pagamento</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label className="text-xs">Adicionar forma de pagamento</Label>
+            <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" disabled={!selectedOrders.length || dueNow <= 0}
+              onClick={() => setSplitOpen(true)}>Dividir conta</Button>
+          </div>
+          {nextAmount && (
+            <p className="mt-1 text-xs text-primary">Próximo pagamento: R$ {nextAmount.amount.toFixed(2)} ({nextAmount.label}) — escolha a forma abaixo.
+              <button type="button" className="ml-1 underline" onClick={() => setNextAmount(null)}>cancelar</button></p>
+          )}
           <div className="mt-1.5 grid grid-cols-2 gap-2">
             {methods.map(m => (
               <button
@@ -692,7 +744,7 @@ export default function Payments() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               className="h-11 rounded-2xl pl-9"
-              placeholder="Buscar mesa..."
+              placeholder="Buscar mesa ou nº do cartão..."
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -752,6 +804,11 @@ export default function Payments() {
       </div>
 
       <aside className="hidden w-[430px] shrink-0 xl:block">{paymentPanel}</aside>
+      <SplitBillDialog open={splitOpen} onOpenChange={setSplitOpen} due={round2(dueNow - linesTotal)} total={selectedTotal} itemsTotal={selectedItems}
+        items={(items || []).filter(i => selectedOrderIds.includes(i.order_id)).map(i => ({
+          id: i.id, name: `${(i as any).menu_items?.name || 'Item'}${i.options_text ? ` (${i.options_text})` : ''}`, quantity: i.quantity, unit_price: Number(i.unit_price),
+        }))}
+        onApply={(amount, label) => setNextAmount({ amount, label })} />
 
       {restaurantId && (
         <DeliverySaleDialog

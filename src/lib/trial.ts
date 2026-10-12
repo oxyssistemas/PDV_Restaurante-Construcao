@@ -3,10 +3,11 @@ export const TRIAL_DAYS = 14;
 export const OXYS_WHATSAPP = '5543988709679';
 export const OXYS_WHATSAPP_LABEL = '(43) 98870-9679';
 
-export const trialWhatsappLink = (restaurant?: string | null, expired = false) => {
-  const text = expired
+export const trialWhatsappLink = (restaurant?: string | null, expired = false, plan?: string | null) => {
+  const base = expired
     ? `Olá! Meu teste grátis do Oxys${restaurant ? ` (${restaurant})` : ''} terminou e quero contratar um plano.`
     : `Olá! Estou testando o Oxys${restaurant ? ` (${restaurant})` : ''} e quero contratar um plano.`;
+  const text = plan ? `${base} O sistema me indicou o plano ${plan}.` : base;
   return `https://wa.me/${OXYS_WHATSAPP}?text=${encodeURIComponent(text)}`;
 };
 

@@ -15,12 +15,16 @@ import {
 } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Loader2, Pencil, Trash2, Upload, Boxes, ReceiptText } from 'lucide-react';
+import { Plus, Loader2, Pencil, Trash2, Upload, Boxes, ReceiptText, Clock } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import MenuImage, { useMenuImageUrl } from '@/components/MenuImage';
 import CmvPanel from '@/components/CmvPanel';
 import { cmvPercent, cmvTone, useCostData } from '@/lib/cmv';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
+import OptionGroupsEditor, { ScheduleEditor, loadItemOptions, saveItemOptions, type EditGroup } from '@/components/admin/OptionGroupsEditor';
+import { scheduleLabel, useMenuOptions } from '@/lib/menuOptions';
+import RodiziosPanel, { useRodizios } from '@/components/admin/RodiziosPanel';
 import {
   csosnOptions, cstOptions, isSimples, ncmSuggestions, originOptions, unitOptions, type TaxRegime,
 } from '@/lib/fiscal';
@@ -52,6 +56,7 @@ export default function MenuPage() {
         .from('menu_items')
         .select('*, menu_categories(name)')
         .eq('restaurant_id', restaurantId!)
+        .eq('is_rodizio_charge', false)
         .order('name');
       if (error) throw error;
       return data;
@@ -102,6 +107,8 @@ export default function MenuPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['menu-items'] }),
   });
 
+  const { data: rodizios } = useRodizios(restaurantId);
+  const { data: optionMap } = useMenuOptions(restaurantId);
   const isLoading = catLoading || itemsLoading;
 
   return (
@@ -115,8 +122,13 @@ export default function MenuPage() {
           <TabsList className="mb-4">
             <TabsTrigger value="items">Itens ({items?.length || 0})</TabsTrigger>
             <TabsTrigger value="categories">Categorias ({categories?.length || 0})</TabsTrigger>
+            <TabsTrigger value="rodizios">Rodízios ({rodizios?.length || 0})</TabsTrigger>
             <TabsTrigger value="cmv">Custo e margem (CMV)</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="rodizios">
+            {restaurantId && <RodiziosPanel restaurantId={restaurantId} items={items || []} />}
+          </TabsContent>
 
           <TabsContent value="cmv">
             {restaurantId && <CmvPanel restaurantId={restaurantId} />}
@@ -146,14 +158,22 @@ export default function MenuPage() {
                           <MenuImage path={item.image_url} alt={item.name} className="h-11 w-11" />
                         </TableCell>
                         <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             {item.name}
                             {(item as any).is_combo && <Badge variant="secondary">Combo</Badge>}
+                            {(optionMap?.get(item.id) ?? []).map(g => (
+                              <Badge key={g.id} variant="secondary">{g.kind === 'flavor' && g.max_select > 1 ? `Até ${g.max_select} sabores` : g.name}</Badge>
+                            ))}
+                            {scheduleLabel(item) && <Badge variant="outline" className="gap-1"><Clock className="h-3 w-3" />{scheduleLabel(item)}</Badge>}
+                            {(item.rodizio_ids ?? []).map(id => {
+                              const r = rodizios?.find(x => x.id === id);
+                              return r ? <Badge key={id} variant="outline" className="border-primary/50 text-primary">Rodízio {r.name}</Badge> : null;
+                            })}
                           </div>
                           {item.description && <div className="text-xs text-muted-foreground truncate max-w-[200px]">{item.description}</div>}
                         </TableCell>
                         <TableCell>{(item as any).menu_categories?.name || '—'}</TableCell>
-                        <TableCell>R$ {Number(item.price).toFixed(2)}</TableCell>
+                        <TableCell>R$ {Number(item.price).toFixed(2)}{(item as any).sold_by_weight ? '/kg' : ''}</TableCell>
                         <TableCell>
                           <Switch
                             checked={item.available}
@@ -294,6 +314,9 @@ function ItemDialog({
   const [categoryId, setCategoryId] = useState(editItem?.category_id || '');
   const [imagePath, setImagePath] = useState<string | null>(editItem?.image_url || null);
   const [isCombo, setIsCombo] = useState<boolean>(!!editItem?.is_combo);
+  const [byWeight, setByWeight] = useState<boolean>(!!editItem?.sold_by_weight);
+  const [rodizioIds, setRodizioIds] = useState<string[]>(editItem?.rodizio_ids ?? []);
+  const { data: rodizios } = useRodizios(restaurantId);
   const [ncm, setNcm] = useState(editItem?.ncm || '');
   const [cfop, setCfop] = useState(editItem?.cfop || '');
   const [csosn, setCsosn] = useState(editItem?.csosn || '');
@@ -302,6 +325,12 @@ function ItemDialog({
   const [ifoodProductId, setIfoodProductId] = useState(editItem?.ifood_product_id || '');
   const [ingredients, setIngredients] = useState<IngRow[]>([]);
   const [components, setComponents] = useState<CompRow[]>([]);
+  const [optionGroups, setOptionGroups] = useState<EditGroup[]>([]);
+  const [schedule, setSchedule] = useState({
+    days: (editItem?.available_days ?? []) as number[],
+    from: editItem?.available_from?.slice(0, 5) ?? '',
+    to: editItem?.available_to?.slice(0, 5) ?? '',
+  });
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
@@ -317,6 +346,7 @@ function ItemDialog({
       ]);
       setIngredients((ings || []).map(i => ({ inventory_id: i.inventory_id, quantity: String(Number(i.quantity)) })));
       setComponents((comps || []).map(c => ({ component_item_id: c.component_item_id, quantity: String(Number(c.quantity)) })));
+      setOptionGroups(await loadItemOptions(editItem.id));
       return true;
     },
   });
@@ -379,6 +409,11 @@ function ItemDialog({
       category_id: categoryId || null,
       image_url: imagePath,
       is_combo: isCombo,
+      sold_by_weight: byWeight,
+      rodizio_ids: rodizioIds,
+      available_days: schedule.days,
+      available_from: schedule.from && schedule.to ? schedule.from : null,
+      available_to: schedule.from && schedule.to ? schedule.to : null,
       restaurant_id: restaurantId,
       ncm: ncm.replace(/\D/g, '') || null,
       cfop: cfop.replace(/\D/g, '') || null,
@@ -425,7 +460,14 @@ function ItemDialog({
       if (compError) toast({ title: 'Erro no combo', description: compError.message, variant: 'destructive' });
     }
 
+    try {
+      await saveItemOptions(restaurantId, itemId, optionGroups);
+    } catch (e) {
+      toast({ title: 'Erro nas opções do prato', description: (e as Error).message, variant: 'destructive' });
+    }
+
     queryClient.invalidateQueries({ queryKey: ['menu-items'] });
+    queryClient.invalidateQueries({ queryKey: ['menu-options'] });
     queryClient.invalidateQueries({ queryKey: ['cmv-data'] });
     queryClient.invalidateQueries({ queryKey: ['item-composition'] });
     queryClient.invalidateQueries({ queryKey: ['fiscal-items-missing-ncm'] });
@@ -433,7 +475,8 @@ function ItemDialog({
     setOpen(false);
     if (!editItem) {
       setName(''); setDescription(''); setPrice(''); setCategoryId(''); setImagePath(null);
-      setIsCombo(false); setIngredients([]); setComponents([]);
+      setIsCombo(false); setIngredients([]); setComponents([]); setRodizioIds([]); setOptionGroups([]);
+      setSchedule({ days: [], from: '', to: '' });
       setNcm(''); setCfop(''); setCsosn(''); setOrigin(''); setCommercialUnit('');
     }
     setLoading(false);
@@ -486,6 +529,37 @@ function ItemDialog({
             </div>
             <Switch checked={isCombo} onCheckedChange={setIsCombo} />
           </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div>
+              <Label className="text-sm font-medium">Vendido por quilo (balança)</Label>
+              <p className="text-xs text-muted-foreground">O preço vira o valor do kg. O garçom e o caixa pesam na hora (digitando ou lendo a balança).</p>
+            </div>
+            <Switch checked={byWeight} onCheckedChange={setByWeight} />
+          </div>
+
+          {!!rodizios?.length && (
+            <div className="space-y-2 rounded-lg border p-3">
+              <div>
+                <Label className="text-sm font-medium">Faz parte do rodízio</Label>
+                <p className="text-xs text-muted-foreground">
+                  Na mesa em rodízio este prato aparece no QR/tablet sem cobrar. Fora do rodízio ele continua com o preço normal.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {rodizios.map(r => {
+                  const on = rodizioIds.includes(r.id);
+                  return (
+                    <label key={r.id} className={cn('flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm',
+                      on ? 'border-primary bg-primary/10' : 'border-border')}>
+                      <Checkbox checked={on} onCheckedChange={v => setRodizioIds(ids => v ? [...ids, r.id] : ids.filter(x => x !== r.id))} />
+                      Rodízio {r.name}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Nome *</Label>
@@ -603,6 +677,11 @@ function ItemDialog({
               {recipeSummary}
             </div>
           )}
+
+          <OptionGroupsEditor groups={optionGroups} onChange={setOptionGroups} allItems={allItems}
+            itemId={editItem?.id} basePrice={Number(price) || 0} />
+
+          <ScheduleEditor days={schedule.days} from={schedule.from} to={schedule.to} onChange={setSchedule} />
 
           <div className="space-y-2 rounded-lg border p-3">
             <Label className="text-sm font-medium">Código do produto no iFood</Label>

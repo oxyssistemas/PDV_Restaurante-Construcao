@@ -168,7 +168,7 @@ function ProductCodes({ restaurantId, channels }: { restaurantId: string; channe
   const { data: items } = useQuery({
     queryKey: ['marketplace-codes', restaurantId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('menu_items').select('id, name, external_codes').eq('restaurant_id', restaurantId).order('name');
+      const { data, error } = await supabase.from('menu_items').select('id, name, external_codes').eq('restaurant_id', restaurantId).eq('is_rodizio_charge', false).order('name');
       if (error) throw error;
       return data;
     },

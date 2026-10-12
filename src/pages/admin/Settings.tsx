@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import AsaasCard from '@/components/admin/AsaasCard';
+import BookingSettingsCard from '@/components/admin/BookingSettingsCard';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -93,6 +95,8 @@ export default function SettingsPage() {
       </Card>
 
       {restaurantId && <FeatureGate feature="service_fee" fallback={null}><ServiceChargeCard restaurantId={restaurantId} /></FeatureGate>}
+      {restaurantId && <FeatureGate feature="reservations" fallback={null}><BookingSettingsCard restaurantId={restaurantId} /></FeatureGate>}
+      {restaurantId && <FeatureGate feature="crm" fallback={null}><AsaasCard restaurantId={restaurantId} /></FeatureGate>}
 
       {restaurantId && (
         <PrintersCard restaurantId={restaurantId} />

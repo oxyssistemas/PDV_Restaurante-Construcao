@@ -4,12 +4,14 @@ import { Clock3, LogOut, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTrial } from '@/hooks/useTrial';
+import { useTrial, useTrialSuggestion } from '@/hooks/useTrial';
+import TrialSuggestion from '@/components/TrialSuggestion';
 import { OXYS_WHATSAPP_LABEL, trialWhatsappLink } from '@/lib/trial';
 
 /** Fim do teste grátis: a loja para e o login mostra só o contato para contratar um plano. */
 export default function TrialGate({ children }: { children: ReactNode }) {
   const { trial } = useTrial();
+  const { data: suggestion } = useTrialSuggestion(trial?.restaurant_id);
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const [now, setNow] = useState(Date.now());
@@ -40,8 +42,9 @@ export default function TrialGate({ children }: { children: ReactNode }) {
               Seus dados continuam guardados: fale com a Oxys para escolher um plano e voltar a usar na hora.
             </p>
           </div>
+          <TrialSuggestion suggestion={suggestion} />
           <Button asChild className="h-11 w-full gap-2 bg-[#25d366] text-base font-semibold text-white hover:bg-[#1ebe5b]">
-            <a href={trialWhatsappLink(trial!.name, true)} target="_blank" rel="noreferrer">
+            <a href={trialWhatsappLink(trial!.name, true, suggestion?.plan?.name)} target="_blank" rel="noreferrer">
               <MessageCircle className="h-5 w-5" /> Falar no WhatsApp {OXYS_WHATSAPP_LABEL}
             </a>
           </Button>

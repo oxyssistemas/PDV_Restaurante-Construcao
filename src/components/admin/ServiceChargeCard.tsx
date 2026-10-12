@@ -20,6 +20,7 @@ export default function ServiceChargeCard({ restaurantId }: { restaurantId: stri
   const [form, setForm] = useState({
     service_enabled: false, service_percent: '10', service_on_delivery: false,
     couvert_enabled: false, couvert_amount: '0', couvert_label: 'Couvert artístico',
+    min_consumption_enabled: false, min_consumption_amount: '0', waiter_commission_percent: '0', waiter_commission_base: 'service',
   });
 
   useEffect(() => {
@@ -28,6 +29,8 @@ export default function ServiceChargeCard({ restaurantId }: { restaurantId: stri
       service_enabled: settings.service_enabled, service_percent: String(settings.service_percent),
       service_on_delivery: settings.service_on_delivery, couvert_enabled: settings.couvert_enabled,
       couvert_amount: String(settings.couvert_amount), couvert_label: settings.couvert_label,
+      min_consumption_enabled: settings.min_consumption_enabled, min_consumption_amount: String(settings.min_consumption_amount ?? 0),
+      waiter_commission_percent: String(settings.waiter_commission_percent ?? 0), waiter_commission_base: settings.waiter_commission_base ?? 'service',
     });
   }, [settings]);
 
@@ -37,10 +40,16 @@ export default function ServiceChargeCard({ restaurantId }: { restaurantId: stri
       const amount = Number(form.couvert_amount.replace(',', '.'));
       if (!(percent >= 0 && percent <= 30)) throw new Error('A taxa de serviço deve ficar entre 0% e 30%.');
       if (!(amount >= 0)) throw new Error('Valor do couvert inválido.');
+      const minimum = Number(form.min_consumption_amount.replace(',', '.'));
+      const commission = Number(form.waiter_commission_percent.replace(',', '.'));
+      if (!(minimum >= 0)) throw new Error('Valor da consumação mínima inválido.');
+      if (!(commission >= 0 && commission <= 100)) throw new Error('A comissão deve ficar entre 0% e 100%.');
       const { error } = await supabase.from('service_settings').upsert({
         restaurant_id: restaurantId, service_enabled: form.service_enabled, service_percent: percent,
         service_on_delivery: form.service_on_delivery, couvert_enabled: form.couvert_enabled, couvert_amount: amount,
         couvert_label: form.couvert_label.trim() || 'Couvert', updated_by: user?.id ?? null,
+        min_consumption_enabled: form.min_consumption_enabled, min_consumption_amount: minimum,
+        waiter_commission_percent: commission, waiter_commission_base: form.waiter_commission_base,
       });
       if (error) throw error;
       await logAudit({
@@ -101,6 +110,41 @@ export default function ServiceChargeCard({ restaurantId }: { restaurantId: stri
                   </p>
                 </div>
               )}
+            </div>
+
+            <div className="space-y-3 rounded-xl border border-border p-4">
+              <label className="flex items-center justify-between gap-3">
+                <span className="font-medium">Consumação mínima por pessoa</span>
+                <Switch checked={form.min_consumption_enabled} onCheckedChange={v => setForm({ ...form, min_consumption_enabled: v })} />
+              </label>
+              {form.min_consumption_enabled && (
+                <div className="max-w-[220px] space-y-1.5">
+                  <Label>Mínimo por pessoa (R$)</Label>
+                  <Input type="number" min="0" step="1" value={form.min_consumption_amount}
+                    onChange={e => setForm({ ...form, min_consumption_amount: e.target.value })} />
+                  <p className="text-xs text-muted-foreground">Se a mesa consumir menos que o mínimo × pessoas, o caixa cobra a diferença.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3 rounded-xl border border-border p-4">
+              <span className="font-medium">Comissão do garçom</span>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Percentual (%)</Label>
+                  <Input type="number" min="0" max="100" step="0.5" value={form.waiter_commission_percent}
+                    onChange={e => setForm({ ...form, waiter_commission_percent: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Calculada sobre</Label>
+                  <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.waiter_commission_base}
+                    onChange={e => setForm({ ...form, waiter_commission_base: e.target.value })}>
+                    <option value="service">a taxa de serviço recebida</option>
+                    <option value="sales">o total vendido pelo garçom</option>
+                  </select>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">O valor de cada garçom aparece em Relatórios → Garçons.</p>
             </div>
 
             <Button onClick={() => save.mutate()} disabled={save.isPending} className="gap-2">

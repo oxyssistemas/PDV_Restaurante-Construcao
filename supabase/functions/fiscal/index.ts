@@ -186,14 +186,15 @@ Deno.serve(async (req) => {
       case 'emit_order': {
         const { db, user } = await authorize(req, rid, ['admin', 'finance', 'cashier']);
         const orderId = String(body.orderId ?? '');
-        const { data: order } = await db.from('orders').select('id, customer_name, total, delivery_fee').eq('id', orderId).eq('restaurant_id', rid).maybeSingle();
+        const { data: order } = await db.from('orders').select('id, customer_name, total, delivery_fee, discount').eq('id', orderId).eq('restaurant_id', rid).maybeSingle();
         if (!order) throw new HttpError(404, 'Pedido não encontrado');
         const { data: existing } = await db.from('fiscal_invoices').select('id, status').eq('order_id', orderId).neq('status', 'cancelled').maybeSingle();
         if (existing?.status === 'issued') throw new HttpError(409, 'Este pedido já tem NFC-e emitida');
         const { data: profile } = await db.from('fiscal_profiles').select('environment').eq('restaurant_id', rid).maybeSingle();
         const id = existing?.id ?? (await db.from('fiscal_invoices').insert({
           restaurant_id: rid, order_id: orderId, status: 'pending', customer_name: body.customerName || order.customer_name || 'Consumidor',
-          customer_document: body.customerDocument || null, subtotal: Number(order.total), discount: 0, total: Number(order.total),
+          customer_document: body.customerDocument || null, subtotal: Number(order.total), discount: Number(order.discount || 0),
+          total: Number(order.total) - Number(order.discount || 0),
           environment: profile?.environment ?? 'homologation', provider: provider.key, created_by: user.id,
         }).select('id').single()).data!.id;
         await db.from('fiscal_invoices').update({ status: 'pending', next_attempt_at: null, locked_until: null }).eq('id', id);

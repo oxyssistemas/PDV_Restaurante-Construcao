@@ -12,6 +12,8 @@ import Setup from "./pages/Setup";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import TableMenu from "./pages/public/TableMenu";
+import Booking from "./pages/public/Booking";
+import QueueStatus from "./pages/public/QueueStatus";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import RoleGate from "./components/RoleGate";
@@ -24,6 +26,9 @@ import Restaurants from "./pages/super-admin/Restaurants";
 import AdminLayout from "./components/layouts/AdminLayout";
 import AdminDashboard from "./pages/admin/Dashboard";
 import MenuPage from "./pages/admin/Menu";
+import PromotionsPage from "./pages/admin/Promotions";
+import PurchasesPage from "./pages/shared/PurchasesPage";
+import WhatsAppCampaigns from "./pages/marketing/WhatsAppCampaigns";
 import TablesPage from "./pages/admin/Tables";
 import InventoryPage from "./pages/admin/Inventory";
 import UsersPage from "./pages/admin/Users";
@@ -45,6 +50,7 @@ import WaiterLayout from "./components/layouts/WaiterLayout";
 import TableMap from "./pages/waiter/TableMap";
 import WaiterOrders from "./pages/waiter/Orders";
 import OrderDetail from "./pages/waiter/OrderDetail";
+import Waitlist from "./pages/waiter/Waitlist";
 import WaiterMenu from "./pages/waiter/WaiterMenu";
 import WaiterReservations from "./pages/waiter/Reservations";
 
@@ -63,6 +69,7 @@ import FinanceReports from "./pages/finance/Reports";
 import FinanceInventory from "./pages/finance/Inventory";
 
 import DeliveryLayout from "./components/layouts/DeliveryLayout";
+import DeliveryMap from "./pages/delivery/DeliveryMap";
 import DeliveryOrders from "./pages/delivery/DeliveryOrders";
 import NewDelivery from "./pages/delivery/NewDelivery";
 import StoreSettings from "./pages/delivery/StoreSettings";
@@ -84,7 +91,6 @@ import HrPage from "./pages/shared/HrPage";
 import DrePage from "./pages/shared/DrePage";
 import LoyaltyPage from "./pages/shared/LoyaltyPage";
 import BrandingPage from "./pages/shared/BrandingPage";
-import AssistantPage from "./pages/shared/AssistantPage";
 import PlansPage from "./pages/super-admin/Plans";
 import MarketingLayout from "./components/layouts/MarketingLayout";
 import IfoodPage from "./pages/shared/IfoodPage";
@@ -96,6 +102,7 @@ import PrintStation from "./pages/PrintStation";
 import PrintStationRunner from "./components/print/PrintStationRunner";
 import NativeShell from "./components/NativeShell";
 import OfflineBanner from "./components/OfflineBanner";
+import OxyGuide from "./components/oxy/OxyGuide";
 import DedicatedGate from "./components/DedicatedGate";
 import Terms from "./pages/legal/Terms";
 import MarketingPosts from "./pages/marketing/Posts";
@@ -118,6 +125,7 @@ const App = () => (
           <PrintStationRunner />
           <NativeShell />
           <OfflineBanner />
+          <OxyGuide />
           <DedicatedGate>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -125,6 +133,8 @@ const App = () => (
             <Route path="/setup" element={<Setup />} />
             <Route path="/" element={<Index />} />
             <Route path="/mesa/:token" element={<TableMenu />} />
+            <Route path="/reservar/:slug" element={<Booking />} />
+            <Route path="/fila/:token" element={<QueueStatus />} />
             <Route path="/pedir/:slug" element={<OnlineStore />} />
             <Route path="/pedir/:slug/pedido/:orderId" element={<OrderTracking />} />
             <Route path="/avaliar/:token" element={<ReviewOrder />} />
@@ -154,13 +164,16 @@ const App = () => (
               <Route path="crm" element={<ModuleGate module="crm"><CrmPage /></ModuleGate>} />
               <Route path="menu" element={<ModuleGate module="menu"><MenuPage /></ModuleGate>} />
               <Route path="tables" element={<ModuleGate module="tables"><TablesPage /></ModuleGate>} />
+              <Route path="fila" element={<ModuleGate module="tables"><FeatureGate feature="reservations"><Waitlist /></FeatureGate></ModuleGate>} />
               <Route path="inventory" element={<ModuleGate module="inventory"><InventoryPage /></ModuleGate>} />
+              <Route path="compras" element={<ModuleGate module="inventory"><PurchasesPage /></ModuleGate>} />
               <Route path="users" element={<ModuleGate module="users"><UsersPage /></ModuleGate>} />
               <Route path="branches" element={<ModuleGate module="branches"><BranchesPage /></ModuleGate>} />
               <Route path="network" element={<ModuleGate module="network"><NetworkPage /></ModuleGate>} />
               <Route path="stock-counts" element={<ModuleGate module="stock_counts"><StockCountsPage /></ModuleGate>} />
               <Route path="stock-counts/:id" element={<ModuleGate module="stock_counts"><StockCountDetailPage /></ModuleGate>} />
               <Route path="reviews" element={<ModuleGate module="reviews"><ReviewsPage /></ModuleGate>} />
+              <Route path="promotions" element={<ModuleGate module="promotions"><PromotionsPage /></ModuleGate>} />
               <Route path="accountant" element={<ModuleGate module="accountant"><AccountantPage /></ModuleGate>} />
               <Route path="kiosks" element={<ModuleGate module="kiosks"><KiosksPage /></ModuleGate>} />
               <Route path="permissions" element={<RoleGate roles={['admin']}><FeatureGate feature="permissions"><PermissionsPage /></FeatureGate></RoleGate>} />
@@ -169,11 +182,11 @@ const App = () => (
               <Route path="dre" element={<ModuleGate module="dre"><DrePage /></ModuleGate>} />
               <Route path="loyalty" element={<ModuleGate module="loyalty"><LoyaltyPage /></ModuleGate>} />
               <Route path="branding" element={<ModuleGate module="branding"><BrandingPage /></ModuleGate>} />
-              <Route path="assistant" element={<ModuleGate module="ai"><AssistantPage /></ModuleGate>} />
 
               <Route path="delivery" element={<DeliveryHub />}>
                 <Route index element={<ModuleGate module="delivery"><DeliveryOverview /></ModuleGate>} />
                 <Route path="pedidos" element={<ModuleGate module="delivery"><DeliveryOrders readOnly /></ModuleGate>} />
+                <Route path="mapa" element={<ModuleGate module="delivery"><DeliveryMap /></ModuleGate>} />
                 <Route path="loja" element={<ModuleGate module="online_store"><StoreSettings /></ModuleGate>} />
                 <Route path="whatsapp" element={<ModuleGate module="whatsapp"><WhatsAppBot /></ModuleGate>} />
                 <Route path="ifood" element={<ModuleGate module="ifood"><IfoodPage /></ModuleGate>} />
@@ -203,6 +216,7 @@ const App = () => (
               <Route path="posts" element={<MarketingPosts />} />
               <Route path="connections" element={<MarketingConnections />} />
               <Route path="campaigns" element={<MarketingCampaigns />} />
+              <Route path="whatsapp" element={<WhatsAppCampaigns />} />
             </Route>
 
 
@@ -217,6 +231,7 @@ const App = () => (
               <Route path="orders/:orderId" element={<OrderDetail />} />
               <Route path="menu" element={<WaiterMenu />} />
               <Route path="reservations" element={<FeatureGate feature="reservations"><WaiterReservations /></FeatureGate>} />
+              <Route path="fila" element={<FeatureGate feature="reservations"><Waitlist /></FeatureGate>} />
             </Route>
             <Route path="/kitchen" element={
               <ProtectedRoute allowedRoles={['kitchen']}>
@@ -246,6 +261,7 @@ const App = () => (
               <Route path="crm" element={<ModuleGate module="crm"><FinanceCrmPage /></ModuleGate>} />
               <Route path="reports" element={<ModuleGate module="reports"><FinanceReports /></ModuleGate>} />
               <Route path="inventory" element={<ModuleGate module="inventory"><FinanceInventory /></ModuleGate>} />
+              <Route path="compras" element={<ModuleGate module="inventory"><PurchasesPage /></ModuleGate>} />
               <Route path="history" element={<ModuleGate module="history"><OrdersHistory /></ModuleGate>} />
               <Route path="stock-counts" element={<ModuleGate module="stock_counts"><StockCountsPage /></ModuleGate>} />
               <Route path="stock-counts/:id" element={<ModuleGate module="stock_counts"><StockCountDetailPage /></ModuleGate>} />
@@ -265,6 +281,7 @@ const App = () => (
             }>
               <Route index element={<ModuleGate module="delivery"><DeliveryOrders /></ModuleGate>} />
               <Route path="new" element={<ModuleGate module="delivery"><NewDelivery /></ModuleGate>} />
+              <Route path="mapa" element={<ModuleGate module="delivery"><DeliveryMap /></ModuleGate>} />
               <Route path="ifood" element={<ModuleGate module="ifood"><IfoodPage /></ModuleGate>} />
               <Route path="loja" element={<ModuleGate module="online_store"><StoreSettings /></ModuleGate>} />
               <Route path="whatsapp" element={<ModuleGate module="whatsapp"><WhatsAppBot /></ModuleGate>} />

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { pushIfoodStatus } from '@/lib/ifood';
@@ -9,7 +9,8 @@ import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { courierStatusClasses, courierStatusLabels, courierDotClass, navigationUrl, telUrl } from '@/lib/delivery';
+import { courierStatusClasses, courierStatusLabels, courierDotClass, navigationUrl, routeUrl, telUrl } from '@/lib/delivery';
+import { Route as RouteIcon, Satellite } from 'lucide-react';
 
 export default function MyDeliveries() {
   const { user } = useAuth();
@@ -36,12 +37,13 @@ export default function MyDeliveries() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('*, order_items(id, quantity, unit_price, status, menu_items(name))')
+        .select('*, order_items(id, quantity, unit_price, status, notes, options_text, menu_items(name))')
         .eq('courier_id', courier!.id)
         .in('delivery_status', ['pending', 'preparing', 'out_for_delivery'])
         .order('created_at', { ascending: true });
       if (error) throw error;
-      return data || [];
+      // ordem da rota montada pelo delivery (quando houver)
+      return (data || []).sort((a, b) => (a.route_seq ?? 999) - (b.route_seq ?? 999));
     },
   });
 
@@ -59,6 +61,24 @@ export default function MyDeliveries() {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [courier?.id, queryClient]);
+
+  // localização ao vivo para o mapa do delivery, enquanto houver entrega na rua
+  const onRoute = courier?.status === 'on_route' || (orders || []).some(o => o.delivery_status === 'out_for_delivery');
+  const [gps, setGps] = useState<'off' | 'on' | 'denied'>('off');
+  const lastSent = useRef(0);
+  useEffect(() => {
+    if (!courier?.id || !onRoute || !('geolocation' in navigator)) { setGps('off'); return; }
+    const id = navigator.geolocation.watchPosition(async pos => {
+      setGps('on');
+      if (Date.now() - lastSent.current < 15_000) return;
+      lastSent.current = Date.now();
+      await supabase.from('courier_locations').upsert({
+        courier_id: courier.id, restaurant_id: courier.restaurant_id, lat: pos.coords.latitude, lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy, heading: pos.coords.heading, speed: pos.coords.speed, updated_at: new Date().toISOString(),
+      });
+    }, () => setGps('denied'), { enableHighAccuracy: true, maximumAge: 10_000, timeout: 30_000 });
+    return () => navigator.geolocation.clearWatch(id);
+  }, [courier?.id, courier?.restaurant_id, onRoute]);
 
   const setOrderStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -126,6 +146,24 @@ export default function MyDeliveries() {
         </Button>
       </div>
 
+      {onRoute && (
+        <div className={cn('flex items-center gap-2 rounded-xl border px-3 py-2 text-xs',
+          gps === 'denied' ? 'border-destructive/40 text-destructive' : 'border-border text-muted-foreground')}>
+          <Satellite className="h-4 w-4 shrink-0" />
+          {gps === 'on' ? 'Sua localização está aparecendo no mapa do delivery.'
+            : gps === 'denied' ? 'Libere a localização do celular para a loja acompanhar a entrega.'
+            : 'Ligando a localização…'}
+        </div>
+      )}
+
+      {(orders?.length ?? 0) > 1 && routeUrl(orders!.map(o => ({ id: o.id, lat: o.delivery_lat, lng: o.delivery_lng, address: o.customer_address }))) && (
+        <Button asChild variant="outline" className="w-full gap-2">
+          <a href={routeUrl(orders!.map(o => ({ id: o.id, lat: o.delivery_lat, lng: o.delivery_lng, address: o.customer_address })))!} target="_blank" rel="noopener noreferrer">
+            <RouteIcon className="h-4 w-4" /> Abrir rota com todas as entregas ({orders!.length})
+          </a>
+        </Button>
+      )}
+
       {!orders?.length ? (
         <div className="py-16 text-center text-muted-foreground">
           <Bike className="mx-auto mb-4 h-16 w-16 opacity-30" />
@@ -140,7 +178,7 @@ export default function MyDeliveries() {
             return (
               <div key={o.id} className="rounded-2xl border border-border bg-card p-4">
                 <div className="flex items-start justify-between gap-2">
-                  <span className="truncate font-semibold">{o.customer_name || 'Cliente'}</span>
+                  <span className="truncate font-semibold">{o.route_seq ? `${o.route_seq}º · ` : ''}{o.customer_name || 'Cliente'}</span>
                   <span className="shrink-0 text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(o.created_at), { addSuffix: true, locale: ptBR })}
                   </span>
@@ -167,13 +205,13 @@ export default function MyDeliveries() {
 
                 <ul className="mt-3 space-y-0.5 text-xs text-muted-foreground">
                   {items.map((i: any) => (
-                    <li key={i.id}>{i.quantity}x {i.menu_items?.name}</li>
+                    <li key={i.id}>{i.quantity}x {i.menu_items?.name}{i.options_text ? ` (${i.options_text})` : ''}</li>
                   ))}
                 </ul>
 
                 <div className="mt-3 flex items-center justify-between text-sm font-bold">
                   <span>Total</span>
-                  <span>R$ {(Number(o.total) + Number(o.delivery_fee || 0)).toFixed(2)}</span>
+                  <span>R$ {(Number(o.total) + Number(o.delivery_fee || 0) - Number(o.discount || 0)).toFixed(2)}</span>
                 </div>
 
                 <div className="mt-3 flex gap-2">

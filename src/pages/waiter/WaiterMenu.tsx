@@ -25,7 +25,7 @@ export default function WaiterMenu() {
     queryKey: ['waiter-menu', restaurantId],
     enabled: !!restaurantId,
     queryFn: async () => {
-      const { data } = await supabase.from('menu_items').select('*').eq('restaurant_id', restaurantId!).order('name');
+      const { data } = await supabase.from('menu_items').select('*').eq('restaurant_id', restaurantId!).eq('is_rodizio_charge', false).order('name');
       return data || [];
     },
   });

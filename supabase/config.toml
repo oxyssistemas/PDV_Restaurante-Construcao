@@ -36,3 +36,9 @@ verify_jwt = false
 
 [functions.marketplace-webhook]
 verify_jwt = false
+
+[functions.public-booking]
+verify_jwt = false
+
+[functions.asaas]
+verify_jwt = false
